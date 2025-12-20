@@ -11,20 +11,18 @@ public struct GeminiUsageProbe: UsageProbePort {
 
     private let homeDirectory: String
     private let timeout: TimeInterval
-    private let dataLoader: @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    private let networkClient: any NetworkClient
 
     private static let credentialsPath = "/.gemini/oauth_creds.json"
 
     public init(
         homeDirectory: String = NSHomeDirectory(),
         timeout: TimeInterval = 10.0,
-        dataLoader: @escaping @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
-            try await URLSession.shared.data(for: request)
-        }
+        networkClient: any NetworkClient = URLSessionNetworkClient()
     ) {
         self.homeDirectory = homeDirectory
         self.timeout = timeout
-        self.dataLoader = dataLoader
+        self.networkClient = networkClient
     }
 
     public func isAvailable() async -> Bool {
@@ -48,7 +46,7 @@ public struct GeminiUsageProbe: UsageProbePort {
             let apiProbe = GeminiAPIProbe(
                 homeDirectory: homeDirectory,
                 timeout: timeout,
-                networkClient: dataLoader
+                networkClient: networkClient
             )
             return try await apiProbe.probe()
         }

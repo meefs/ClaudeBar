@@ -4,7 +4,6 @@ import Mockable
 @testable import Infrastructure
 @testable import Domain
 
-
 @Suite
 struct GeminiAPIProbeTests {
     
@@ -34,12 +33,12 @@ struct GeminiAPIProbeTests {
     @Test
     func `probe fails when credentials missing`() async throws {
         let homeDir = try makeTemporaryHomeDirectory()
-        let mockService = MockNetworkService()
+        let mockService = MockNetworkClient()
         
         let probe = GeminiAPIProbe(
             homeDirectory: homeDir.path,
             timeout: 1.0,
-            networkClient: { try await mockService.request($0) }
+            networkClient: mockService
         )
         
         await #expect(throws: ProbeError.authenticationRequired) {
@@ -51,7 +50,7 @@ struct GeminiAPIProbeTests {
     func `probe discovers project id and fetches quota`() async throws {
         let homeDir = try makeTemporaryHomeDirectory()
         try createCredentialsFile(in: homeDir)
-        let mockService = MockNetworkService()
+        let mockService = MockNetworkClient()
         
         // Setup mocks
         let projectsResponse = """
@@ -88,7 +87,7 @@ struct GeminiAPIProbeTests {
         let probe = GeminiAPIProbe(
             homeDirectory: homeDir.path,
             timeout: 1.0,
-            networkClient: { try await mockService.request($0) }
+            networkClient: mockService
         )
         
         let snapshot = try await probe.probe()
@@ -119,7 +118,7 @@ struct GeminiAPIProbeTests {
     func `probe handles api error gracefully`() async throws {
         let homeDir = try makeTemporaryHomeDirectory()
         try createCredentialsFile(in: homeDir)
-        let mockService = MockNetworkService()
+        let mockService = MockNetworkClient()
         
         given(mockService)
             .request(.any)
@@ -130,7 +129,7 @@ struct GeminiAPIProbeTests {
         let probe = GeminiAPIProbe(
             homeDirectory: homeDir.path,
             timeout: 1.0,
-            networkClient: { try await mockService.request($0) }
+            networkClient: mockService
         )
         
         await #expect(throws: ProbeError.executionFailed("HTTP 500")) {

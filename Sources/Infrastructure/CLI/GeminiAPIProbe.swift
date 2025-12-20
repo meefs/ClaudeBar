@@ -7,7 +7,7 @@ private let logger = Logger(subsystem: "com.claudebar", category: "GeminiAPIProb
 internal struct GeminiAPIProbe {
     private let homeDirectory: String
     private let timeout: TimeInterval
-    private let networkClient: @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    private let networkClient: any NetworkClient
 
     private static let quotaEndpoint = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota"
     private static let credentialsPath = "/.gemini/oauth_creds.json"
@@ -15,7 +15,7 @@ internal struct GeminiAPIProbe {
     init(
         homeDirectory: String,
         timeout: TimeInterval,
-        networkClient: @escaping @Sendable (URLRequest) async throws -> (Data, URLResponse)
+        networkClient: any NetworkClient
     ) {
         self.homeDirectory = homeDirectory
         self.timeout = timeout
@@ -31,6 +31,7 @@ internal struct GeminiAPIProbe {
             throw ProbeError.authenticationRequired
         }
 
+        // Discover the Gemini project ID for accurate quota data
         let repository = GeminiProjectRepository(networkClient: networkClient, timeout: timeout)
         let projectId = await repository.fetchBestProject(accessToken: accessToken)?.projectId
 
@@ -51,7 +52,7 @@ internal struct GeminiAPIProbe {
         }
         request.timeoutInterval = timeout
 
-        let (data, response) = try await networkClient(request)
+        let (data, response) = try await networkClient.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw ProbeError.executionFailed("Invalid response")
@@ -74,7 +75,7 @@ internal struct GeminiAPIProbe {
             logger.debug("Gemini API response:\n\(jsonString)")
         }
 
-        let snapshot = try parseAPIResponse(data)
+        let snapshot = try mapToSnapshot(data)
         logger.info("Gemini API probe success: \(snapshot.quotas.count) quotas found")
         for quota in snapshot.quotas {
             logger.info("  - \(quota.quotaType.displayName): \(Int(quota.percentRemaining))% remaining")
@@ -83,7 +84,7 @@ internal struct GeminiAPIProbe {
         return snapshot
     }
 
-    private func parseAPIResponse(_ data: Data) throws -> UsageSnapshot {
+    private func mapToSnapshot(_ data: Data) throws -> UsageSnapshot {
         let decoder = JSONDecoder()
         let response = try decoder.decode(QuotaResponse.self, from: data)
 

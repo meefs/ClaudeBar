@@ -36,10 +36,12 @@ let package = Package(
             name: "Infrastructure",
             dependencies: [
                 "Domain",
+                .product(name: "Mockable", package: "Mockable"),
             ],
             path: "Sources/Infrastructure",
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
+                .define("MOCKING", .when(configuration: .debug)),
             ]
         ),
 

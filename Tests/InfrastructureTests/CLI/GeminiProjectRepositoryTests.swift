@@ -8,13 +8,13 @@ struct GeminiProjectRepositoryTests {
     
     @Test
     func `fetchProjects returns nil when network fails`() async throws {
-        let mockService = MockNetworkService()
+        let mockService = MockNetworkClient()
         given(mockService)
             .request(.any)
             .willProduce { _ in throw URLError(.notConnectedToInternet) }
         
         let repository = GeminiProjectRepository(
-            networkClient: { try await mockService.request($0) },
+            networkClient: mockService,
             timeout: 1.0
         )
         
@@ -24,7 +24,7 @@ struct GeminiProjectRepositoryTests {
     
     @Test
     func `fetchProjects parses projects and returns collection`() async throws {
-        let mockService = MockNetworkService()
+        let mockService = MockNetworkClient()
         let json = """
         {
             "projects": [
@@ -39,7 +39,7 @@ struct GeminiProjectRepositoryTests {
             .willReturn((json, HTTPURLResponse(url: URL(string: "http://x")!, statusCode: 200, httpVersion: nil, headerFields: nil)!))
         
         let repository = GeminiProjectRepository(
-            networkClient: { try await mockService.request($0) },
+            networkClient: mockService,
             timeout: 1.0
         )
         
@@ -51,7 +51,7 @@ struct GeminiProjectRepositoryTests {
     
     @Test
     func `fetchBestProject returns correct project`() async throws {
-        let mockService = MockNetworkService()
+        let mockService = MockNetworkClient()
         let json = """
         {
             "projects": [
@@ -66,7 +66,7 @@ struct GeminiProjectRepositoryTests {
             .willReturn((json, HTTPURLResponse(url: URL(string: "http://x")!, statusCode: 200, httpVersion: nil, headerFields: nil)!))
         
         let repository = GeminiProjectRepository(
-            networkClient: { try await mockService.request($0) },
+            networkClient: mockService,
             timeout: 1.0
         )
         

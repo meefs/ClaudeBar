@@ -2,12 +2,12 @@ import Foundation
 import Domain
 
 internal struct GeminiProjectRepository {
-    private let networkClient: @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    private let networkClient: any NetworkClient
     private let timeout: TimeInterval
     private static let projectsEndpoint = "https://cloudresourcemanager.googleapis.com/v1/projects"
 
     init(
-        networkClient: @escaping @Sendable (URLRequest) async throws -> (Data, URLResponse),
+        networkClient: any NetworkClient,
         timeout: TimeInterval
     ) {
         self.networkClient = networkClient
@@ -28,7 +28,7 @@ internal struct GeminiProjectRepository {
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = timeout
 
-        guard let (data, response) = try? await networkClient(request),
+        guard let (data, response) = try? await networkClient.request(request),
               let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
             return nil
