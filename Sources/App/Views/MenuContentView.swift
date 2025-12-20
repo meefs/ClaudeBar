@@ -266,6 +266,9 @@ struct MenuContentView: View {
     // MARK: - Actions
 
     private func refresh() async {
+        // Guard against concurrent refreshes
+        guard !appState.isRefreshing else { return }
+
         appState.isRefreshing = true
         defer { appState.isRefreshing = false }
 
