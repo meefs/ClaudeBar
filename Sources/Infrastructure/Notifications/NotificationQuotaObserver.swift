@@ -5,16 +5,20 @@ import Domain
 /// Infrastructure adapter that sends macOS notifications when quota status changes.
 /// Implements QuotaObserverPort from the domain layer.
 public final class NotificationQuotaObserver: QuotaObserverPort, @unchecked Sendable {
-    private let notificationCenter: UNUserNotificationCenter
-
-    public init(notificationCenter: UNUserNotificationCenter = .current()) {
-        self.notificationCenter = notificationCenter
+    /// Lazily initialized notification center to avoid bundle issues during init
+    private var notificationCenter: UNUserNotificationCenter? {
+        // Only access notification center when running in a proper app context
+        guard Bundle.main.bundleIdentifier != nil else { return nil }
+        return UNUserNotificationCenter.current()
     }
+
+    public init() {}
 
     /// Requests notification permission from the user
     public func requestPermission() async -> Bool {
+        guard let center = notificationCenter else { return false }
         do {
-            return try await notificationCenter.requestAuthorization(options: [.alert, .sound, .badge])
+            return try await center.requestAuthorization(options: [.alert, .sound, .badge])
         } catch {
             return false
         }
@@ -47,8 +51,9 @@ public final class NotificationQuotaObserver: QuotaObserverPort, @unchecked Send
             trigger: nil // Deliver immediately
         )
 
+        guard let center = notificationCenter else { return }
         do {
-            try await notificationCenter.add(request)
+            try await center.add(request)
         } catch {
             // Silently fail - notifications are non-critical
         }
@@ -72,7 +77,8 @@ public final class NotificationQuotaObserver: QuotaObserverPort, @unchecked Send
                 trigger: nil
             )
 
-            try? await notificationCenter.add(request)
+            guard let center = notificationCenter else { return }
+            try? await center.add(request)
         default:
             break
         }

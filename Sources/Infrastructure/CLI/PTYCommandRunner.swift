@@ -173,11 +173,23 @@ public struct PTYCommandRunner: Sendable {
             usleep(60000)
         }
 
+        // Final read to capture any remaining output
+        readChunk()
+
         guard let text = String(data: buffer, encoding: .utf8), !text.isEmpty else {
             throw RunError.timedOut
         }
 
-        return Result(text: text, exitCode: proc.terminationStatus)
+        // If process is still running, we timed out - cleanup will terminate it
+        let exitCode: Int32
+        if proc.isRunning {
+            // Process didn't finish in time, return -1 as exit code
+            exitCode = -1
+        } else {
+            exitCode = proc.terminationStatus
+        }
+
+        return Result(text: text, exitCode: exitCode)
     }
 
     /// Locates a binary using the which command
