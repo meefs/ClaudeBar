@@ -1,27 +1,18 @@
 import Foundation
-import UserNotifications
 import Domain
 
 /// Infrastructure adapter that sends macOS notifications when quota status changes.
 /// Implements StatusChangeObserver from the domain layer.
 public final class NotificationQuotaObserver: StatusChangeObserver, @unchecked Sendable {
-    /// Lazily initialized notification center to avoid bundle issues during init
-    private var notificationCenter: UNUserNotificationCenter? {
-        // Only access notification center when running in a proper app context
-        guard Bundle.main.bundleIdentifier != nil else { return nil }
-        return UNUserNotificationCenter.current()
-    }
+    private let notificationService: NotificationService
 
-    public init() {}
+    public init(notificationService: NotificationService? = nil) {
+        self.notificationService = notificationService ?? UserNotificationService()
+    }
 
     /// Requests notification permission from the user
     public func requestPermission() async -> Bool {
-        guard let center = notificationCenter else { return false }
-        do {
-            return try await center.requestAuthorization(options: [.alert, .sound, .badge])
-        } catch {
-            return false
-        }
+        await notificationService.requestPermission()
     }
 
     // MARK: - StatusChangeObserver
@@ -34,24 +25,15 @@ public final class NotificationQuotaObserver: StatusChangeObserver, @unchecked S
         guard shouldNotify(for: newStatus) else { return }
 
         let providerName = providerDisplayName(for: providerId)
+        let title = "\(providerName) Quota Alert"
+        let body = notificationBody(for: newStatus, providerName: providerName)
 
-        let content = UNMutableNotificationContent()
-        content.title = "\(providerName) Quota Alert"
-        content.body = notificationBody(for: newStatus, providerName: providerName)
-        content.sound = .default
-
-        // Add category for actionable notifications
-        content.categoryIdentifier = "QUOTA_ALERT"
-
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: nil // Deliver immediately
-        )
-
-        guard let center = notificationCenter else { return }
         do {
-            try await center.add(request)
+            try await notificationService.send(
+                title: title,
+                body: body,
+                categoryIdentifier: "QUOTA_ALERT"
+            )
         } catch {
             // Silently fail - notifications are non-critical
         }
