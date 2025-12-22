@@ -52,9 +52,16 @@ struct MenuContentView: View {
         .frame(width: 380)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .task {
+            // Auto-refresh active provider when menu opens
             await refresh()
             withAnimation(.easeOut(duration: 0.6)) {
                 animateIn = true
+            }
+        }
+        .onChange(of: selectedProvider) { _, _ in
+            // Refresh when user switches provider
+            Task {
+                await refresh()
             }
         }
     }
@@ -347,20 +354,19 @@ struct MenuContentView: View {
 
     // MARK: - Actions
 
-    private func refresh() async {
+    /// Refresh a specific provider
+    private func refresh(provider: AIProvider) async {
         guard !appState.isRefreshing else { return }
 
         appState.isRefreshing = true
         defer { appState.isRefreshing = false }
 
         do {
-            appState.snapshots = try await monitor.refreshAll()
-            appState.lastError = nil
-
-            if appState.snapshots[selectedProvider] == nil,
-               let first = appState.snapshots.keys.first {
-                selectedProvider = first
+            // Capture provider to avoid race condition when user switches tabs
+            if let snapshot = try await monitor.refresh(provider: provider) {
+                appState.snapshots[provider] = snapshot
             }
+            appState.lastError = nil
         } catch {
             appState.lastError = error.localizedDescription
         }
@@ -405,15 +411,6 @@ struct ProviderPill: View {
                         .stroke(pillBorderColor, lineWidth: 1)
                 }
             )
-            .overlay(alignment: .topTrailing) {
-                // Data indicator
-                if hasData && !isSelected {
-                    Circle()
-                        .fill(AppTheme.statusHealthy(for: colorScheme))
-                        .frame(width: 6, height: 6)
-                        .offset(x: -4, y: 2)
-                }
-            }
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }

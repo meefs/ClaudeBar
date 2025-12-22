@@ -52,6 +52,88 @@ struct QuotaMonitorTests {
         #expect(snapshots.isEmpty)
     }
 
+    // MARK: - Single Provider Refresh
+
+    @Test
+    func `refresh single provider returns only that provider snapshot`() async throws {
+        // Given
+        let claudeProbe = MockUsageProbePort()
+        let codexProbe = MockUsageProbePort()
+
+        let claudeSnapshot = UsageSnapshot(
+            provider: .claude,
+            quotas: [UsageQuota(percentRemaining: 70, quotaType: .session, provider: .claude)],
+            capturedAt: Date()
+        )
+
+        given(claudeProbe).provider.willReturn(.claude)
+        given(claudeProbe).isAvailable().willReturn(true)
+        given(claudeProbe).probe().willReturn(claudeSnapshot)
+
+        given(codexProbe).provider.willReturn(.codex)
+        given(codexProbe).isAvailable().willReturn(true)
+
+        let monitor = QuotaMonitor(probes: [claudeProbe, codexProbe])
+
+        // When - refresh only Claude
+        let snapshot = try await monitor.refresh(provider: .claude)
+
+        // Then - only Claude is loaded, Codex probe not called
+        #expect(snapshot?.provider == .claude)
+        #expect(snapshot?.quota(for: .session)?.percentRemaining == 70)
+
+        let allSnapshots = await monitor.allSnapshots()
+        #expect(allSnapshots.count == 1)
+        #expect(allSnapshots[.codex] == nil)
+    }
+
+    @Test
+    func `refreshOthers excludes the specified provider`() async throws {
+        // Given
+        let claudeProbe = MockUsageProbePort()
+        let codexProbe = MockUsageProbePort()
+        let geminiProbe = MockUsageProbePort()
+
+        let claudeSnapshot = UsageSnapshot(
+            provider: .claude,
+            quotas: [UsageQuota(percentRemaining: 70, quotaType: .session, provider: .claude)],
+            capturedAt: Date()
+        )
+        let codexSnapshot = UsageSnapshot(
+            provider: .codex,
+            quotas: [UsageQuota(percentRemaining: 50, quotaType: .session, provider: .codex)],
+            capturedAt: Date()
+        )
+        let geminiSnapshot = UsageSnapshot(
+            provider: .gemini,
+            quotas: [UsageQuota(percentRemaining: 30, quotaType: .session, provider: .gemini)],
+            capturedAt: Date()
+        )
+
+        given(claudeProbe).provider.willReturn(.claude)
+        given(claudeProbe).isAvailable().willReturn(true)
+        given(claudeProbe).probe().willReturn(claudeSnapshot)
+
+        given(codexProbe).provider.willReturn(.codex)
+        given(codexProbe).isAvailable().willReturn(true)
+        given(codexProbe).probe().willReturn(codexSnapshot)
+
+        given(geminiProbe).provider.willReturn(.gemini)
+        given(geminiProbe).isAvailable().willReturn(true)
+        given(geminiProbe).probe().willReturn(geminiSnapshot)
+
+        let monitor = QuotaMonitor(probes: [claudeProbe, codexProbe, geminiProbe])
+
+        // When - refresh all except Claude
+        let others = try await monitor.refreshOthers(except: .claude)
+
+        // Then - Codex and Gemini loaded, Claude excluded
+        #expect(others.count == 2)
+        #expect(others[.claude] == nil)
+        #expect(others[.codex]?.quota(for: .session)?.percentRemaining == 50)
+        #expect(others[.gemini]?.quota(for: .session)?.percentRemaining == 30)
+    }
+
     // MARK: - Multiple Provider Monitoring
 
     @Test

@@ -106,6 +106,51 @@ public actor QuotaMonitor {
         }
     }
 
+    /// Refreshes a single provider by its AIProvider type.
+    /// Useful for loading only the active provider on startup.
+    @discardableResult
+    public func refresh(provider: AIProvider) async throws -> UsageSnapshot? {
+        guard let probe = probes.first(where: { $0.provider == provider }) else {
+            return nil
+        }
+
+        let (_, snapshot) = await refreshProvider(probe)
+        if let snapshot {
+            await updateSnapshot(provider: provider, snapshot: snapshot)
+            snapshots[provider] = snapshot
+        }
+        return snapshot
+    }
+
+    /// Refreshes all providers except the specified one.
+    /// Useful for background loading after the active provider is loaded.
+    @discardableResult
+    public func refreshOthers(except provider: AIProvider) async throws -> [AIProvider: UsageSnapshot] {
+        let otherProbes = probes.filter { $0.provider != provider }
+
+        return await withTaskGroup(of: (AIProvider, UsageSnapshot?).self) { group in
+            for probe in otherProbes {
+                group.addTask {
+                    await self.refreshProvider(probe)
+                }
+            }
+
+            var results: [AIProvider: UsageSnapshot] = [:]
+            for await (provider, snapshot) in group {
+                if let snapshot {
+                    results[provider] = snapshot
+                }
+            }
+
+            // Update internal state
+            for (provider, snapshot) in results {
+                await self.updateSnapshot(provider: provider, snapshot: snapshot)
+            }
+
+            return results
+        }
+    }
+
     // MARK: - Queries
 
     /// Returns the current snapshot for a provider, if available
