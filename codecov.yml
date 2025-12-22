@@ -15,5 +15,5 @@ comment:
 
 ignore:
   - "Tests/**/*"
-  - "Sources/App/**/*"  # UI code - harder to test
+  - "Sources/App/Views/**/*"  # UI code - harder to test
   - "**/*Preview*.swift"  # SwiftUI previews
