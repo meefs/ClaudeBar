@@ -50,8 +50,8 @@ struct ProviderIconView: View {
 
     private func loadProviderIcon(for providerId: String) -> NSImage? {
         let assetName = AppTheme.providerIconAssetName(for: providerId)
-        // Load SVG from SPM bundle resources
-        if let url = Bundle.module.url(forResource: assetName, withExtension: "svg") {
+        // Load SVG from resource bundle (supports both dev and packaged app)
+        if let url = ResourceBundle.bundle.url(forResource: assetName, withExtension: "svg") {
             return NSImage(contentsOf: url)
         }
         return nil

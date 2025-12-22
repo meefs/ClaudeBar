@@ -132,12 +132,12 @@ jobs:
             echo "Copied AppIcon.icns to Resources"
           fi
 
-          # Copy resource bundle for Bundle.module access (images, etc.)
-          # SPM's Bundle.module looks for the bundle at app bundle root, not Contents/Resources
+          # Copy resource bundle for ResourceBundle.bundle access (images, etc.)
+          # Must be in Contents/Resources/ for macOS code signing compatibility
           RESOURCE_BUNDLE=$(swift build -c release --arch arm64 --show-bin-path)/ClaudeBar_ClaudeBar.bundle
           if [ -d "$RESOURCE_BUNDLE" ]; then
-            cp -R "$RESOURCE_BUNDLE" "$APP_BUNDLE/"
-            echo "Copied resource bundle to app bundle root"
+            cp -R "$RESOURCE_BUNDLE" "$RESOURCES/"
+            echo "Copied resource bundle to Contents/Resources"
           fi
 
           # Create PkgInfo
