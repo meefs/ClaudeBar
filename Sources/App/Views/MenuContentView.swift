@@ -1,12 +1,13 @@
 import SwiftUI
 import Domain
 
-/// The main menu content view with OpenRouter Wrapped-inspired design.
+/// The main menu content view with adaptive light/dark theme support.
 /// Features purple-pink gradients, glassmorphism cards, and bold typography.
 struct MenuContentView: View {
     let monitor: QuotaMonitor
     let appState: AppState
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedProvider: AIProvider = .claude
     @State private var isHoveringRefresh = false
     @State private var animateIn = false
@@ -14,7 +15,7 @@ struct MenuContentView: View {
     var body: some View {
         ZStack {
             // Gradient background
-            AppTheme.backgroundGradient
+            AppTheme.backgroundGradient(for: colorScheme)
                 .ignoresSafeArea()
 
             // Subtle animated orbs in background
@@ -68,7 +69,7 @@ struct MenuContentView: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                AppTheme.violetElectric.opacity(0.4),
+                                AppTheme.violetElectric(for: colorScheme).opacity(colorScheme == .dark ? 0.4 : 0.15),
                                 Color.clear
                             ],
                             center: .center,
@@ -85,7 +86,7 @@ struct MenuContentView: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                AppTheme.pinkHot.opacity(0.35),
+                                AppTheme.pinkHot(for: colorScheme).opacity(colorScheme == .dark ? 0.35 : 0.12),
                                 Color.clear
                             ],
                             center: .center,
@@ -111,11 +112,11 @@ struct MenuContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("ClaudeBar")
                     .font(AppTheme.titleFont(size: 18))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
 
                 Text("AI Usage Monitor")
                     .font(AppTheme.captionFont(size: 11))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(AppTheme.textSecondary(for: colorScheme))
             }
 
             Spacer()
@@ -132,11 +133,11 @@ struct MenuContentView: View {
             // Animated pulse dot
             ZStack {
                 Circle()
-                    .fill(appState.overallStatus.themeColor)
+                    .fill(appState.overallStatus.themeColor(for: colorScheme))
                     .frame(width: 8, height: 8)
 
                 Circle()
-                    .stroke(appState.overallStatus.themeColor, lineWidth: 2)
+                    .stroke(appState.overallStatus.themeColor(for: colorScheme), lineWidth: 2)
                     .frame(width: 16, height: 16)
                     .scaleEffect(appState.isRefreshing ? 1.5 : 1.0)
                     .opacity(appState.isRefreshing ? 0 : 0.5)
@@ -150,16 +151,16 @@ struct MenuContentView: View {
 
             Text(statusText)
                 .font(AppTheme.captionFont(size: 11))
-                .foregroundStyle(.white)
+                .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(
             Capsule()
-                .fill(appState.overallStatus.themeColor.opacity(0.25))
+                .fill(appState.overallStatus.themeColor(for: colorScheme).opacity(colorScheme == .dark ? 0.25 : 0.15))
                 .overlay(
                     Capsule()
-                        .stroke(appState.overallStatus.themeColor.opacity(0.5), lineWidth: 1)
+                        .stroke(appState.overallStatus.themeColor(for: colorScheme).opacity(colorScheme == .dark ? 0.5 : 0.3), lineWidth: 1)
                 )
         )
     }
@@ -218,7 +219,7 @@ struct MenuContentView: View {
             // Avatar circle
             ZStack {
                 Circle()
-                    .fill(selectedProvider.themeGradient)
+                    .fill(selectedProvider.themeGradient(for: colorScheme))
                     .frame(width: 32, height: 32)
 
                 Text(String(email.prefix(1)).uppercased())
@@ -229,12 +230,12 @@ struct MenuContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(email)
                     .font(AppTheme.bodyFont(size: 12))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
                     .lineLimit(1)
 
                 Text("Updated \(snapshot.ageDescription)")
                     .font(AppTheme.captionFont(size: 10))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(AppTheme.textTertiary(for: colorScheme))
             }
 
             Spacer()
@@ -243,7 +244,7 @@ struct MenuContentView: View {
             if snapshot.isStale {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 12))
-                    .foregroundStyle(AppTheme.statusWarning)
+                    .foregroundStyle(AppTheme.statusWarning(for: colorScheme))
             }
         }
         .glassCard(cornerRadius: 12, padding: 10)
@@ -272,21 +273,21 @@ struct MenuContentView: View {
         VStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(AppTheme.statusWarning.opacity(0.2))
+                    .fill(AppTheme.statusWarning(for: colorScheme).opacity(0.2))
                     .frame(width: 60, height: 60)
 
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 28))
-                    .foregroundStyle(AppTheme.statusWarning)
+                    .foregroundStyle(AppTheme.statusWarning(for: colorScheme))
             }
 
             Text("\(selectedProvider.name) Unavailable")
                 .font(AppTheme.titleFont(size: 14))
-                .foregroundStyle(.white)
+                .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
 
             Text("Install CLI or check configuration")
                 .font(AppTheme.captionFont(size: 11))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(AppTheme.textTertiary(for: colorScheme))
         }
         .frame(height: 140)
         .frame(maxWidth: .infinity)
@@ -301,7 +302,7 @@ struct MenuContentView: View {
             WrappedActionButton(
                 icon: "safari.fill",
                 label: "Dashboard",
-                gradient: selectedProvider.themeGradient
+                gradient: selectedProvider.themeGradient(for: colorScheme)
             ) {
                 if let url = selectedProvider.dashboardURL {
                     NSWorkspace.shared.open(url)
@@ -313,7 +314,7 @@ struct MenuContentView: View {
             WrappedActionButton(
                 icon: appState.isRefreshing ? "arrow.trianglehead.2.counterclockwise.rotate.90" : "arrow.clockwise",
                 label: appState.isRefreshing ? "Syncing" : "Refresh",
-                gradient: AppTheme.accentGradient,
+                gradient: AppTheme.accentGradient(for: colorScheme),
                 isLoading: appState.isRefreshing
             ) {
                 Task { await refresh() }
@@ -328,12 +329,12 @@ struct MenuContentView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(0.1))
+                        .fill(AppTheme.glassBackground(for: colorScheme))
                         .frame(width: 32, height: 32)
 
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(AppTheme.textSecondary(for: colorScheme))
                 }
             }
             .buttonStyle(.plain)
@@ -374,6 +375,7 @@ struct ProviderPill: View {
     let hasData: Bool
     let action: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
 
     var body: some View {
@@ -385,30 +387,60 @@ struct ProviderPill: View {
                 Text(provider.name)
                     .font(AppTheme.bodyFont(size: 12))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(pillForegroundColor)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
                 ZStack {
                     if isSelected {
                         Capsule()
-                            .fill(provider.themeGradient)
-                            .shadow(color: provider.themeColor.opacity(0.4), radius: 8, y: 2)
+                            .fill(provider.themeGradient(for: colorScheme))
+                            .shadow(color: provider.themeColor(for: colorScheme).opacity(colorScheme == .dark ? 0.4 : 0.25), radius: 8, y: 2)
                     } else {
                         Capsule()
-                            .fill(Color.white.opacity(isHovering ? 0.18 : 0.12))
+                            .fill(pillBackgroundColor)
                     }
 
                     Capsule()
-                        .stroke(
-                            isSelected ? Color.white.opacity(0.3) : Color.white.opacity(0.15),
-                            lineWidth: 1
-                        )
+                        .stroke(pillBorderColor, lineWidth: 1)
                 }
             )
+            .overlay(alignment: .topTrailing) {
+                // Data indicator
+                if hasData && !isSelected {
+                    Circle()
+                        .fill(AppTheme.statusHealthy(for: colorScheme))
+                        .frame(width: 6, height: 6)
+                        .offset(x: -4, y: 2)
+                }
+            }
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
+    }
+
+    private var pillForegroundColor: Color {
+        if isSelected {
+            return .white
+        }
+        return AppTheme.textPrimary(for: colorScheme)
+    }
+
+    private var pillBackgroundColor: Color {
+        if colorScheme == .dark {
+            return Color.white.opacity(isHovering ? 0.18 : 0.12)
+        } else {
+            return Color.white.opacity(isHovering ? 0.95 : 0.85)
+        }
+    }
+
+    private var pillBorderColor: Color {
+        if isSelected {
+            return colorScheme == .dark ? Color.white.opacity(0.3) : Color.white.opacity(0.5)
+        }
+        return colorScheme == .dark
+            ? Color.white.opacity(0.15)
+            : AppTheme.purpleVibrant(for: colorScheme).opacity(0.2)
     }
 
     private var providerIcon: String {
@@ -426,6 +458,7 @@ struct WrappedStatCard: View {
     let quota: UsageQuota
     let delay: Double
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
     @State private var animateProgress = false
 
@@ -437,11 +470,11 @@ struct WrappedStatCard: View {
                 HStack(spacing: 5) {
                     Image(systemName: iconName)
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(quota.status.themeColor)
+                        .foregroundStyle(quota.status.themeColor(for: colorScheme))
 
                     Text(quota.quotaType.displayName.uppercased())
                         .font(AppTheme.captionFont(size: 8))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(AppTheme.textSecondary(for: colorScheme))
                         .tracking(0.3)
                 }
 
@@ -449,19 +482,19 @@ struct WrappedStatCard: View {
 
                 // Status badge - fixed size, won't wrap
                 Text(quota.status.badgeText)
-                    .badge(quota.status.themeColor)
+                    .badge(quota.status.themeColor(for: colorScheme))
             }
 
             // Large percentage number
             HStack(alignment: .firstTextBaseline, spacing: 1) {
                 Text("\(Int(quota.percentRemaining))")
                     .font(AppTheme.statFont(size: 32))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
                     .contentTransition(.numericText())
 
                 Text("%")
                     .font(AppTheme.titleFont(size: 16))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(AppTheme.textTertiary(for: colorScheme))
             }
 
             // Progress bar with gradient
@@ -469,11 +502,11 @@ struct WrappedStatCard: View {
                 ZStack(alignment: .leading) {
                     // Track
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.white.opacity(0.15))
+                        .fill(progressTrackColor)
 
                     // Fill
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(AppTheme.progressGradient(for: quota.percentRemaining))
+                        .fill(AppTheme.progressGradient(for: quota.percentRemaining, scheme: colorScheme))
                         .frame(width: animateProgress ? geo.size.width * quota.percentRemaining / 100 : 0)
                         .animation(.spring(response: 0.8, dampingFraction: 0.7).delay(delay + 0.2), value: animateProgress)
                 }
@@ -489,7 +522,7 @@ struct WrappedStatCard: View {
                     Text(resetText)
                         .font(AppTheme.captionFont(size: 8))
                 }
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(AppTheme.textTertiary(for: colorScheme))
                 .lineLimit(1)
             }
         }
@@ -497,20 +530,17 @@ struct WrappedStatCard: View {
         .background(
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(AppTheme.cardGradient)
+                    .fill(AppTheme.cardGradient(for: colorScheme))
+
+                // Light mode shadow
+                if colorScheme == .light {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color.clear)
+                        .shadow(color: AppTheme.glassShadow(for: colorScheme), radius: 6, y: 3)
+                }
 
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(isHovering ? 0.35 : 0.25),
-                                Color.white.opacity(0.08)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
+                    .stroke(cardBorderGradient, lineWidth: 1)
             }
         )
         .scaleEffect(isHovering ? 1.015 : 1.0)
@@ -519,6 +549,27 @@ struct WrappedStatCard: View {
         .onAppear {
             animateProgress = true
         }
+    }
+
+    private var progressTrackColor: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.15)
+            : AppTheme.purpleDeep(for: colorScheme).opacity(0.1)
+    }
+
+    private var cardBorderGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                colorScheme == .dark
+                    ? Color.white.opacity(isHovering ? 0.35 : 0.25)
+                    : AppTheme.purpleVibrant(for: colorScheme).opacity(isHovering ? 0.3 : 0.18),
+                colorScheme == .dark
+                    ? Color.white.opacity(0.08)
+                    : AppTheme.pinkHot(for: colorScheme).opacity(0.08)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 
     private var iconName: String {
@@ -533,19 +584,20 @@ struct WrappedStatCard: View {
 // MARK: - Loading Spinner View
 
 struct LoadingSpinnerView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isSpinning = false
 
     var body: some View {
         VStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .stroke(Color.white.opacity(0.2), lineWidth: 3)
+                    .stroke(AppTheme.textTertiary(for: colorScheme), lineWidth: 3)
                     .frame(width: 50, height: 50)
 
                 Circle()
                     .trim(from: 0, to: 0.3)
                     .stroke(
-                        AppTheme.accentGradient,
+                        AppTheme.accentGradient(for: colorScheme),
                         style: StrokeStyle(lineWidth: 3, lineCap: .round)
                     )
                     .frame(width: 50, height: 50)
@@ -558,7 +610,7 @@ struct LoadingSpinnerView: View {
 
             Text("Fetching usage data...")
                 .font(AppTheme.bodyFont(size: 13))
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(AppTheme.textSecondary(for: colorScheme))
         }
         .frame(height: 140)
         .frame(maxWidth: .infinity)
@@ -578,6 +630,7 @@ struct WrappedActionButton: View {
     var isLoading: Bool = false
     let action: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
 
     var body: some View {
@@ -587,7 +640,7 @@ struct WrappedActionButton: View {
                     ProgressView()
                         .scaleEffect(0.5)
                         .frame(width: 14, height: 14)
-                        .tint(.white)
+                        .tint(AppTheme.textPrimary(for: colorScheme))
                 } else {
                     Image(systemName: icon)
                         .font(.system(size: 12, weight: .semibold))
@@ -596,23 +649,46 @@ struct WrappedActionButton: View {
                 Text(label)
                     .font(AppTheme.bodyFont(size: 12))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(buttonForegroundColor)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
                 ZStack {
                     Capsule()
-                        .fill(isHovering ? gradient : LinearGradient(colors: [Color.white.opacity(0.15)], startPoint: .leading, endPoint: .trailing))
+                        .fill(isHovering ? AnyShapeStyle(gradient) : AnyShapeStyle(buttonBackgroundColor))
 
                     Capsule()
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        .stroke(buttonBorderColor, lineWidth: 1)
                 }
             )
-            .shadow(color: isHovering ? gradient.stops.first?.color.opacity(0.3) ?? .clear : .clear, radius: 8, y: 2)
+            .shadow(color: isHovering ? shadowColor : .clear, radius: 8, y: 2)
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
         .disabled(isLoading)
+    }
+
+    private var buttonForegroundColor: Color {
+        if isHovering {
+            return .white
+        }
+        return AppTheme.textPrimary(for: colorScheme)
+    }
+
+    private var buttonBackgroundColor: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.15)
+            : Color.white.opacity(0.85)
+    }
+
+    private var buttonBorderColor: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.2)
+            : AppTheme.purpleVibrant(for: colorScheme).opacity(0.2)
+    }
+
+    private var shadowColor: Color {
+        AppTheme.coralAccent(for: colorScheme).opacity(colorScheme == .dark ? 0.3 : 0.2)
     }
 }
 

@@ -10,17 +10,19 @@ struct ProviderIconView: View {
     var size: CGFloat = 24
     var showGlow: Bool = true
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         ZStack {
             if showGlow {
-                // Subtle glow behind icon
+                // Subtle glow behind icon - adapts to theme
                 Circle()
-                    .fill(provider.themeColor.opacity(0.3))
+                    .fill(provider.themeColor(for: colorScheme).opacity(colorScheme == .dark ? 0.3 : 0.2))
                     .frame(width: size * 1.3, height: size * 1.3)
                     .blur(radius: size * 0.3)
             }
 
-            // Provider icon - fills the entire circle with white border
+            // Provider icon - fills the entire circle with adaptive border
             if let nsImage = loadProviderIcon(for: provider) {
                 Image(nsImage: nsImage)
                     .resizable()
@@ -29,9 +31,20 @@ struct ProviderIconView: View {
                     .clipShape(Circle())
                     .overlay(
                         Circle()
-                            .stroke(Color.white.opacity(0.6), lineWidth: 2)
+                            .stroke(
+                                colorScheme == .dark
+                                    ? Color.white.opacity(0.6)
+                                    : AppTheme.purpleVibrant(for: colorScheme).opacity(0.3),
+                                lineWidth: 2
+                            )
                     )
-                    .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
+                    .shadow(
+                        color: colorScheme == .dark
+                            ? .black.opacity(0.15)
+                            : AppTheme.purpleDeep(for: colorScheme).opacity(0.15),
+                        radius: 3,
+                        y: 1
+                    )
             }
         }
     }
@@ -60,7 +73,7 @@ extension AIProvider {
 
 // MARK: - Preview
 
-#Preview("Provider Icons") {
+#Preview("Provider Icons - Dark") {
     HStack(spacing: 30) {
         VStack {
             ProviderIconView(provider: .claude, size: 40)
@@ -82,7 +95,34 @@ extension AIProvider {
         }
     }
     .padding(40)
-    .background(AppTheme.backgroundGradient)
+    .background(AppTheme.backgroundGradient(for: .dark))
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Provider Icons - Light") {
+    HStack(spacing: 30) {
+        VStack {
+            ProviderIconView(provider: .claude, size: 40)
+            Text("Claude")
+                .font(.caption)
+                .foregroundStyle(AppTheme.textPrimary(for: .light))
+        }
+        VStack {
+            ProviderIconView(provider: .codex, size: 40)
+            Text("Codex")
+                .font(.caption)
+                .foregroundStyle(AppTheme.textPrimary(for: .light))
+        }
+        VStack {
+            ProviderIconView(provider: .gemini, size: 40)
+            Text("Gemini")
+                .font(.caption)
+                .foregroundStyle(AppTheme.textPrimary(for: .light))
+        }
+    }
+    .padding(40)
+    .background(AppTheme.backgroundGradient(for: .light))
+    .preferredColorScheme(.light)
 }
 
 #Preview("Provider Icons - Sizes") {
@@ -93,5 +133,6 @@ extension AIProvider {
         ProviderIconView(provider: .claude, size: 48)
     }
     .padding(40)
-    .background(AppTheme.backgroundGradient)
+    .background(AppTheme.backgroundGradient(for: .dark))
+    .preferredColorScheme(.dark)
 }
