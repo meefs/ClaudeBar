@@ -164,7 +164,7 @@ struct ClaudeUsageProbeTests {
         let mockExecutor = MockCLIExecutor()
 
         let usageOutput = """
-        Opus 4.5 · Claude Pro · Organization
+        Opus 4.5 · Claude Pro · user@example.com's Organization
 
         Current session
         █████░░░░░░░░░░░░░░░ 1% used

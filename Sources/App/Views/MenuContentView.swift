@@ -249,10 +249,25 @@ struct MenuContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(email)
-                    .font(AppTheme.bodyFont(size: 12))
-                    .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(email)
+                        .font(AppTheme.bodyFont(size: 12))
+                        .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
+                        .lineLimit(1)
+
+                    // Account type badge
+                    if let accountType = snapshot.accountType {
+                        Text(accountType.badgeText)
+                            .font(AppTheme.captionFont(size: 8))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(AppTheme.purpleVibrant(for: colorScheme).opacity(0.8))
+                            )
+                    }
+                }
 
                 Text("Updated \(snapshot.ageDescription)")
                     .font(AppTheme.captionFont(size: 10))
