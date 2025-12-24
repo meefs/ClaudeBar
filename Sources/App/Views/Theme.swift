@@ -858,12 +858,9 @@ struct ThemeProvider: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .environment(\.colorScheme, effectiveColorScheme)  // Override colorScheme directly!
             .environment(\.activeTheme, effectiveColorScheme)
             .environment(\.isChristmasTheme, themeMode.isChristmas)
-            .preferredColorScheme(
-                themeMode == .system ? nil :
-                (themeMode == .light ? .light : .dark)  // Christmas and dark both use .dark
-            )
     }
 }
 
