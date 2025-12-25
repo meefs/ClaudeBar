@@ -1,6 +1,9 @@
 import SwiftUI
 import Domain
 import Infrastructure
+#if ENABLE_SPARKLE
+import Sparkle
+#endif
 
 /// Inline settings content view that fits within the menu bar popup.
 struct SettingsContentView: View {
@@ -8,6 +11,10 @@ struct SettingsContentView: View {
     let appState: AppState
     @Environment(\.colorScheme) private var colorScheme
     @State private var settings = AppSettings.shared
+
+    #if ENABLE_SPARKLE
+    @Environment(\.sparkleUpdater) private var sparkleUpdater
+    #endif
 
     // Token input state
     @State private var copilotTokenInput: String = ""
@@ -32,6 +39,9 @@ struct SettingsContentView: View {
                     themeCard
                     claudeBudgetCard
                     copilotCard
+                    #if ENABLE_SPARKLE
+                    updatesCard
+                    #endif
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
@@ -536,6 +546,155 @@ struct SettingsContentView: View {
             }
         }
     }
+
+    // MARK: - Updates Card
+
+    #if ENABLE_SPARKLE
+    private var updatesCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.3, green: 0.7, blue: 0.4),
+                                    Color(red: 0.2, green: 0.55, blue: 0.35)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Updates")
+                        .font(AppTheme.titleFont(size: 14))
+                        .foregroundStyle(isChristmas ? AppTheme.christmasTextPrimary : AppTheme.textPrimary(for: colorScheme))
+
+                    Text("Version \(appVersion)")
+                        .font(AppTheme.captionFont(size: 10))
+                        .foregroundStyle(isChristmas ? AppTheme.christmasTextTertiary : AppTheme.textTertiary(for: colorScheme))
+                }
+
+                Spacer()
+            }
+
+            // Show different content based on updater availability
+            if sparkleUpdater?.isAvailable == true {
+                // Check for Updates Button
+                Button {
+                    sparkleUpdater?.checkForUpdates()
+                } label: {
+                    HStack(spacing: 6) {
+                        if sparkleUpdater?.isCheckingForUpdates == true {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                                .frame(width: 14, height: 14)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+
+                        Text(sparkleUpdater?.isCheckingForUpdates == true ? "Checking..." : "Check for Updates")
+                            .font(AppTheme.bodyFont(size: 11))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.3, green: 0.7, blue: 0.4),
+                                        Color(red: 0.2, green: 0.55, blue: 0.35)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(sparkleUpdater?.canCheckForUpdates != true || sparkleUpdater?.isCheckingForUpdates == true)
+                .opacity(sparkleUpdater?.canCheckForUpdates == true ? 1 : 0.6)
+
+                // Last check info
+                if let lastCheck = sparkleUpdater?.lastUpdateCheckDate {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 8))
+
+                        Text("Last checked: \(lastCheck.formatted(date: .abbreviated, time: .shortened))")
+                            .font(AppTheme.captionFont(size: 9))
+                    }
+                    .foregroundStyle(isChristmas ? AppTheme.christmasTextTertiary : AppTheme.textTertiary(for: colorScheme))
+                }
+
+                // Auto updates toggle
+                HStack {
+                    Text("Check automatically")
+                        .font(AppTheme.bodyFont(size: 11))
+                        .foregroundStyle(isChristmas ? AppTheme.christmasTextPrimary : AppTheme.textPrimary(for: colorScheme))
+
+                    Spacer()
+
+                    Toggle("", isOn: Binding(
+                        get: { sparkleUpdater?.automaticallyChecksForUpdates ?? true },
+                        set: { sparkleUpdater?.automaticallyChecksForUpdates = $0 }
+                    ))
+                    .toggleStyle(.switch)
+                    .tint(AppTheme.purpleVibrant(for: colorScheme))
+                    .scaleEffect(0.8)
+                    .labelsHidden()
+                }
+            } else {
+                // Debug mode message
+                HStack(spacing: 6) {
+                    Image(systemName: "hammer.fill")
+                        .font(.system(size: 10))
+                    Text("Updates unavailable in debug builds")
+                        .font(AppTheme.captionFont(size: 10))
+                }
+                .foregroundStyle(isChristmas ? AppTheme.christmasTextTertiary : AppTheme.textTertiary(for: colorScheme))
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(isChristmas ? AppTheme.christmasCardGradient : AppTheme.cardGradient(for: colorScheme))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(
+                            LinearGradient(
+                                colors: isChristmas
+                                    ? [AppTheme.christmasGold.opacity(0.4), AppTheme.christmasGold.opacity(0.2)]
+                                    : [
+                                        colorScheme == .dark ? Color.white.opacity(0.25) : AppTheme.purpleVibrant(for: colorScheme).opacity(0.18),
+                                        colorScheme == .dark ? Color.white.opacity(0.08) : AppTheme.pinkHot(for: colorScheme).opacity(0.08)
+                                    ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+    }
+
+    /// The app version from the bundle
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+    #endif
 
     // MARK: - Footer
 

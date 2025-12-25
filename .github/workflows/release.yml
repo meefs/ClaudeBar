@@ -18,6 +18,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 env:
   APP_NAME: ClaudeBar
@@ -380,6 +382,92 @@ jobs:
             ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Sparkle Appcast
+        if: ${{ steps.version.outputs.is_prerelease == 'false' }}
+        env:
+          SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${NOTARIZED_ZIP}"
+
+          # Find sign_update tool
+          SIGN_UPDATE=$(find .build -name "sign_update" -path "*/bin/*" | head -1)
+
+          if [ -z "$SIGN_UPDATE" ]; then
+            echo "Warning: sign_update not found, skipping appcast generation"
+            exit 0
+          fi
+
+          if [ -z "$SPARKLE_EDDSA_PRIVATE_KEY" ]; then
+            echo "Warning: SPARKLE_EDDSA_PRIVATE_KEY not set, skipping appcast generation"
+            exit 0
+          fi
+
+          # Get file size
+          FILE_SIZE=$(stat -f%z "$NOTARIZED_ZIP")
+
+          # Sign the archive
+          echo "Signing archive with EdDSA..."
+          SIGNATURE=$("$SIGN_UPDATE" "$NOTARIZED_ZIP" --ed-key-file <(echo "$SPARKLE_EDDSA_PRIVATE_KEY") 2>&1 || true)
+
+          # Extract EdDSA signature
+          ED_SIGNATURE=$(echo "$SIGNATURE" | grep -o 'edSignature="[^"]*"' | sed 's/edSignature="//;s/"//' || echo "")
+
+          if [ -z "$ED_SIGNATURE" ]; then
+            echo "Warning: Failed to extract EdDSA signature"
+            echo "Signature output: $SIGNATURE"
+            exit 0
+          fi
+
+          echo "EdDSA signature generated successfully"
+
+          # Generate appcast.xml
+          PUB_DATE=$(date -R)
+          mkdir -p docs
+
+          cat > docs/appcast.xml << EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+              <title>ClaudeBar Updates</title>
+              <link>https://tddworks.github.io/claudebar/appcast.xml</link>
+              <description>Most recent updates for ClaudeBar</description>
+              <language>en</language>
+              <item>
+                <title>Version ${VERSION}</title>
+                <pubDate>${PUB_DATE}</pubDate>
+                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+                <enclosure
+                  url="${DOWNLOAD_URL}"
+                  sparkle:edSignature="${ED_SIGNATURE}"
+                  length="${FILE_SIZE}"
+                  type="application/octet-stream"
+                />
+              </item>
+            </channel>
+          </rss>
+          EOF
+
+          echo "Generated appcast.xml:"
+          cat docs/appcast.xml
+
+      - name: Setup Pages
+        if: ${{ steps.version.outputs.is_prerelease == 'false' }}
+        uses: actions/configure-pages@v4
+
+      - name: Upload appcast to Pages
+        if: ${{ steps.version.outputs.is_prerelease == 'false' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        if: ${{ steps.version.outputs.is_prerelease == 'false' }}
+        id: deployment
+        uses: actions/deploy-pages@v4
 
       - name: Cleanup
         if: always()

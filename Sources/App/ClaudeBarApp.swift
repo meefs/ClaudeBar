@@ -1,6 +1,9 @@
 import SwiftUI
 import Domain
 import Infrastructure
+#if ENABLE_SPARKLE
+import Sparkle
+#endif
 
 /// Shared app state observable by all views
 @Observable
@@ -51,6 +54,11 @@ struct ClaudeBarApp: App {
     /// Notification observer
     private let notificationObserver = NotificationQuotaObserver()
 
+    #if ENABLE_SPARKLE
+    /// Sparkle updater for auto-updates
+    @State private var sparkleUpdater = SparkleUpdater()
+    #endif
+
     init() {
         // Create providers with their probes (rich domain models)
         var providers: [any AIProvider] = [
@@ -93,8 +101,14 @@ struct ClaudeBarApp: App {
 
     var body: some Scene {
         MenuBarExtra {
+            #if ENABLE_SPARKLE
             MenuContentView(monitor: monitor, appState: appState)
                 .themeProvider(currentThemeMode)
+                .environment(\.sparkleUpdater, sparkleUpdater)
+            #else
+            MenuContentView(monitor: monitor, appState: appState)
+                .themeProvider(currentThemeMode)
+            #endif
         } label: {
             StatusBarIcon(status: appState.overallStatus, isChristmas: currentThemeMode == .christmas)
         }
