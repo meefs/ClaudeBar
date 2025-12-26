@@ -48,15 +48,20 @@ jobs:
           swift-version: ${{ env.SWIFT_VERSION }}
 
       - name: Install Tuist
-        run: brew install tuist
+        run: |
+          curl -Ls https://install.tuist.io | bash
+          echo "/usr/local/bin" >> $GITHUB_PATH
+          tuist version
 
-      - name: Cache Swift Packages
+      - name: Cache Tuist
         uses: actions/cache@v4
         with:
-          path: .build
-          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          path: |
+            ~/Library/Caches/tuist
+            .tuist-cache
+          key: ${{ runner.os }}-tuist-${{ hashFiles('Project.swift', 'Tuist.swift', 'Package.swift') }}
           restore-keys: |
-            ${{ runner.os }}-spm-
+            ${{ runner.os }}-tuist-
 
       - name: Extract Version
         id: version
@@ -95,29 +100,14 @@ jobs:
           echo "Updated version to $VERSION (build $BUILD_NUMBER)"
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
 
-      - name: Install Dependencies & Generate Xcode Project
+      - name: Fetch Dependencies
+        run: tuist fetch
+
+      - name: Generate Xcode Project
         run: |
-          echo "=== Tuist version ==="
-          tuist version
-
-          echo "=== Installing dependencies ==="
-          tuist install || echo "tuist install not available, skipping..."
-
-          echo "=== Generating project ==="
           tuist generate --no-open
-
-          echo "=== Generated files ==="
-          ls -la
-          ls -la ClaudeBar.xcworkspace/ || true
-
           echo "=== Available schemes ==="
           xcodebuild -workspace ClaudeBar.xcworkspace -list
-
-      - name: Resolve Package Dependencies
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -workspace ClaudeBar.xcworkspace \
-            -scheme ClaudeBar
 
       - name: Build Universal App Bundle
         run: |
@@ -134,18 +124,7 @@ jobs:
             ONLY_ACTIVE_ARCH=NO \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty || xcodebuild archive \
-              -workspace "${APP_NAME}.xcworkspace" \
-              -scheme "${APP_NAME}" \
-              -configuration Release \
-              -archivePath "$ARCHIVE_PATH" \
-              -destination "generic/platform=macOS" \
-              ARCHS="arm64 x86_64" \
-              ONLY_ACTIVE_ARCH=NO \
-              CODE_SIGN_IDENTITY="-" \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO
 
           # Extract app from archive
           cp -R "$ARCHIVE_PATH/Products/Applications/${APP_NAME}.app" .
