@@ -1,92 +1,130 @@
+import Foundation
 import OSLog
 
-/// Centralized logging infrastructure using Apple's OSLog framework.
+/// Dual-output logger that writes to both OSLog (for developers) and file (for users).
 ///
-/// This extension provides category-specific loggers for different subsystems
-/// of the ClaudeBar application. Each logger is configured with the app's
-/// bundle identifier as the subsystem and a specific category for filtering.
+/// This facade provides category-specific loggers that output to:
+/// 1. **OSLog** - For Console.app, live streaming, and development debugging
+/// 2. **File** - For user-accessible logs at ~/Library/Logs/ClaudeBar/ClaudeBar.log
 ///
 /// ## Usage Examples
 ///
 /// ```swift
 /// // Monitor operations
-/// Logger.monitor.info("Starting refresh for \(providers.count) providers")
-/// Logger.monitor.debug("Provider \(id, privacy: .public) completed refresh")
+/// AppLog.monitor.info("Starting refresh for \(providers.count) providers")
 ///
 /// // Probe execution
-/// Logger.probes.debug("Executing Claude CLI probe")
-/// Logger.probes.trace("Raw CLI output: \(output, privacy: .private)")
-/// Logger.probes.error("CLI probe failed: \(error.localizedDescription)")
+/// AppLog.probes.debug("Executing Claude CLI probe")
+/// AppLog.probes.error("CLI probe failed: \(error.localizedDescription)")
 ///
-/// // Sensitive data (ALWAYS use privacy annotations)
-/// Logger.credentials.debug("Token hash: \(token, privacy: .private(mask: .hash))")
-/// Logger.network.debug("API request to: \(url, privacy: .public)")
+/// // Sensitive data - use sanitized messages for file logs
+/// AppLog.credentials.info("Token loaded for provider")
 /// ```
-///
-/// ## Privacy Guidelines
-///
-/// - **Public data** (`.public`): Safe to log (provider names, status enums, counts)
-/// - **Private data** (`.private`): Redacted in logs (tokens, API keys, usernames, CLI output)
-/// - **Hash masking** (`.private(mask: .hash)`): Shows hash for correlation without exposing value
 ///
 /// ## Log Levels
 ///
-/// - **Trace/Debug**: Development diagnostics (memory-only, not persisted)
-/// - **Info**: Informational messages (persisted only with `log collect`)
-/// - **Notice**: Significant events (always persisted)
-/// - **Error/Fault**: Errors and critical failures (always persisted)
+/// | Level | File Output | OSLog Persistence |
+/// |-------|-------------|-------------------|
+/// | debug | No | Memory only |
+/// | info | Yes | With `log collect` |
+/// | warning | Yes | Always persisted |
+/// | error | Yes | Always persisted |
 ///
 /// ## Viewing Logs
 ///
-/// Use Console.app with filter: `subsystem:com.tddworks.ClaudeBar`
-/// Or use `log` command:
-/// ```bash
-/// log show --predicate 'subsystem == "com.tddworks.ClaudeBar"' --last 1h
+/// **File logs (for users):**
 /// ```
-public extension Logger {
-    /// The app's bundle identifier used as the logging subsystem
-    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.tddworks.ClaudeBar"
-    
+/// ~/Library/Logs/ClaudeBar/ClaudeBar.log
+/// ```
+///
+/// **OSLog (for developers):**
+/// ```bash
+/// log show --predicate 'subsystem == "com.tddworks.ClaudeBar"' --info --debug --last 1h
+/// ```
+public enum AppLog {
     /// Logger for quota monitoring operations
-    ///
-    /// Use for: Monitor lifecycle, refresh operations, provider coordination
-    static let monitor = Logger(subsystem: subsystem, category: "monitor")
+    public static let monitor = CategoryLogger(category: "monitor")
     
     /// Logger for AI provider operations
-    ///
-    /// Use for: Provider lifecycle, state changes, snapshot updates
-    static let providers = Logger(subsystem: subsystem, category: "providers")
+    public static let providers = CategoryLogger(category: "providers")
     
     /// Logger for usage probe operations
-    ///
-    /// Use for: CLI execution, probe results, parsing operations
-    /// Note: Always use `.private` for raw CLI output
-    static let probes = Logger(subsystem: subsystem, category: "probes")
+    public static let probes = CategoryLogger(category: "probes")
     
     /// Logger for network operations
-    ///
-    /// Use for: API requests, HTTP responses, network errors
-    /// Note: Use `.public` for URLs, `.private` for response bodies
-    static let network = Logger(subsystem: subsystem, category: "network")
+    public static let network = CategoryLogger(category: "network")
     
     /// Logger for credential operations
-    ///
-    /// Use for: Token management, credential storage, authentication
-    /// Note: ALWAYS use `.private` or `.private(mask: .hash)` for sensitive data
-    static let credentials = Logger(subsystem: subsystem, category: "credentials")
+    public static let credentials = CategoryLogger(category: "credentials")
     
     /// Logger for UI operations
-    ///
-    /// Use for: View lifecycle, user interactions, UI state changes
-    static let ui = Logger(subsystem: subsystem, category: "ui")
+    public static let ui = CategoryLogger(category: "ui")
     
     /// Logger for notification operations
-    ///
-    /// Use for: Permission requests, notification delivery, status changes
-    static let notifications = Logger(subsystem: subsystem, category: "notifications")
+    public static let notifications = CategoryLogger(category: "notifications")
     
     /// Logger for update operations
-    ///
-    /// Use for: Sparkle updates, version checks, update installations
-    static let updates = Logger(subsystem: subsystem, category: "updates")
+    public static let updates = CategoryLogger(category: "updates")
+    
+    /// Open the logs directory in Finder
+    public static func openLogsDirectory() {
+        FileLogger.shared.openLogsDirectory()
+    }
+    
+    /// The URL to the logs directory
+    public static var logsDirectoryURL: URL {
+        FileLogger.shared.logsDirectory
+    }
 }
+
+/// A category-specific logger that outputs to both OSLog and file.
+///
+/// **Privacy Note**: All messages are logged publicly (no redaction).
+/// Callers must manually redact sensitive data before logging.
+/// Do NOT log tokens, API keys, passwords, or other secrets.
+public struct CategoryLogger: Sendable {
+    private let category: String
+    private let osLogger: Logger
+    
+    init(category: String) {
+        self.category = category
+        let subsystem = Bundle.main.bundleIdentifier ?? "com.tddworks.ClaudeBar"
+        self.osLogger = Logger(subsystem: subsystem, category: category)
+    }
+    
+    /// Log a debug message (OSLog only, not written to file).
+    /// - Note: Message is logged publicly. Caller must redact sensitive data.
+    public func debug(_ message: String) {
+        osLogger.debug("\(message, privacy: .public)")
+    }
+    
+    /// Log an info message (written to both OSLog and file).
+    /// - Note: Message is logged publicly. Caller must redact sensitive data.
+    public func info(_ message: String) {
+        osLogger.info("\(message, privacy: .public)")
+        FileLogger.shared.log(.info, category: category, message: message)
+    }
+    
+    /// Log a notice message (written to both OSLog and file as INFO level).
+    /// - Note: Message is logged publicly. Caller must redact sensitive data.
+    public func notice(_ message: String) {
+        osLogger.notice("\(message, privacy: .public)")
+        FileLogger.shared.log(.info, category: category, message: message)
+    }
+    
+    /// Log a warning message (written to both OSLog and file).
+    /// - Note: Message is logged publicly. Caller must redact sensitive data.
+    public func warning(_ message: String) {
+        osLogger.warning("\(message, privacy: .public)")
+        FileLogger.shared.log(.warning, category: category, message: message)
+    }
+    
+    /// Log an error message (written to both OSLog and file).
+    /// - Note: Message is logged publicly. Caller must redact sensitive data.
+    public func error(_ message: String) {
+        osLogger.error("\(message, privacy: .public)")
+        FileLogger.shared.log(.error, category: category, message: message)
+    }
+}
+
+

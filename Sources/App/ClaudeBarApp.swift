@@ -1,7 +1,6 @@
 import SwiftUI
 import Domain
 import Infrastructure
-import OSLog
 #if ENABLE_SPARKLE
 import Sparkle
 #endif
@@ -34,18 +33,18 @@ final class AppState {
     /// Adds a provider if not already present
     func addProvider(_ provider: any AIProvider) {
         guard !providers.contains(where: { $0.id == provider.id }) else {
-            Logger.providers.debug("Provider already exists: \(provider.id)")
+            AppLog.providers.debug("Provider already exists: \(provider.id)")
             return
         }
         providers.append(provider)
         AIProviderRegistry.shared.register([provider])
-        Logger.providers.info("Added provider: \(provider.id)")
+        AppLog.providers.info("Added provider: \(provider.id)")
     }
 
     /// Removes a provider by ID
     func removeProvider(id: String) {
         providers.removeAll { $0.id == id }
-        Logger.providers.info("Removed provider: \(id)")
+        AppLog.providers.info("Removed provider: \(id)")
     }
 }
 
@@ -66,7 +65,7 @@ struct ClaudeBarApp: App {
     #endif
 
     init() {
-        Logger.ui.info("ClaudeBar initializing...")
+        AppLog.ui.info("ClaudeBar initializing...")
         
         // Create providers with their probes (rich domain models)
         var providers: [any AIProvider] = [
@@ -74,19 +73,19 @@ struct ClaudeBarApp: App {
             CodexProvider(probe: CodexUsageProbe()),
             GeminiProvider(probe: GeminiUsageProbe()),
         ]
-        Logger.providers.info("Created base providers: Claude, Codex, Gemini")
+        AppLog.providers.info("Created base providers: Claude, Codex, Gemini")
 
         // Add Copilot provider if configured
         if AppSettings.shared.copilotEnabled && AppSettings.shared.hasCopilotToken {
             providers.append(CopilotProvider(probe: CopilotUsageProbe()))
-            Logger.providers.info("Added Copilot provider (enabled and configured)")
+            AppLog.providers.info("Added Copilot provider (enabled and configured)")
         } else if AppSettings.shared.copilotEnabled {
-            Logger.providers.debug("Copilot enabled but no token configured")
+            AppLog.providers.debug("Copilot enabled but no token configured")
         }
 
         // Register providers for global access
         AIProviderRegistry.shared.register(providers)
-        Logger.providers.info("Registered \(providers.count) providers")
+        AppLog.providers.info("Registered \(providers.count) providers")
 
         // Store providers in app state
         appState = AppState(providers: providers)
@@ -96,16 +95,16 @@ struct ClaudeBarApp: App {
             providers: providers,
             statusObserver: notificationObserver
         )
-        Logger.monitor.info("QuotaMonitor initialized")
+        AppLog.monitor.info("QuotaMonitor initialized")
 
         // Request notification permission
         let observer = notificationObserver
         Task {
             let granted = await observer.requestPermission()
-            Logger.notifications.info("Notification permission: \(granted ? "granted" : "denied")")
+            AppLog.notifications.info("Notification permission: \(granted ? "granted" : "denied")")
         }
         
-        Logger.ui.info("ClaudeBar initialization complete")
+        AppLog.ui.info("ClaudeBar initialization complete")
     }
 
     /// App settings for theme

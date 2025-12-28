@@ -248,9 +248,9 @@ public struct InteractiveRunner: Sendable {
             // Exit if process stopped
             if !process.isRunning { break }
 
-            // Exit if we have output and haven't received new data for a while
-            // This handles cases where process.isRunning doesn't update promptly
-            if !buffer.isEmpty && Date().timeIntervalSince(lastDataTime) > idleTimeout {
+            // Exit if we have meaningful output (not just escape sequences) and idle
+            // This prevents early exit when CLI outputs escape codes then pauses for network
+            if hasMeaningfulContent(buffer) && Date().timeIntervalSince(lastDataTime) > idleTimeout {
                 break
             }
 
@@ -260,6 +260,45 @@ public struct InteractiveRunner: Sendable {
         // Capture any remaining output
         readAvailableData(from: fd, into: &buffer)
         return buffer
+    }
+    
+    /// Checks if buffer contains meaningful content beyond just ANSI escape sequences.
+    /// ANSI escapes start with ESC (0x1B) followed by '[' and end with a letter.
+    /// Returns true only if there's visible text content.
+    private func hasMeaningfulContent(_ data: Data) -> Bool {
+        guard let text = String(data: data, encoding: .utf8) else {
+            return !data.isEmpty
+        }
+        
+        // Comprehensive ANSI escape sequence pattern:
+        // - CSI sequences: ESC [ params letter (e.g., \x1B[0m, \x1B[?25h)
+        // - Charset sequences: ESC ( or ) followed by charset designator (e.g., \x1B(B)
+        // - OSC sequences: ESC ] ... BEL (e.g., \x1B]0;title\x07)
+        let stripped = text
+            // CSI sequences: ESC[ followed by parameters and final byte
+            .replacingOccurrences(
+                of: #"\x1B\[[0-9;?]*[A-Za-z]"#,
+                with: "",
+                options: .regularExpression
+            )
+            // Charset designation sequences: ESC( or ESC) followed by charset
+            .replacingOccurrences(
+                of: #"\x1B[\(\)][AB012]"#,
+                with: "",
+                options: .regularExpression
+            )
+            // OSC sequences: ESC] ... BEL or ESC] ... ST
+            .replacingOccurrences(
+                of: #"\x1B\][^\x07]*\x07"#,
+                with: "",
+                options: .regularExpression
+            )
+            // Strip remaining lone ESC characters
+            .replacingOccurrences(of: "\u{1B}", with: "")
+        
+        // Check if anything meaningful remains after stripping whitespace
+        let meaningful = stripped.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !meaningful.isEmpty
     }
 
     /// Reads all currently available data from a file descriptor.

@@ -13,6 +13,11 @@ internal struct GeminiCLIProbe {
 
     func probe() async throws -> UsageSnapshot {
         guard BinaryLocator.which("gemini") != nil else {
+            // Log diagnostic info when binary not found
+            let env = ProcessInfo.processInfo.environment
+            logger.error("Gemini binary 'gemini' not found in PATH")
+            logger.debug("Current directory: \(FileManager.default.currentDirectoryPath)")
+            logger.debug("PATH: \(env["PATH"] ?? "<not set>")")
             throw ProbeError.cliNotFound("gemini")
         }
 

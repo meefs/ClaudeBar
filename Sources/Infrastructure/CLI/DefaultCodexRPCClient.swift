@@ -1,8 +1,5 @@
 import Foundation
 import Domain
-import os.log
-
-private let logger = Logger(subsystem: "com.claudebar", category: "CodexRPC")
 
 /// Default implementation of CodexRPCClient that communicates with `codex app-server`.
 /// Uses RPCTransport for communication, enabling testability.
@@ -27,7 +24,17 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
     }
 
     public func isAvailable() -> Bool {
-        cliExecutor.locate(executable) != nil
+        let binaryName = executable
+        if cliExecutor.locate(binaryName) != nil {
+            return true
+        }
+        
+        // Log diagnostic info when binary not found
+        let env = ProcessInfo.processInfo.environment
+        AppLog.probes.error("Codex binary '\(binaryName)' not found in PATH")
+        AppLog.probes.debug("Current directory: \(FileManager.default.currentDirectoryPath)")
+        AppLog.probes.debug("PATH: \(env["PATH"] ?? "<not set>")")
+        return false
     }
 
     public func fetchRateLimits() async throws -> CodexRateLimitsResponse {
@@ -35,7 +42,7 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
         do {
             return try await fetchViaRPC()
         } catch {
-            logger.warning("Codex RPC failed: \(error.localizedDescription), trying TTY fallback...")
+            AppLog.probes.warning("Codex RPC failed: \(error.localizedDescription), trying TTY fallback...")
             return try await fetchViaTTY()
         }
     }
@@ -65,21 +72,21 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
         // Log raw response
         if let data = try? JSONSerialization.data(withJSONObject: message, options: .prettyPrinted),
            let jsonString = String(data: data, encoding: .utf8) {
-            logger.debug("Codex RPC raw response:\n\(jsonString)")
+            AppLog.probes.debug("Codex RPC raw response:\n\(jsonString)")
         }
 
         guard let result = message["result"] as? [String: Any] else {
-            logger.error("No result in response: \(String(describing: message))")
+            AppLog.probes.error("No result in response: \(String(describing: message))")
             throw ProbeError.parseFailed("Invalid rate limits response")
         }
 
         guard let rateLimits = result["rateLimits"] as? [String: Any] else {
-            logger.error("No rateLimits in result: \(String(describing: result))")
+            AppLog.probes.error("No rateLimits in result: \(String(describing: result))")
             throw ProbeError.parseFailed("No rateLimits in response")
         }
 
         let planType = rateLimits["planType"] as? String
-        logger.info("Codex plan type: \(planType ?? "unknown")")
+        AppLog.probes.info("Codex plan type: \(planType ?? "unknown")")
 
         let primary = parseWindow(rateLimits["primary"])
         let secondary = parseWindow(rateLimits["secondary"])
@@ -87,7 +94,7 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
         // If plan is free and no limits, create default "unlimited" quotas
         if primary == nil && secondary == nil {
             if planType == "free" {
-                logger.info("Codex free plan - returning unlimited quotas")
+                AppLog.probes.info("Codex free plan - returning unlimited quotas")
                 return CodexRateLimitsResponse(
                     primary: CodexRateLimitWindow(usedPercent: 0, resetDescription: "Free plan"),
                     secondary: nil,
@@ -104,7 +111,7 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
     // MARK: - TTY Fallback
 
     private func fetchViaTTY() async throws -> CodexRateLimitsResponse {
-        logger.info("Starting Codex TTY fallback...")
+        AppLog.probes.info("Starting Codex TTY fallback...")
 
         let result = try cliExecutor.execute(
             binary: executable,
@@ -115,9 +122,14 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
             autoResponses: [:]
         )
 
-        logger.debug("Codex TTY raw output:\n\(result.output)")
+        AppLog.probes.debug("Codex TTY raw output:\n\(result.output)")
 
-        return try parseTTYOutput(result.output)
+        do {
+            return try parseTTYOutput(result.output)
+        } catch {
+            AppLog.probes.debug("Working directory: \(FileManager.default.currentDirectoryPath)")
+            throw error
+        }
     }
 
     private func parseTTYOutput(_ text: String) throws -> CodexRateLimitsResponse {
@@ -183,14 +195,14 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
 
     internal func parseWindow(_ value: Any?) -> CodexRateLimitWindow? {
         guard let dict = value as? [String: Any] else {
-            logger.debug("parseWindow: value is not a dict: \(String(describing: value))")
+            AppLog.probes.debug("parseWindow: value is not a dict: \(String(describing: value))")
             return nil
         }
 
-        logger.debug("parseWindow dict keys: \(dict.keys.joined(separator: ", "))")
+        AppLog.probes.debug("parseWindow dict keys: \(dict.keys.joined(separator: ", "))")
 
         guard let usedPercent = dict["usedPercent"] as? Double else {
-            logger.debug("parseWindow: no usedPercent in dict")
+            AppLog.probes.debug("parseWindow: no usedPercent in dict")
             return nil
         }
 

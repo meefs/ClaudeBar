@@ -1,6 +1,5 @@
 import Foundation
 import Domain
-import OSLog
 
 /// Infrastructure adapter that probes the Claude CLI to fetch usage quotas.
 /// Implements the UsageProbe protocol from the domain layer.
@@ -20,11 +19,24 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     }
 
     public func isAvailable() async -> Bool {
-        cliExecutor.locate(claudeBinary) != nil
+        if cliExecutor.locate(claudeBinary) != nil {
+            return true
+        }
+        
+        // Log diagnostic info when binary not found
+        let env = ProcessInfo.processInfo.environment
+        AppLog.probes.error("Claude binary '\(claudeBinary)' not found in PATH")
+        AppLog.probes.debug("Current directory: \(FileManager.default.currentDirectoryPath)")
+        AppLog.probes.debug("PATH: \(env["PATH"] ?? "<not set>")")
+        if let configDir = env["CLAUDE_CONFIG_DIR"] {
+            AppLog.probes.debug("CLAUDE_CONFIG_DIR: \(configDir)")
+        }
+        return false
     }
 
     public func probe() async throws -> UsageSnapshot {
-        Logger.probes.info("Starting Claude probe with /usage command...")
+        let workingDir = probeWorkingDirectory()
+        AppLog.probes.info("Starting Claude probe with /usage command...")
 
         let usageResult: CLIResult
         do {
@@ -33,7 +45,7 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
                 args: ["/usage", "--allowed-tools", ""],
                 input: "",
                 timeout: timeout,
-                workingDirectory: probeWorkingDirectory(),
+                workingDirectory: workingDir,
                 autoResponses: [
                     "Esc to cancel": "\r",  // Trust prompt - press Enter to confirm
                     "Ready to code here?": "\r",
@@ -42,19 +54,27 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
                 ]
             )
         } catch {
-            Logger.probes.error("Claude /usage probe failed: \(error.localizedDescription)")
+            AppLog.probes.error("Claude /usage probe failed: \(error.localizedDescription)")
+            AppLog.probes.debug("Working directory: \(workingDir.path)")
             throw ProbeError.executionFailed(error.localizedDescription)
         }
 
-        Logger.probes.debug("Claude /usage output:\n\(usageResult.output)")
+        AppLog.probes.debug("Claude /usage output:\n\(usageResult.output)")
 
-        let snapshot = try parseClaudeOutput(usageResult.output)
-        Logger.probes.info("Claude probe success: accountType=\(snapshot.accountType?.rawValue ?? "unknown"), quotas=\(snapshot.quotas.count)")
+        let snapshot: UsageSnapshot
+        do {
+            snapshot = try parseClaudeOutput(usageResult.output)
+        } catch {
+            AppLog.probes.debug("Working directory: \(workingDir.path)")
+            throw error
+        }
+        
+        AppLog.probes.info("Claude probe success: accountType=\(snapshot.accountType?.rawValue ?? "unknown"), quotas=\(snapshot.quotas.count)")
         for quota in snapshot.quotas {
-            Logger.probes.info("  - \(quota.quotaType.displayName): \(Int(quota.percentRemaining))% remaining")
+            AppLog.probes.info("  - \(quota.quotaType.displayName): \(Int(quota.percentRemaining))% remaining")
         }
         if let cost = snapshot.costUsage {
-            Logger.probes.info("  - Extra usage: \(cost.formattedCost) / \(cost.formattedBudget ?? "N/A")")
+            AppLog.probes.info("  - Extra usage: \(cost.formattedCost) / \(cost.formattedBudget ?? "N/A")")
         }
 
         return snapshot
@@ -92,8 +112,9 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         ], text: clean)
 
         guard let sessionPct else {
-            Logger.probes.error("Claude parse failed: could not find 'Current session' percentage in output")
-            Logger.probes.debug("Raw output for debugging:\n\(clean, privacy: .private)")
+            AppLog.probes.error("Claude parse failed: could not find 'Current session' percentage in output")
+            AppLog.probes.debug("Raw output (original, \(text.count) chars): \(text.debugDescription)")
+            AppLog.probes.debug("Raw output (cleaned, \(clean.count) chars): \(clean)")
             throw ProbeError.parseFailed("Could not find session usage")
         }
 
@@ -154,36 +175,36 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     /// or "Opus 4.5 · Claude Pro · email@example.com's Organization"
     internal func detectAccountType(_ text: String) -> ClaudeAccountType {
         let lower = text.lowercased()
-        Logger.probes.debug("Detecting account type from /usage output...")
+        AppLog.probes.debug("Detecting account type from /usage output...")
 
         // Check for Claude Pro in header (e.g., "Opus 4.5 · Claude Pro")
         if lower.contains("· claude pro") || lower.contains("·claude pro") {
-            Logger.probes.info("Detected Claude Pro account from header")
+            AppLog.probes.info("Detected Claude Pro account from header")
             return .pro
         }
 
         // Check for Claude Max in header (e.g., "Opus 4.5 · Claude Max")
         if lower.contains("· claude max") || lower.contains("·claude max") {
-            Logger.probes.info("Detected Claude Max account from header")
+            AppLog.probes.info("Detected Claude Max account from header")
             return .max
         }
 
         // Check for Claude API (unlikely in /usage, but check anyway)
         if lower.contains("· claude api") || lower.contains("·claude api") ||
            lower.contains("api account") {
-            Logger.probes.info("Detected Claude API account from header")
+            AppLog.probes.info("Detected Claude API account from header")
             return .api
         }
 
         // Fallback: Check for presence of quota data (subscription accounts have quotas)
         let hasSessionQuota = lower.contains("current session") && (lower.contains("% left") || lower.contains("% used"))
         if hasSessionQuota {
-            Logger.probes.info("Detected subscription account from quota data, defaulting to Max")
+            AppLog.probes.info("Detected subscription account from quota data, defaulting to Max")
             return .max
         }
 
         // Default to Max if we can't determine
-        Logger.probes.warning("Could not determine account type, defaulting to Max")
+        AppLog.probes.warning("Could not determine account type, defaulting to Max")
         return .max
     }
 
@@ -202,7 +223,7 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
 
         // Check if Extra usage is not enabled
         if lower.contains("extra usage not enabled") {
-            Logger.probes.debug("Extra usage not enabled for this account")
+            AppLog.probes.debug("Extra usage not enabled for this account")
             return nil
         }
 
@@ -433,33 +454,37 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         let lower = text.lowercased()
 
         if lower.contains("do you trust the files in this folder?"), !lower.contains("current session") {
-            let folder = extractFolderFromTrustPrompt(text) ?? "unknown"
-            Logger.probes.error("Claude probe blocked: folder trust required for '\(folder, privacy: .private)'")
+            AppLog.probes.error("Claude probe blocked: folder trust required")
             return .folderTrustRequired
         }
 
         if lower.contains("token_expired") || lower.contains("token has expired") {
-            Logger.probes.error("Claude probe failed: token has expired, re-authentication required")
+            AppLog.probes.error("Claude probe failed: token has expired, re-authentication required")
             return .authenticationRequired
         }
 
         if lower.contains("authentication_error") {
-            Logger.probes.error("Claude probe failed: authentication error, login required")
+            AppLog.probes.error("Claude probe failed: authentication error, login required")
             return .authenticationRequired
         }
 
         if lower.contains("not logged in") || lower.contains("please log in") {
-            Logger.probes.error("Claude probe failed: not logged in")
+            AppLog.probes.error("Claude probe failed: not logged in")
             return .authenticationRequired
         }
 
         if lower.contains("update required") || lower.contains("please update") {
-            Logger.probes.error("Claude probe failed: CLI update required")
+            AppLog.probes.error("Claude probe failed: CLI update required")
             return .updateRequired
         }
 
-        if lower.contains("rate limit") || lower.contains("too many requests") {
-            Logger.probes.warning("Claude probe hit rate limit")
+        // Check for rate limit errors, but exclude promotional messages like "rate limits are 2x higher"
+        let isRateLimitError = (lower.contains("rate limited") || 
+                                lower.contains("rate limit exceeded") ||
+                                lower.contains("too many requests")) &&
+                               !lower.contains("rate limits are")
+        if isRateLimitError {
+            AppLog.probes.warning("Claude probe hit rate limit")
             return .executionFailed("Rate limited - too many requests")
         }
 

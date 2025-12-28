@@ -1,6 +1,5 @@
 import Foundation
 import Domain
-import OSLog
 
 /// Infrastructure adapter that sends macOS notifications when quota status changes.
 /// Implements StatusChangeObserver from the domain layer.
@@ -13,26 +12,26 @@ public final class NotificationQuotaObserver: StatusChangeObserver, @unchecked S
 
     /// Requests notification permission from the user
     public func requestPermission() async -> Bool {
-        Logger.notifications.debug("Requesting notification permission...")
+        AppLog.notifications.debug("Requesting notification permission...")
         let granted = await notificationService.requestPermission()
-        Logger.notifications.info("Notification permission: \(granted ? "granted" : "denied")")
+        AppLog.notifications.info("Notification permission: \(granted ? "granted" : "denied")")
         return granted
     }
 
     // MARK: - StatusChangeObserver
 
     public func onStatusChanged(providerId: String, oldStatus: QuotaStatus, newStatus: QuotaStatus) async {
-        Logger.notifications.debug("Status change: \(providerId) \(String(describing: oldStatus)) -> \(String(describing: newStatus))")
+        AppLog.notifications.debug("Status change: \(providerId) \(String(describing: oldStatus)) -> \(String(describing: newStatus))")
         
         // Only notify on degradation (getting worse)
         guard newStatus > oldStatus else {
-            Logger.notifications.debug("Status improved or same, skipping notification")
+            AppLog.notifications.debug("Status improved or same, skipping notification")
             return
         }
 
         // Skip if status improved or stayed the same
         guard shouldNotify(for: newStatus) else {
-            Logger.notifications.debug("Status \(String(describing: newStatus)) does not require notification")
+            AppLog.notifications.debug("Status \(String(describing: newStatus)) does not require notification")
             return
         }
 
@@ -40,7 +39,7 @@ public final class NotificationQuotaObserver: StatusChangeObserver, @unchecked S
         let title = "\(providerName) Quota Alert"
         let body = notificationBody(for: newStatus, providerName: providerName)
 
-        Logger.notifications.notice("Sending quota alert for \(providerId): \(String(describing: newStatus))")
+        AppLog.notifications.notice("Sending quota alert for \(providerId): \(String(describing: newStatus))")
         
         do {
             try await notificationService.send(
@@ -48,9 +47,9 @@ public final class NotificationQuotaObserver: StatusChangeObserver, @unchecked S
                 body: body,
                 categoryIdentifier: "QUOTA_ALERT"
             )
-            Logger.notifications.info("Notification sent successfully")
+            AppLog.notifications.info("Notification sent successfully")
         } catch {
-            Logger.notifications.error("Failed to send notification: \(error.localizedDescription)")
+            AppLog.notifications.error("Failed to send notification: \(error.localizedDescription)")
         }
     }
 

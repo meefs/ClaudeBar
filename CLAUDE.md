@@ -168,45 +168,68 @@ Or use the manual workflow dispatch in GitHub Actions with version input.
 
 ## Logging
 
-The app uses Apple's **OSLog framework** via a centralized `Logger` extension in `Sources/App/AppLogger.swift`.
+The app uses a **dual-output logging system** via `AppLog` in `Sources/Infrastructure/Logging/`:
 
-### Logger Categories
+- **OSLog** (for developers): Full privacy controls, visible in Console.app
+- **File** (for users): Persistent logs at `~/Library/Logs/ClaudeBar/ClaudeBar.log`
+
+### AppLog Categories
 
 ```swift
-Logger.monitor        // QuotaMonitor operations
-Logger.providers      // AI provider lifecycle  
-Logger.probes         // CLI probe execution
-Logger.network        // HTTP requests/responses
-Logger.credentials    // Token management (use .private!)
-Logger.ui             // SwiftUI view lifecycle
-Logger.notifications  // System notifications
-Logger.updates        // Sparkle updates
+AppLog.monitor        // QuotaMonitor operations
+AppLog.providers      // AI provider lifecycle  
+AppLog.probes         // CLI probe execution
+AppLog.network        // HTTP requests/responses
+AppLog.credentials    // Token management (redact sensitive data!)
+AppLog.ui             // SwiftUI view lifecycle
+AppLog.notifications  // System notifications
+AppLog.updates        // Sparkle updates
 ```
+
+### Log Levels and Output
+
+| Level | Method | OSLog | File | Use Case |
+|-------|--------|-------|------|----------|
+| `debug` | `.debug()` | ✅ | ❌ | Development diagnostics (too verbose for file) |
+| `info` | `.info()` | ✅ | ✅ | Informational events |
+| `notice` | `.notice()` | ✅ | ✅ | Significant events |
+| `warning` | `.warning()` | ✅ | ✅ | Potential issues |
+| `error` | `.error()` | ✅ | ✅ | Recoverable errors |
 
 ### Privacy Rules
 
-- **Always use `.private`** for: tokens, API keys, CLI output, usernames
-- **Use `.private(mask: .hash)`** for: correlation IDs you need to track
-- **Safe as `.public`**: provider names, status enums, counts, URLs
+Since `AppLog` uses simple String parameters (not OSLog interpolation), you must manually redact sensitive data:
 
-### Log Levels
+```swift
+// ✅ Correct - redact sensitive data
+AppLog.credentials.info("Token refreshed for provider")
+AppLog.probes.error("Probe failed: \(error.localizedDescription)")
 
-OSLog levels are used at the **call site** - you choose the level when logging:
+// ❌ Wrong - exposes secrets in file log
+AppLog.credentials.info("Token: \(accessToken)")
+```
 
-| Level | Method | Persistence | Use Case |
-|-------|--------|-------------|----------|
-| `trace` | `.trace()` | Memory only | Extremely verbose debugging |
-| `debug` | `.debug()` | Memory only | Development diagnostics |
-| `info` | `.info()` | With `log collect` | Informational events |
-| `notice` | `.notice()` | Always persisted | Significant events |
-| `warning` | `.warning()` | Always persisted | Potential issues |
-| `error` | `.error()` | Always persisted | Recoverable errors |
-| `fault` | `.fault()` | Always persisted | Critical failures |
+For sensitive debugging that needs OSLog privacy controls, use OSLog directly.
 
-**Key insight**: OSLog filtering happens at the *consumer* level (Console.app, `log` command), not at the app level. The app emits all logs - the OS filters what gets shown/persisted based on level.
+### File Logging Details
+
+- **Location**: `~/Library/Logs/ClaudeBar/ClaudeBar.log`
+- **Rotation**: Rotates to `ClaudeBar.old.log` at 5MB
+- **Format**: `[YYYY-MM-DD HH:MM:SS] [LEVEL] [category] message`
+- **Access**: Settings → "Open Logs Folder" button
 
 ### Viewing Logs
 
+**File logs (for users):**
+```bash
+# Open in Finder (or use Settings → Open Logs Folder)
+open ~/Library/Logs/ClaudeBar/
+
+# Tail the log
+tail -f ~/Library/Logs/ClaudeBar/ClaudeBar.log
+```
+
+**OSLog (for developers):**
 ```bash
 # Console.app filter
 subsystem:com.tddworks.ClaudeBar
@@ -226,7 +249,10 @@ log stream --predicate 'subsystem == "com.tddworks.ClaudeBar"' --info --debug
 When a probe fails (e.g., `claude /usage`), all errors are logged with context:
 
 ```bash
-# See probe-specific logs
+# File log - grep for probe issues
+grep -i "probe" ~/Library/Logs/ClaudeBar/ClaudeBar.log
+
+# OSLog - probe-specific logs
 log show --predicate 'subsystem == "com.tddworks.ClaudeBar" AND category == "probes"' --info --debug --last 1h
 ```
 

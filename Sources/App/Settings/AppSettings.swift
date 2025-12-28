@@ -1,7 +1,6 @@
 import Foundation
 import Infrastructure
 import Domain
-import OSLog
 
 /// Observable settings manager for ClaudeBar preferences.
 /// Credentials are stored in UserDefaults via CredentialStore.
@@ -87,20 +86,20 @@ public final class AppSettings {
     /// Saves the GitHub Copilot token
     public func saveCopilotToken(_ token: String) {
         credentialStore.save(token, forKey: CredentialKey.githubToken)
-        Logger.credentials.info("Saved GitHub Copilot token")
+        AppLog.credentials.info("Saved GitHub Copilot token")
     }
 
     /// Retrieves the GitHub Copilot token
     public func getCopilotToken() -> String? {
         let token = credentialStore.get(forKey: CredentialKey.githubToken)
-        Logger.credentials.debug("Retrieved GitHub Copilot token: \(token != nil ? "exists" : "nil")")
+        AppLog.credentials.debug("Retrieved GitHub Copilot token: \(token != nil ? "exists" : "nil")")
         return token
     }
 
     /// Deletes the GitHub Copilot token
     public func deleteCopilotToken() {
         credentialStore.delete(forKey: CredentialKey.githubToken)
-        Logger.credentials.info("Deleted GitHub Copilot token")
+        AppLog.credentials.info("Deleted GitHub Copilot token")
     }
 
     // MARK: - Initialization
