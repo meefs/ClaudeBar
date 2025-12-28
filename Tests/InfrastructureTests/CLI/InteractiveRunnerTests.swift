@@ -44,13 +44,13 @@ struct HasMeaningfulContentTests {
     
     @Test
     func `whitespace only returns false`() {
-        let data = "   \n\t\r\n  ".data(using: .utf8)!
+        let data = Data("   \n\t\r\n  ".utf8)
         #expect(runner.hasMeaningfulContent(data) == false)
     }
     
     @Test
     func `visible text returns true`() {
-        let data = "Hello, World!".data(using: .utf8)!
+        let data = Data("Hello, World!".utf8)
         #expect(runner.hasMeaningfulContent(data) == true)
     }
     
@@ -98,7 +98,7 @@ struct HasMeaningfulContentTests {
         // \x1B]0;Window Title\x07 = set window title
         var data = Data()
         data.append(contentsOf: [0x1B, 0x5D])  // ESC ]
-        data.append(contentsOf: "0;Window Title".data(using: .utf8)!)
+        data.append(Data("0;Window Title".utf8))
         data.append(0x07)  // BEL
         #expect(runner.hasMeaningfulContent(data) == false)
     }
@@ -108,7 +108,7 @@ struct HasMeaningfulContentTests {
         // \x1B]0;Window Title\x1B\\ = set window title (ST = ESC \)
         var data = Data()
         data.append(contentsOf: [0x1B, 0x5D])  // ESC ]
-        data.append(contentsOf: "0;Window Title".data(using: .utf8)!)
+        data.append(Data("0;Window Title".utf8))
         data.append(contentsOf: [0x1B, 0x5C])  // ESC \ (ST)
         #expect(runner.hasMeaningfulContent(data) == false)
     }
@@ -118,7 +118,7 @@ struct HasMeaningfulContentTests {
         // OSC with newlines in content
         var data = Data()
         data.append(contentsOf: [0x1B, 0x5D])  // ESC ]
-        data.append(contentsOf: "0;Line1\nLine2\nLine3".data(using: .utf8)!)
+        data.append(Data("0;Line1\nLine2\nLine3".utf8))
         data.append(0x07)  // BEL
         #expect(runner.hasMeaningfulContent(data) == false)
     }
@@ -128,7 +128,7 @@ struct HasMeaningfulContentTests {
         // OSC with newlines in content, ST termination
         var data = Data()
         data.append(contentsOf: [0x1B, 0x5D])  // ESC ]
-        data.append(contentsOf: "0;Line1\nLine2\nLine3".data(using: .utf8)!)
+        data.append(Data("0;Line1\nLine2\nLine3".utf8))
         data.append(contentsOf: [0x1B, 0x5C])  // ESC \ (ST)
         #expect(runner.hasMeaningfulContent(data) == false)
     }
@@ -140,9 +140,9 @@ struct HasMeaningfulContentTests {
         // \x1B[0mHello\x1B[1mWorld
         var data = Data()
         data.append(contentsOf: [0x1B, 0x5B, 0x30, 0x6D])  // ESC [ 0 m
-        data.append(contentsOf: "Hello".data(using: .utf8)!)
+        data.append(Data("Hello".utf8))
         data.append(contentsOf: [0x1B, 0x5B, 0x31, 0x6D])  // ESC [ 1 m
-        data.append(contentsOf: "World".data(using: .utf8)!)
+        data.append(Data("World".utf8))
         #expect(runner.hasMeaningfulContent(data) == true)
     }
     
@@ -150,9 +150,9 @@ struct HasMeaningfulContentTests {
     func `OSC sequence followed by visible text returns true`() {
         var data = Data()
         data.append(contentsOf: [0x1B, 0x5D])  // ESC ]
-        data.append(contentsOf: "0;Title".data(using: .utf8)!)
+        data.append(Data("0;Title".utf8))
         data.append(0x07)  // BEL
-        data.append(contentsOf: "Actual content".data(using: .utf8)!)
+        data.append(Data("Actual content".utf8))
         #expect(runner.hasMeaningfulContent(data) == true)
     }
     
@@ -161,14 +161,14 @@ struct HasMeaningfulContentTests {
         var data = Data()
         // OSC title
         data.append(contentsOf: [0x1B, 0x5D])
-        data.append(contentsOf: "0;Title".data(using: .utf8)!)
+        data.append(Data("0;Title".utf8))
         data.append(0x07)
         // CSI reset
         data.append(contentsOf: [0x1B, 0x5B, 0x30, 0x6D])
         // Charset
         data.append(contentsOf: [0x1B, 0x28, 0x42])
         // Visible text
-        data.append(contentsOf: "Usage: 50%".data(using: .utf8)!)
+        data.append(Data("Usage: 50%".utf8))
         // More CSI
         data.append(contentsOf: [0x1B, 0x5B, 0x3F, 0x32, 0x35, 0x68])
         #expect(runner.hasMeaningfulContent(data) == true)
