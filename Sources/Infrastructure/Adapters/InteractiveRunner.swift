@@ -273,8 +273,8 @@ public struct InteractiveRunner: Sendable {
         // Comprehensive ANSI escape sequence pattern:
         // - CSI sequences: ESC [ params letter (e.g., \x1B[0m, \x1B[?25h)
         // - Charset sequences: ESC ( or ) followed by charset designator (e.g., \x1B(B)
-        // - OSC sequences: ESC ] ... BEL (e.g., \x1B]0;title\x07)
-        let stripped = text
+        // - OSC sequences: ESC ] ... terminated by BEL (0x07) or ST (ESC \)
+        var stripped = text
             // CSI sequences: ESC[ followed by parameters and final byte
             .replacingOccurrences(
                 of: #"\x1B\[[0-9;?]*[A-Za-z]"#,
@@ -287,14 +287,23 @@ public struct InteractiveRunner: Sendable {
                 with: "",
                 options: .regularExpression
             )
-            // OSC sequences: ESC] ... BEL or ESC] ... ST
-            .replacingOccurrences(
-                of: #"\x1B\][^\x07]*\x07"#,
-                with: "",
-                options: .regularExpression
+        
+        // OSC sequences: ESC ] ... terminated by BEL (0x07) or ST (ESC \)
+        // Uses non-greedy .*? to match minimal content, with dotMatchesLineSeparators
+        // to handle OSC sequences that may span multiple lines
+        if let oscRegex = try? NSRegularExpression(
+            pattern: #"\x1B\].*?(?:\x07|\x1B\\)"#,
+            options: .dotMatchesLineSeparators
+        ) {
+            stripped = oscRegex.stringByReplacingMatches(
+                in: stripped,
+                range: NSRange(stripped.startIndex..., in: stripped),
+                withTemplate: ""
             )
-            // Strip remaining lone ESC characters
-            .replacingOccurrences(of: "\u{1B}", with: "")
+        }
+        
+        // Strip remaining lone ESC characters
+        stripped = stripped.replacingOccurrences(of: "\u{1B}", with: "")
         
         // Check if anything meaningful remains after stripping whitespace
         let meaningful = stripped.trimmingCharacters(in: .whitespacesAndNewlines)

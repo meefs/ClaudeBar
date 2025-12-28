@@ -1,8 +1,5 @@
 import Foundation
 import Domain
-import os.log
-
-private let logger = Logger(subsystem: "com.claudebar", category: "GeminiCLIProbe")
 
 internal struct GeminiCLIProbe {
     private let timeout: TimeInterval
@@ -15,13 +12,13 @@ internal struct GeminiCLIProbe {
         guard BinaryLocator.which("gemini") != nil else {
             // Log diagnostic info when binary not found
             let env = ProcessInfo.processInfo.environment
-            logger.error("Gemini binary 'gemini' not found in PATH")
-            logger.debug("Current directory: \(FileManager.default.currentDirectoryPath)")
-            logger.debug("PATH: \(env["PATH"] ?? "<not set>")")
+            AppLog.probes.error("Gemini binary 'gemini' not found in PATH")
+            AppLog.probes.debug("Current directory: \(FileManager.default.currentDirectoryPath)")
+            AppLog.probes.debug("PATH: \(env["PATH"] ?? "<not set>")")
             throw ProbeError.cliNotFound("gemini")
         }
 
-        logger.info("Starting Gemini CLI fallback...")
+        AppLog.probes.info("Starting Gemini CLI fallback...")
 
         let runner = InteractiveRunner()
         let options = InteractiveRunner.Options(
@@ -33,14 +30,14 @@ internal struct GeminiCLIProbe {
         do {
             result = try runner.run(binary: "gemini", input: "/stats\n", options: options)
         } catch let error as InteractiveRunner.RunError {
-            logger.error("Gemini CLI failed: \(error.localizedDescription)")
+            AppLog.probes.error("Gemini CLI failed: \(error.localizedDescription)")
             throw mapRunError(error)
         }
 
-        logger.debug("Gemini CLI raw output:\n\(result.output)")
+        AppLog.probes.debug("Gemini CLI raw output:\n\(result.output)")
 
         let snapshot = try Self.parse(result.output)
-        logger.info("Gemini CLI probe success: \(snapshot.quotas.count) quotas found")
+        AppLog.probes.info("Gemini CLI probe success: \(snapshot.quotas.count) quotas found")
         return snapshot
     }
 

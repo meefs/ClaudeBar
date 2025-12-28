@@ -30,7 +30,12 @@ public final class FileLogger: @unchecked Sendable {
             .appendingPathComponent("ClaudeBar", isDirectory: true)
         
         // Create directory if needed
-        try? FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
+        // Note: Can't use AppLog here as FileLogger is used by AppLog (circular dependency)
+        do {
+            try FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
+        } catch {
+            NSLog("[FileLogger] Failed to create logs directory at %@: %@", logsDir.path, error.localizedDescription)
+        }
         
         self.fileURL = logsDir.appendingPathComponent("ClaudeBar.log")
     }
