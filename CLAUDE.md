@@ -102,10 +102,27 @@ The codebase separates testable logic from external system interaction:
 
 ### Adding a New AI Provider
 
-1. Create a new provider class implementing `AIProvider` in `Sources/Domain/Provider/`
-2. Create probe in `Sources/Infrastructure/CLI/` implementing `UsageProbe`
-3. Register provider in `ClaudeBarApp.init()`
-4. Add parsing tests in `Tests/InfrastructureTests/CLI/`
+Use the **add-provider** skill to guide you through adding new AI providers following TDD patterns:
+
+```
+Tell Claude Code: "I want to add a new provider for [ProviderName]"
+```
+
+The skill will guide you through:
+
+1. **Parsing Tests** → Create tests for API/CLI response parsing first
+2. **Probe Behavior Tests** → Test detection and error handling with mocks
+3. **Probe Implementation** → Implement `UsageProbe` in `Sources/Infrastructure/CLI/`
+4. **Provider Class** → Create `AIProvider` in `Sources/Domain/Provider/`
+5. **Registration** → Add to `ClaudeBarApp.init()` and `AIProviderRegistry`
+
+**Skill location:** `skills/add-provider/SKILL.md`
+
+**Reference implementation:** See `AntigravityUsageProbe` for a complete example of:
+- Local process detection via `ps` and `lsof`
+- CSRF token extraction from process args
+- Local API calls with self-signed cert handling
+- Parsing JSON responses to `UsageSnapshot` with `UsageQuota` array
 
 ## Assets
 

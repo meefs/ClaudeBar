@@ -173,6 +173,20 @@ ClaudeBar uses a layered architecture with protocol-based dependency injection:
 - **Adapters Folder** - Pure 3rd-party wrappers excluded from code coverage
 - **No ViewModel Layer** - SwiftUI views directly consume domain models
 
+## Contributing
+
+### Adding a New AI Provider
+
+Use the **add-provider** skill to guide you through adding new providers with TDD:
+
+```
+Tell Claude Code: "I want to add a new provider for [ProviderName]"
+```
+
+The skill guides you through: Parsing Tests → Probe Tests → Implementation → Registration.
+
+See `skills/add-provider/SKILL.md` for details and `AntigravityUsageProbe` as a reference implementation.
+
 ## Dependencies
 
 - [Sparkle](https://sparkle-project.org/) - Auto-update framework
