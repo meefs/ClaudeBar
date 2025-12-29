@@ -166,6 +166,102 @@ git push origin v1.0.0
 
 Or use the manual workflow dispatch in GitHub Actions with version input.
 
+## Logging
+
+The app uses a **dual-output logging system** via `AppLog` in `Sources/Infrastructure/Logging/`:
+
+- **OSLog** (for developers): Full privacy controls, visible in Console.app
+- **File** (for users): Persistent logs at `~/Library/Logs/ClaudeBar/ClaudeBar.log`
+
+### AppLog Categories
+
+```swift
+AppLog.monitor        // QuotaMonitor operations
+AppLog.providers      // AI provider lifecycle  
+AppLog.probes         // CLI probe execution
+AppLog.network        // HTTP requests/responses
+AppLog.credentials    // Token management (redact sensitive data!)
+AppLog.ui             // SwiftUI view lifecycle
+AppLog.notifications  // System notifications
+AppLog.updates        // Sparkle updates
+```
+
+### Log Levels and Output
+
+| Level | Method | OSLog | File | Use Case |
+|-------|--------|-------|------|----------|
+| `debug` | `.debug()` | ✅ | ❌ | Development diagnostics (too verbose for file) |
+| `info` | `.info()` | ✅ | ✅ | Informational events |
+| `notice` | `.notice()` | ✅ | ✅ | Significant events |
+| `warning` | `.warning()` | ✅ | ✅ | Potential issues |
+| `error` | `.error()` | ✅ | ✅ | Recoverable errors |
+
+### Privacy Rules
+
+Since `AppLog` uses simple String parameters (not OSLog interpolation), you must manually redact sensitive data:
+
+```swift
+// ✅ Correct - redact sensitive data
+AppLog.credentials.info("Token refreshed for provider")
+AppLog.probes.error("Probe failed: \(error.localizedDescription)")
+
+// ❌ Wrong - exposes secrets in file log
+AppLog.credentials.info("Token: \(accessToken)")
+```
+
+For sensitive debugging that needs OSLog privacy controls, use OSLog directly.
+
+### File Logging Details
+
+- **Location**: `~/Library/Logs/ClaudeBar/ClaudeBar.log`
+- **Rotation**: Rotates to `ClaudeBar.old.log` at 5MB
+- **Format**: `[YYYY-MM-DD HH:MM:SS] [LEVEL] [category] message`
+- **Access**: Settings → "Open Logs Folder" button
+
+### Viewing Logs
+
+**File logs (for users):**
+```bash
+# Open in Finder (or use Settings → Open Logs Folder)
+open ~/Library/Logs/ClaudeBar/
+
+# Tail the log
+tail -f ~/Library/Logs/ClaudeBar/ClaudeBar.log
+```
+
+**OSLog (for developers):**
+```bash
+# Console.app filter
+subsystem:com.tddworks.ClaudeBar
+
+# Terminal - show all levels (including debug)
+log show --predicate 'subsystem == "com.tddworks.ClaudeBar"' --info --debug --last 1h
+
+# Terminal - errors only
+log show --predicate 'subsystem == "com.tddworks.ClaudeBar" AND messageType == error' --last 1h
+
+# Live stream (for debugging)
+log stream --predicate 'subsystem == "com.tddworks.ClaudeBar"' --info --debug
+```
+
+### Debugging Probe Issues
+
+When a probe fails (e.g., `claude /usage`), all errors are logged with context:
+
+```bash
+# File log - grep for probe issues
+grep -i "probe" ~/Library/Logs/ClaudeBar/ClaudeBar.log
+
+# OSLog - probe-specific logs
+log show --predicate 'subsystem == "com.tddworks.ClaudeBar" AND category == "probes"' --info --debug --last 1h
+```
+
+Common error patterns logged:
+- `"Claude probe failed: token has expired"` → Re-login required
+- `"Claude probe blocked: folder trust required"` → Trust the folder in Claude CLI
+- `"Codex probe failed: data not available yet"` → Wait for Codex to sync
+- `"Gemini probe failed: no access token"` → Re-authenticate with Gemini CLI
+
 ## Dependencies
 
 - **Sparkle**: Auto-update framework for macOS

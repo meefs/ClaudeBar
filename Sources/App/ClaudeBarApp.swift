@@ -32,14 +32,19 @@ final class AppState {
 
     /// Adds a provider if not already present
     func addProvider(_ provider: any AIProvider) {
-        guard !providers.contains(where: { $0.id == provider.id }) else { return }
+        guard !providers.contains(where: { $0.id == provider.id }) else {
+            AppLog.providers.debug("Provider already exists: \(provider.id)")
+            return
+        }
         providers.append(provider)
         AIProviderRegistry.shared.register([provider])
+        AppLog.providers.info("Added provider: \(provider.id)")
     }
 
     /// Removes a provider by ID
     func removeProvider(id: String) {
         providers.removeAll { $0.id == id }
+        AppLog.providers.info("Removed provider: \(id)")
     }
 }
 
@@ -60,20 +65,27 @@ struct ClaudeBarApp: App {
     #endif
 
     init() {
+        AppLog.ui.info("ClaudeBar initializing...")
+        
         // Create providers with their probes (rich domain models)
         var providers: [any AIProvider] = [
             ClaudeProvider(probe: ClaudeUsageProbe()),
             CodexProvider(probe: CodexUsageProbe()),
             GeminiProvider(probe: GeminiUsageProbe()),
         ]
+        AppLog.providers.info("Created base providers: Claude, Codex, Gemini")
 
         // Add Copilot provider if configured
         if AppSettings.shared.copilotEnabled && AppSettings.shared.hasCopilotToken {
             providers.append(CopilotProvider(probe: CopilotUsageProbe()))
+            AppLog.providers.info("Added Copilot provider (enabled and configured)")
+        } else if AppSettings.shared.copilotEnabled {
+            AppLog.providers.debug("Copilot enabled but no token configured")
         }
 
         // Register providers for global access
         AIProviderRegistry.shared.register(providers)
+        AppLog.providers.info("Registered \(providers.count) providers")
 
         // Store providers in app state
         appState = AppState(providers: providers)
@@ -83,12 +95,16 @@ struct ClaudeBarApp: App {
             providers: providers,
             statusObserver: notificationObserver
         )
+        AppLog.monitor.info("QuotaMonitor initialized")
 
         // Request notification permission
         let observer = notificationObserver
         Task {
-            _ = await observer.requestPermission()
+            let granted = await observer.requestPermission()
+            AppLog.notifications.info("Notification permission: \(granted ? "granted" : "denied")")
         }
+        
+        AppLog.ui.info("ClaudeBar initialization complete")
     }
 
     /// App settings for theme

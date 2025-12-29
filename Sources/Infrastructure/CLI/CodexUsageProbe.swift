@@ -1,9 +1,6 @@
 import Foundation
 import Domain
 import Mockable
-import os.log
-
-private let logger = Logger(subsystem: "com.claudebar", category: "CodexProbe")
 
 // MARK: - Codex Service Protocol
 
@@ -55,15 +52,15 @@ public struct CodexUsageProbe: UsageProbe {
     }
 
     public func probe() async throws -> UsageSnapshot {
-        logger.info("Starting Codex probe...")
+        AppLog.probes.info("Starting Codex probe...")
         defer { client.shutdown() }
 
         let limits = try await client.fetchRateLimits()
         let snapshot = try Self.mapRateLimitsToSnapshot(limits)
 
-        logger.info("Codex probe success: \(snapshot.quotas.count) quotas found")
+        AppLog.probes.info("Codex probe success: \(snapshot.quotas.count) quotas found")
         for quota in snapshot.quotas {
-            logger.info("  - \(quota.quotaType.displayName): \(Int(quota.percentRemaining))% remaining")
+            AppLog.probes.info("  - \(quota.quotaType.displayName): \(Int(quota.percentRemaining))% remaining")
         }
         return snapshot
     }
@@ -91,6 +88,7 @@ public struct CodexUsageProbe: UsageProbe {
         }
 
         guard !quotas.isEmpty else {
+            AppLog.probes.error("Codex probe failed: no rate limits in RPC response")
             throw ProbeError.parseFailed("No rate limits found")
         }
 
@@ -132,6 +130,9 @@ public struct CodexUsageProbe: UsageProbe {
         }
 
         if quotas.isEmpty {
+            AppLog.probes.error("Codex parse failed: could not find usage limits in TTY output")
+            AppLog.probes.debug("Raw output (original, \(text.count) chars): \(text.debugDescription)")
+            AppLog.probes.debug("Raw output (cleaned, \(clean.count) chars): \(clean)")
             throw ProbeError.parseFailed("Could not find usage limits in Codex output")
         }
 
@@ -182,11 +183,18 @@ public struct CodexUsageProbe: UsageProbe {
         let lower = text.lowercased()
 
         if lower.contains("data not available yet") {
+            AppLog.probes.error("Codex probe failed: data not available yet")
             return .parseFailed("Data not available yet")
         }
 
         if lower.contains("update available") && lower.contains("codex") {
+            AppLog.probes.error("Codex probe failed: CLI update required")
             return .updateRequired
+        }
+
+        if lower.contains("not logged in") || lower.contains("please log in") {
+            AppLog.probes.error("Codex probe failed: not logged in")
+            return .authenticationRequired
         }
 
         return nil

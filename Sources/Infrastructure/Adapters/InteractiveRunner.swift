@@ -248,9 +248,9 @@ public struct InteractiveRunner: Sendable {
             // Exit if process stopped
             if !process.isRunning { break }
 
-            // Exit if we have output and haven't received new data for a while
-            // This handles cases where process.isRunning doesn't update promptly
-            if !buffer.isEmpty && Date().timeIntervalSince(lastDataTime) > idleTimeout {
+            // Exit if we have meaningful output (not just escape sequences) and idle
+            // This prevents early exit when CLI outputs escape codes then pauses for network
+            if hasMeaningfulContent(buffer) && Date().timeIntervalSince(lastDataTime) > idleTimeout {
                 break
             }
 
@@ -260,6 +260,69 @@ public struct InteractiveRunner: Sendable {
         // Capture any remaining output
         readAvailableData(from: fd, into: &buffer)
         return buffer
+    }
+    
+    // MARK: - ANSI Escape Sequence Handling
+    
+    /// Cached regex for OSC sequences (ESC ] ... BEL or ESC ] ... ST).
+    /// OSC = Operating System Command, used for terminal titles, hyperlinks, etc.
+    /// Matches: ESC ] followed by any content (non-greedy) terminated by BEL (0x07) or ST (ESC \)
+    private static let oscRegex: NSRegularExpression? = {
+        try? NSRegularExpression(
+            pattern: #"\x1B\].*?(?:\x07|\x1B\\)"#,
+            options: .dotMatchesLineSeparators
+        )
+    }()
+    
+    /// Checks if buffer contains meaningful content beyond just ANSI escape sequences.
+    ///
+    /// ANSI escape sequences stripped:
+    /// - **CSI** (Control Sequence Introducer): `ESC [` followed by parameters and a letter
+    ///   - Examples: `\x1B[0m` (reset), `\x1B[?25h` (show cursor)
+    /// - **Charset**: `ESC (` or `ESC )` followed by charset designator
+    ///   - Examples: `\x1B(B` (ASCII), `\x1B(0` (line drawing)
+    /// - **OSC** (Operating System Command): `ESC ]` ... terminated by BEL or ST
+    ///   - BEL termination: `\x1B]0;title\x07`
+    ///   - ST termination: `\x1B]0;title\x1B\\`
+    ///
+    /// - Parameter data: The raw data buffer to check
+    /// - Returns: `true` if visible text content remains after stripping escapes,
+    ///            `true` if data is non-UTF8 (binary data), `false` otherwise
+    internal func hasMeaningfulContent(_ data: Data) -> Bool {
+        guard let text = String(data: data, encoding: .utf8) else {
+            // Non-UTF8 binary data is considered meaningful
+            return !data.isEmpty
+        }
+        
+        // Strip CSI sequences: ESC[ followed by parameters and final byte
+        var stripped = text.replacingOccurrences(
+            of: #"\x1B\[[0-9;?]*[A-Za-z]"#,
+            with: "",
+            options: .regularExpression
+        )
+        
+        // Strip charset designation sequences: ESC( or ESC) followed by charset
+        stripped = stripped.replacingOccurrences(
+            of: #"\x1B[\(\)][AB012]"#,
+            with: "",
+            options: .regularExpression
+        )
+        
+        // Strip OSC sequences using cached regex
+        if let oscRegex = Self.oscRegex {
+            stripped = oscRegex.stringByReplacingMatches(
+                in: stripped,
+                range: NSRange(stripped.startIndex..., in: stripped),
+                withTemplate: ""
+            )
+        }
+        
+        // Strip remaining lone ESC characters
+        stripped = stripped.replacingOccurrences(of: "\u{1B}", with: "")
+        
+        // Check if anything meaningful remains after stripping whitespace
+        let meaningful = stripped.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !meaningful.isEmpty
     }
 
     /// Reads all currently available data from a file descriptor.

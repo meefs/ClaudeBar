@@ -1,8 +1,5 @@
 import Foundation
 import Domain
-import os.log
-
-private let logger = Logger(subsystem: "com.claudebar", category: "CopilotUsageProbe")
 
 /// Probe for fetching GitHub Copilot usage data via GitHub Billing API.
 ///
@@ -33,7 +30,7 @@ public struct CopilotUsageProbe: UsageProbe {
               let username = credentialStore.get(forKey: CredentialKey.githubUsername),
               !token.isEmpty,
               !username.isEmpty else {
-            logger.debug("Copilot: Not available - missing token or username")
+            AppLog.probes.debug("Copilot: Not available - missing token or username")
             return false
         }
         return true
@@ -41,16 +38,16 @@ public struct CopilotUsageProbe: UsageProbe {
 
     public func probe() async throws -> UsageSnapshot {
         guard let token = credentialStore.get(forKey: CredentialKey.githubToken), !token.isEmpty else {
-            logger.error("Copilot: No GitHub token configured")
+            AppLog.probes.error("Copilot: No GitHub token configured")
             throw ProbeError.authenticationRequired
         }
 
         guard let username = credentialStore.get(forKey: CredentialKey.githubUsername), !username.isEmpty else {
-            logger.error("Copilot: No GitHub username configured")
+            AppLog.probes.error("Copilot: No GitHub username configured")
             throw ProbeError.executionFailed("GitHub username not configured")
         }
 
-        logger.debug("Copilot: Fetching billing usage for \(username)")
+        AppLog.probes.debug("Copilot: Fetching billing usage for \(username)")
 
         // Fetch billing usage
         let usageData = try await fetchBillingUsage(username: username, token: token)
@@ -82,34 +79,34 @@ public struct CopilotUsageProbe: UsageProbe {
             throw ProbeError.executionFailed("Invalid response")
         }
 
-        logger.debug("Copilot API response status: \(httpResponse.statusCode)")
+        AppLog.probes.debug("Copilot API response status: \(httpResponse.statusCode)")
 
         switch httpResponse.statusCode {
         case 200:
             break
         case 401:
-            logger.error("Copilot: Authentication failed (401)")
+            AppLog.probes.error("Copilot: Authentication failed (401)")
             throw ProbeError.authenticationRequired
         case 403:
-            logger.error("Copilot: Forbidden - check token permissions (403)")
+            AppLog.probes.error("Copilot: Forbidden - check token permissions (403)")
             throw ProbeError.executionFailed("Forbidden - ensure PAT has 'Plan: read' permission")
         case 404:
-            logger.error("Copilot: User not found or no billing access (404)")
+            AppLog.probes.error("Copilot: User not found or no billing access (404)")
             throw ProbeError.executionFailed("User not found or no billing access")
         default:
-            logger.error("Copilot: HTTP error \(httpResponse.statusCode)")
+            AppLog.probes.error("Copilot: HTTP error \(httpResponse.statusCode)")
             throw ProbeError.executionFailed("HTTP error: \(httpResponse.statusCode)")
         }
 
         // Log raw response for debugging
         if let rawString = String(data: data, encoding: .utf8) {
-            logger.debug("Copilot raw response: \(rawString.prefix(1000))")
+            AppLog.probes.debug("Copilot raw response: \(rawString.prefix(1000))")
         }
 
         do {
             return try JSONDecoder().decode(PremiumRequestUsageResponse.self, from: data)
         } catch {
-            logger.error("Copilot: Failed to parse response - \(error.localizedDescription)")
+            AppLog.probes.error("Copilot: Failed to parse response - \(error.localizedDescription)")
             throw ProbeError.parseFailed("Failed to parse billing response: \(error.localizedDescription)")
         }
     }
@@ -125,12 +122,12 @@ public struct CopilotUsageProbe: UsageProbe {
             return product.contains("copilot")
         }
 
-        logger.debug("Copilot: Found \(copilotItems.count) Copilot items for \(response.timePeriod.month)/\(response.timePeriod.year)")
+        AppLog.probes.debug("Copilot: Found \(copilotItems.count) Copilot items for \(response.timePeriod.month)/\(response.timePeriod.year)")
 
         // Log model breakdown
         let modelBreakdown = Dictionary(grouping: copilotItems) { $0.model ?? "Unknown" }
             .mapValues { items in items.reduce(0) { $0 + ($1.grossQuantity ?? 0) } }
-        logger.debug("Copilot models: \(modelBreakdown)")
+        AppLog.probes.debug("Copilot models: \(modelBreakdown)")
 
         // Calculate totals
         let totalGrossQuantity = copilotItems.reduce(0.0) { $0 + ($1.grossQuantity ?? 0) }
@@ -138,7 +135,7 @@ public struct CopilotUsageProbe: UsageProbe {
         let totalNetQuantity = copilotItems.reduce(0.0) { $0 + ($1.netQuantity ?? 0) }
         let totalNetAmount = copilotItems.reduce(0.0) { $0 + ($1.netAmount ?? 0) }
 
-        logger.debug("Copilot: gross=\(Int(totalGrossQuantity)), discount=\(Int(totalDiscountQuantity)), net=\(Int(totalNetQuantity)), amount=\(totalNetAmount)")
+        AppLog.probes.debug("Copilot: gross=\(Int(totalGrossQuantity)), discount=\(Int(totalDiscountQuantity)), net=\(Int(totalNetQuantity)), amount=\(totalNetAmount)")
 
         // GitHub Copilot Free tier: ~2000 premium requests/month
         let monthlyLimit: Double = 2000
@@ -146,7 +143,7 @@ public struct CopilotUsageProbe: UsageProbe {
         let remaining = max(0, monthlyLimit - used)
         let percentRemaining = (remaining / monthlyLimit) * 100
 
-        logger.debug("Copilot: Used \(Int(used))/\(Int(monthlyLimit)) this month, \(Int(percentRemaining))% remaining")
+        AppLog.probes.debug("Copilot: Used \(Int(used))/\(Int(monthlyLimit)) this month, \(Int(percentRemaining))% remaining")
 
         // Create quota
         let quota = UsageQuota(

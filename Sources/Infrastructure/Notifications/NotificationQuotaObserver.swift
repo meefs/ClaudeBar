@@ -12,30 +12,44 @@ public final class NotificationQuotaObserver: StatusChangeObserver, @unchecked S
 
     /// Requests notification permission from the user
     public func requestPermission() async -> Bool {
-        await notificationService.requestPermission()
+        AppLog.notifications.debug("Requesting notification permission...")
+        let granted = await notificationService.requestPermission()
+        AppLog.notifications.info("Notification permission: \(granted ? "granted" : "denied")")
+        return granted
     }
 
     // MARK: - StatusChangeObserver
 
     public func onStatusChanged(providerId: String, oldStatus: QuotaStatus, newStatus: QuotaStatus) async {
+        AppLog.notifications.debug("Status change: \(providerId) \(String(describing: oldStatus)) -> \(String(describing: newStatus))")
+        
         // Only notify on degradation (getting worse)
-        guard newStatus > oldStatus else { return }
+        guard newStatus > oldStatus else {
+            AppLog.notifications.debug("Status improved or same, skipping notification")
+            return
+        }
 
         // Skip if status improved or stayed the same
-        guard shouldNotify(for: newStatus) else { return }
+        guard shouldNotify(for: newStatus) else {
+            AppLog.notifications.debug("Status \(String(describing: newStatus)) does not require notification")
+            return
+        }
 
         let providerName = providerDisplayName(for: providerId)
         let title = "\(providerName) Quota Alert"
         let body = notificationBody(for: newStatus, providerName: providerName)
 
+        AppLog.notifications.notice("Sending quota alert for \(providerId): \(String(describing: newStatus))")
+        
         do {
             try await notificationService.send(
                 title: title,
                 body: body,
                 categoryIdentifier: "QUOTA_ALERT"
             )
+            AppLog.notifications.info("Notification sent successfully")
         } catch {
-            // Silently fail - notifications are non-critical
+            AppLog.notifications.error("Failed to send notification: \(error.localizedDescription)")
         }
     }
 
