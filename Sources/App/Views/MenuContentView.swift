@@ -62,15 +62,12 @@ struct MenuContentView: View {
                         .padding(.horizontal, 16)
                         .padding(.bottom, 16)
 
-                    // Main Content Area
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 12) {
-                            metricsContent
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
+                    // Main Content Area - no scroll, dynamic height
+                    VStack(spacing: 12) {
+                        metricsContent
                     }
-                    .frame(maxHeight: 380)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
 
                     // Bottom Action Bar
                     actionBar
@@ -80,6 +77,7 @@ struct MenuContentView: View {
             }
         }
         .frame(width: 380)
+        .fixedSize(horizontal: false, vertical: true)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .task {
             // Show header and tabs immediately
