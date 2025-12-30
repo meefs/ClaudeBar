@@ -144,6 +144,7 @@ struct StatusBarIcon: View {
 
     var body: some View {
         Image(systemName: iconName)
+            .symbolRenderingMode(.palette)
             .foregroundStyle(iconColor)
     }
 
@@ -169,4 +170,43 @@ struct StatusBarIcon: View {
         }
         return status.displayColor
     }
+}
+
+// MARK: - StatusBarIcon Preview
+
+#Preview("StatusBarIcon - All States") {
+    HStack(spacing: 30) {
+        VStack {
+            StatusBarIcon(status: .healthy)
+            Text("HEALTHY")
+                .font(.caption)
+                .foregroundStyle(.green)
+        }
+        VStack {
+            StatusBarIcon(status: .warning)
+            Text("WARNING")
+                .font(.caption)
+                .foregroundStyle(.orange)
+        }
+        VStack {
+            StatusBarIcon(status: .critical)
+            Text("CRITICAL")
+                .font(.caption)
+                .foregroundStyle(.red)
+        }
+        VStack {
+            StatusBarIcon(status: .depleted)
+            Text("DEPLETED")
+                .font(.caption)
+                .foregroundStyle(.red)
+        }
+        VStack {
+            StatusBarIcon(status: .healthy, isChristmas: true)
+            Text("CHRISTMAS")
+                .font(.caption)
+                .foregroundStyle(AppTheme.christmasGold)
+        }
+    }
+    .padding(40)
+    .background(Color.black)
 }
