@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-01-01
+
+### Added
+- **Share Claude Pass**: Share referral links with friends to give them a free week of Claude Code! Click the gift icon (🎁) in the action bar when Claude is selected to copy or open your referral link.
+
+### Improved
+- **Cleaner Action Bar**: Share button is now a compact icon that fits seamlessly alongside Settings and Close buttons
+- **Button Text Stability**: Fixed issue where action button labels could wrap to multiple lines
+
+### Technical
+- Added `ClaudePass` domain model with referral URL and optional pass count
+- Implemented `ClaudePassProbe` that executes `claude /passes` and reads referral link from clipboard
+- Added `ClaudePassProbing` protocol for testability with dependency injection
+- Created `SharePassOverlay` view component with copy-to-clipboard and open-in-browser actions
+- Extended `ClaudeProvider` with `fetchPasses()` method and guest pass state management
+- Added share gradient to theme system for consistent styling
+- Comprehensive test coverage (30 tests) for domain model, probe parsing, and provider integration
+
 ## [0.2.10] - 2025-12-31
 
 ### Improved
