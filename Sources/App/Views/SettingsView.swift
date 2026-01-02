@@ -46,6 +46,13 @@ struct SettingsContentView: View {
         )
     }
 
+    /// Maximum height for the settings view to ensure it fits on small screens
+    private var maxSettingsHeight: CGFloat {
+        // Use 80% of screen height or 550pt, whichever is smaller
+        let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
+        return min(screenHeight * 0.8, 550)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -55,7 +62,7 @@ struct SettingsContentView: View {
                 .padding(.bottom, 16)
 
             // Scrollable Content
-            ScrollView(.vertical, showsIndicators: false) {
+            ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: 12) {
                     themeCard
                     providersCard
@@ -75,6 +82,7 @@ struct SettingsContentView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
         }
+        .frame(maxHeight: maxSettingsHeight)
         .onAppear {
             // Initialize budget input with current value
             if settings.claudeApiBudget > 0 {
