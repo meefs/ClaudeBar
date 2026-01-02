@@ -15,6 +15,16 @@ struct AntigravityProviderTests {
         return mock
     }
 
+    /// Creates a mock credential store for testing (used when creating CopilotProvider in uniqueness tests)
+    private func makeCredentialStore() -> MockCredentialStore {
+        let mock = MockCredentialStore()
+        given(mock).get(forKey: .any).willReturn(nil)
+        given(mock).exists(forKey: .any).willReturn(false)
+        given(mock).save(.any, forKey: .any).willReturn()
+        given(mock).delete(forKey: .any).willReturn()
+        return mock
+    }
+
     // MARK: - Identity Tests
 
     @Test
@@ -266,12 +276,13 @@ struct AntigravityProviderTests {
     @Test
     func `antigravity provider has unique id compared to other providers`() {
         let settings = makeSettingsRepository()
+        let credentials = makeCredentialStore()
         let mockProbe = MockUsageProbe()
         let antigravity = AntigravityProvider(probe: mockProbe, settingsRepository: settings)
         let claude = ClaudeProvider(probe: mockProbe, settingsRepository: settings)
         let codex = CodexProvider(probe: mockProbe, settingsRepository: settings)
         let gemini = GeminiProvider(probe: mockProbe, settingsRepository: settings)
-        let copilot = CopilotProvider(probe: mockProbe, settingsRepository: settings)
+        let copilot = CopilotProvider(probe: mockProbe, settingsRepository: settings, credentialStore: credentials)
 
         let ids = Set([antigravity.id, claude.id, codex.id, gemini.id, copilot.id])
         #expect(ids.count == 5) // All unique

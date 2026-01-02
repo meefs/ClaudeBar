@@ -25,9 +25,9 @@ struct SettingsContentView: View {
     // Budget input state
     @State private var budgetInput: String = ""
 
-    /// The Copilot provider from the monitor (always exists)
-    private var copilotProvider: (any AIProvider)? {
-        monitor.provider(for: "copilot")
+    /// The Copilot provider from the monitor (cast to CopilotProvider for credential access)
+    private var copilotProvider: CopilotProvider? {
+        monitor.provider(for: "copilot") as? CopilotProvider
     }
 
     /// Binding to the Copilot provider's isEnabled state
@@ -35,6 +35,14 @@ struct SettingsContentView: View {
         Binding(
             get: { copilotProvider?.isEnabled ?? false },
             set: { newValue in copilotProvider?.isEnabled = newValue }
+        )
+    }
+
+    /// Binding to the Copilot provider's username
+    private var copilotUsernameBinding: Binding<String> {
+        Binding(
+            get: { copilotProvider?.username ?? "" },
+            set: { newValue in copilotProvider?.username = newValue }
         )
     }
 
@@ -501,7 +509,7 @@ struct SettingsContentView: View {
                     .foregroundStyle(AppTheme.textSecondary(for: colorScheme))
                     .tracking(0.5)
 
-                TextField("", text: $settings.githubUsername, prompt: Text("username").foregroundStyle(AppTheme.textTertiary(for: colorScheme)))
+                TextField("", text: copilotUsernameBinding, prompt: Text("username").foregroundStyle(AppTheme.textTertiary(for: colorScheme)))
                     .font(AppTheme.bodyFont(size: 12))
                     .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
                     .padding(.horizontal, 10)
@@ -526,7 +534,7 @@ struct SettingsContentView: View {
 
                     Spacer()
 
-                    if settings.hasCopilotToken {
+                    if copilotProvider?.hasToken == true {
                         HStack(spacing: 3) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 9))
@@ -631,7 +639,7 @@ struct SettingsContentView: View {
             }
 
             // Delete token
-            if settings.hasCopilotToken {
+            if copilotProvider?.hasToken == true {
                 Button {
                     deleteToken()
                 } label: {
@@ -947,7 +955,7 @@ struct SettingsContentView: View {
         saveError = nil
         saveSuccess = false
 
-        settings.saveCopilotToken(copilotTokenInput)
+        copilotProvider?.saveToken(copilotTokenInput)
         copilotTokenInput = ""
         saveSuccess = true
 
@@ -964,9 +972,8 @@ struct SettingsContentView: View {
     }
 
     private func deleteToken() {
-        settings.deleteCopilotToken()
+        copilotProvider?.deleteCredentials()
         saveError = nil
-        monitor.removeProvider(id: "copilot")
     }
 }
 

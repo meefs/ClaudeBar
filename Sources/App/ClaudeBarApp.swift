@@ -22,8 +22,9 @@ struct ClaudeBarApp: App {
     init() {
         AppLog.ui.info("ClaudeBar initializing...")
 
-        // Create the shared settings repository
+        // Create the shared settings repository and credential store
         let settingsRepository = UserDefaultsProviderSettingsRepository.shared
+        let credentialStore = UserDefaultsCredentialStore.shared
 
         // Create all providers with their probes (rich domain models)
         // Each provider manages its own isEnabled state (persisted via ProviderSettingsRepository)
@@ -34,7 +35,7 @@ struct ClaudeBarApp: App {
             GeminiProvider(probe: GeminiUsageProbe(), settingsRepository: settingsRepository),
             AntigravityProvider(probe: AntigravityUsageProbe(), settingsRepository: settingsRepository),
             ZaiProvider(probe: ZaiUsageProbe(), settingsRepository: settingsRepository),
-            CopilotProvider(probe: CopilotUsageProbe(), settingsRepository: settingsRepository),
+            CopilotProvider(probe: CopilotUsageProbe(), settingsRepository: settingsRepository, credentialStore: credentialStore),
         ])
         AppLog.providers.info("Created \(repository.all.count) providers")
 

@@ -1,15 +1,11 @@
 import Foundation
-import Infrastructure
-import Domain
 
 /// Observable settings manager for ClaudeBar preferences.
-/// Credentials are stored in UserDefaults via CredentialStore.
+/// Note: Provider-specific settings (e.g., Copilot credentials) are managed by the providers themselves.
 @MainActor
 @Observable
 public final class AppSettings {
     public static let shared = AppSettings()
-
-    private let credentialStore: any CredentialStore
 
     // MARK: - Theme Settings
 
@@ -44,15 +40,6 @@ public final class AppSettings {
     /// Track initialization to avoid marking theme as user-chosen during init
     private var isInitializing = true
 
-    // MARK: - Provider Settings
-
-    /// The GitHub username for Copilot API calls
-    public var githubUsername: String {
-        didSet {
-            credentialStore.save(githubUsername, forKey: CredentialKey.githubUsername)
-        }
-    }
-
     // MARK: - Claude API Budget Settings
 
     /// Whether Claude API budget tracking is enabled
@@ -69,39 +56,11 @@ public final class AppSettings {
         }
     }
 
-    // MARK: - Token Management
-
-    /// Whether a GitHub Copilot token is configured
-    public var hasCopilotToken: Bool {
-        credentialStore.exists(forKey: CredentialKey.githubToken)
-    }
-
-    /// Saves the GitHub Copilot token
-    public func saveCopilotToken(_ token: String) {
-        credentialStore.save(token, forKey: CredentialKey.githubToken)
-        AppLog.credentials.info("Saved GitHub Copilot token")
-    }
-
-    /// Retrieves the GitHub Copilot token
-    public func getCopilotToken() -> String? {
-        let token = credentialStore.get(forKey: CredentialKey.githubToken)
-        AppLog.credentials.debug("Retrieved GitHub Copilot token: \(token != nil ? "exists" : "nil")")
-        return token
-    }
-
-    /// Deletes the GitHub Copilot token
-    public func deleteCopilotToken() {
-        credentialStore.delete(forKey: CredentialKey.githubToken)
-        AppLog.credentials.info("Deleted GitHub Copilot token")
-    }
-
     // MARK: - Initialization
 
-    private init(credentialStore: any CredentialStore = UserDefaultsCredentialStore.shared) {
-        self.credentialStore = credentialStore
+    private init() {
         self.userHasChosenTheme = UserDefaults.standard.bool(forKey: Keys.userHasChosenTheme)
         self.themeMode = UserDefaults.standard.string(forKey: Keys.themeMode) ?? "system"
-        self.githubUsername = credentialStore.get(forKey: CredentialKey.githubUsername) ?? ""
         self.claudeApiBudgetEnabled = UserDefaults.standard.bool(forKey: Keys.claudeApiBudgetEnabled)
         self.claudeApiBudget = Decimal(UserDefaults.standard.double(forKey: Keys.claudeApiBudget))
         self.receiveBetaUpdates = UserDefaults.standard.bool(forKey: Keys.receiveBetaUpdates)
