@@ -115,6 +115,16 @@ public struct UsageQuota: Sendable, Equatable {
 }
 ```
 
+**Domain-Driven Terminology** - Use domain language, not technical terms:
+
+| Domain Term | Instead Of |
+|-------------|------------|
+| `UsageQuota` | `UsageData` |
+| `QuotaStatus` | `HealthStatus` |
+| `AIProvider` | `ServiceProvider` |
+| `UsageSnapshot` | `UsageDataResponse` |
+| `QuotaMonitor` | `UsageDataFetcher` |
+
 ### 2. Single Source of Truth
 
 `QuotaMonitor` owns all provider state. Views read from it, never modify state directly.
@@ -289,6 +299,22 @@ Sources/
     ├── Settings/                    # AppSettings (theme, etc.)
     └── Resources/                   # Assets, Info.plist
 ```
+
+## Business Rules
+
+### Quota Status Thresholds
+
+| Remaining | Status | Needs Attention |
+|-----------|--------|-----------------|
+| > 50% | `.healthy` | No |
+| 20-50% | `.warning` | Yes |
+| < 20% | `.critical` | Yes |
+| 0% | `.depleted` | Yes |
+
+### Snapshot Freshness
+
+- **Fresh**: < 5 minutes old
+- **Stale**: >= 5 minutes old (triggers refresh)
 
 ## Adding New Features
 
