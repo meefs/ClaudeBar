@@ -91,6 +91,7 @@ struct ProviderIconView: View {
         case "claude": return "brain.head.profile"
         case "codex": return "chevron.left.forwardslash.chevron.right"
         case "gemini": return "sparkles"
+        case "zai": return "z.square.fill"
         case "copilot": return "chevron.left.forwardslash.chevron.right"
         default: return "questionmark"
         }
