@@ -306,7 +306,7 @@ struct QuotaMonitorTests {
     func `addProvider adds new provider`() {
         // Given
         let claude = ClaudeProvider(probe: MockUsageProbe())
-        let monitor = QuotaMonitor(providers: [claude])
+        let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]))
 
         #expect(monitor.allProviders.count == 1)
 
@@ -373,7 +373,7 @@ struct QuotaMonitorTests {
     @Test
     func `lowestQuota returns nil when no snapshots`() {
         // Given
-        let monitor = QuotaMonitor(providers: [ClaudeProvider(probe: MockUsageProbe())])
+        let monitor = QuotaMonitor(providers: AIProviders(providers: [ClaudeProvider(probe: MockUsageProbe())]))
 
         // Then
         #expect(monitor.lowestQuota() == nil)
@@ -400,7 +400,7 @@ struct QuotaMonitorTests {
         // Given
         let claude = ClaudeProvider(probe: MockUsageProbe())
         claude.isEnabled = false
-        let monitor = QuotaMonitor(providers: [claude])
+        let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]))
         monitor.selectedProviderId = "claude"
 
         // Then
@@ -411,7 +411,7 @@ struct QuotaMonitorTests {
     func `selectedProviderStatus returns healthy when no snapshot`() {
         // Given
         let claude = ClaudeProvider(probe: MockUsageProbe())
-        let monitor = QuotaMonitor(providers: [claude])
+        let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]))
 
         // Then
         #expect(monitor.selectedProviderStatus == .healthy)
@@ -428,7 +428,7 @@ struct QuotaMonitorTests {
             capturedAt: Date()
         ))
         let claude = ClaudeProvider(probe: probe)
-        let monitor = QuotaMonitor(providers: [claude])
+        let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]))
 
         await monitor.refresh(providerId: "claude")
 
@@ -519,7 +519,7 @@ struct QuotaMonitorTests {
     func `isRefreshing returns false when no providers syncing`() {
         // Given
         let claude = ClaudeProvider(probe: MockUsageProbe())
-        let monitor = QuotaMonitor(providers: [claude])
+        let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]))
 
         // Then
         #expect(monitor.isRefreshing == false)
@@ -558,7 +558,7 @@ struct QuotaMonitorTests {
             capturedAt: Date()
         ))
         let claude = ClaudeProvider(probe: probe)
-        let monitor = QuotaMonitor(providers: [claude], statusListener: mockListener)
+        let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), statusListener: mockListener)
 
         // When
         await monitor.refresh(providerId: "claude")
@@ -585,7 +585,7 @@ struct QuotaMonitorTests {
             capturedAt: Date()
         ))
         let claude = ClaudeProvider(probe: probe)
-        let monitor = QuotaMonitor(providers: [claude], statusListener: mockListener)
+        let monitor = QuotaMonitor(providers: AIProviders(providers: [claude]), statusListener: mockListener)
 
         // When - refresh twice with same status
         await monitor.refresh(providerId: "claude")
