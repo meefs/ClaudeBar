@@ -12,9 +12,9 @@ enum ZaiPlatform: String, Sendable {
 /// Z.ai works as an API-compatible replacement for Anthropic's API,
 /// configured through Claude Code's settings file.
 public struct ZaiUsageProbe: UsageProbe {
-
     private let cliExecutor: any CLIExecutor
     private let networkClient: any NetworkClient
+    private let configRepository: any ProviderConfigRepository
     private let timeout: TimeInterval
 
     // Claude config file location
@@ -30,10 +30,12 @@ public struct ZaiUsageProbe: UsageProbe {
     public init(
         cliExecutor: (any CLIExecutor)? = nil,
         networkClient: (any NetworkClient)? = nil,
+        configRepository: any ProviderConfigRepository = UserDefaultsProviderConfigRepository.shared,
         timeout: TimeInterval = 10.0
     ) {
         self.cliExecutor = cliExecutor ?? DefaultCLIExecutor()
         self.networkClient = networkClient ?? URLSession.shared
+        self.configRepository = configRepository
         self.timeout = timeout
     }
 
@@ -92,7 +94,8 @@ public struct ZaiUsageProbe: UsageProbe {
             AppLog.probes.debug("Zai: Using API key from config file")
         } else {
             // Fall back to environment variable if configured
-            if let envVarName = UserDefaults.standard.string(forKey: "glmAuthEnvVar"), !envVarName.isEmpty {
+            let envVarName = configRepository.glmAuthEnvVar()
+            if !envVarName.isEmpty {
                 if let envValue = ProcessInfo.processInfo.environment[envVarName], !envValue.isEmpty {
                     apiKey = envValue
                     AppLog.probes.debug("Zai: API key not in config, using env var '\(envVarName)'")
@@ -160,8 +163,14 @@ public struct ZaiUsageProbe: UsageProbe {
     // MARK: - Configuration Reading
 
     private func readClaudeConfig() async throws -> (config: String, path: String) {
-        // Use AppSettings helper for consistent path resolution
-        let configPath = AppSettings.zaiConfigURL()
+        // Use config repository for path resolution
+        let configPath: URL
+        let customPath = configRepository.zaiConfigPath()
+        if !customPath.isEmpty {
+            configPath = URL(fileURLWithPath: customPath)
+        } else {
+            configPath = Self.defaultConfigPath
+        }
         AppLog.probes.debug("Using Z.ai config path: \(configPath.path)")
 
         // Try reading the config file using cat command for consistency

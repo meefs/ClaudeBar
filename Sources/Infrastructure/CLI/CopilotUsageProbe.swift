@@ -10,6 +10,7 @@ import Domain
 public struct CopilotUsageProbe: UsageProbe {
     private let networkClient: any NetworkClient
     private let credentialRepository: any CredentialRepository
+    private let configRepository: any ProviderConfigRepository
     private let timeout: TimeInterval
 
     private static let apiBaseURL = "https://api.github.com"
@@ -18,10 +19,12 @@ public struct CopilotUsageProbe: UsageProbe {
     public init(
         networkClient: any NetworkClient = URLSession.shared,
         credentialRepository: any CredentialRepository = UserDefaultsCredentialRepository.shared,
+        configRepository: any ProviderConfigRepository = UserDefaultsProviderConfigRepository.shared,
         timeout: TimeInterval = 30
     ) {
         self.networkClient = networkClient
         self.credentialRepository = credentialRepository
+        self.configRepository = configRepository
         self.timeout = timeout
     }
 
@@ -29,7 +32,8 @@ public struct CopilotUsageProbe: UsageProbe {
 
     private func getToken() -> String? {
         // First, check environment variable if configured
-        if let envVarName = UserDefaults.standard.string(forKey: "copilotAuthEnvVar"), !envVarName.isEmpty {
+        let envVarName = configRepository.copilotAuthEnvVar()
+        if !envVarName.isEmpty {
             if let envValue = ProcessInfo.processInfo.environment[envVarName], !envValue.isEmpty {
                 AppLog.probes.debug("Copilot: Using token from env var '\(envVarName)'")
                 return envValue

@@ -56,28 +56,9 @@ public final class AppSettings {
         }
     }
 
-    // MARK: - Z.ai Settings
 
-    /// Custom path to Z.ai Claude settings.json (empty = use default ~/.claude/settings.json)
-    public var zaiConfigPath: String {
-        didSet {
-            UserDefaults.standard.set(zaiConfigPath, forKey: Keys.zaiConfigPath)
-        }
-    }
 
-    /// Name of environment variable containing GLM auth token (fallback if not in config file)
-    public var glmAuthEnvVar: String {
-        didSet {
-            UserDefaults.standard.set(glmAuthEnvVar, forKey: Keys.glmAuthEnvVar)
-        }
-    }
 
-    /// Name of environment variable containing GitHub personal access token (alternative to direct token entry)
-    public var copilotAuthEnvVar: String {
-        didSet {
-            UserDefaults.standard.set(copilotAuthEnvVar, forKey: Keys.copilotAuthEnvVar)
-        }
-    }
 
     // MARK: - Initialization
 
@@ -87,9 +68,7 @@ public final class AppSettings {
         self.claudeApiBudgetEnabled = UserDefaults.standard.bool(forKey: Keys.claudeApiBudgetEnabled)
         self.claudeApiBudget = Decimal(UserDefaults.standard.double(forKey: Keys.claudeApiBudget))
         self.receiveBetaUpdates = UserDefaults.standard.bool(forKey: Keys.receiveBetaUpdates)
-        self.zaiConfigPath = UserDefaults.standard.string(forKey: Keys.zaiConfigPath) ?? ""
-        self.glmAuthEnvVar = UserDefaults.standard.string(forKey: Keys.glmAuthEnvVar) ?? ""
-        self.copilotAuthEnvVar = UserDefaults.standard.string(forKey: Keys.copilotAuthEnvVar) ?? ""
+
 
         // Auto-enable Christmas theme during Dec 24-26 if user hasn't explicitly chosen
         applySeasonalTheme()
@@ -124,19 +103,7 @@ public final class AppSettings {
         }
     }
 
-    // MARK: - Z.ai Config Path Helper
 
-    /// Returns the Z.ai config path to use (custom path or default)
-    public static func zaiConfigURL() -> URL {
-        let customPath = shared.zaiConfigPath
-        if !customPath.isEmpty {
-            return URL(fileURLWithPath: customPath)
-        }
-        // Default: ~/.claude/settings.json
-        return URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent(".claude")
-            .appendingPathComponent("settings.json")
-    }
 }
 
 // MARK: - UserDefaults Keys
@@ -148,9 +115,6 @@ private extension AppSettings {
         static let claudeApiBudgetEnabled = "claudeApiBudgetEnabled"
         static let claudeApiBudget = "claudeApiBudget"
         static let receiveBetaUpdates = "receiveBetaUpdates"
-        static let zaiConfigPath = "zaiConfigPath"
-        static let glmAuthEnvVar = "glmAuthEnvVar"
-        static let copilotAuthEnvVar = "copilotAuthEnvVar"
     }
 }
 
