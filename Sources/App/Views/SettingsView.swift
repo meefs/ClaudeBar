@@ -20,7 +20,10 @@ struct SettingsContentView: View {
     @State private var copilotTokenInput: String = ""
     @State private var showToken: Bool = false
     @State private var saveError: String?
-     @State private var saveSuccess: Bool = false
+    @State private var saveSuccess: Bool = false
+    @State private var copilotIsExpanded: Bool = false
+    @State private var claudeBudgetExpanded: Bool = false
+    @State private var providersExpanded: Bool = false
 
      // Budget input state
      @State private var budgetInput: String = ""
@@ -30,18 +33,11 @@ struct SettingsContentView: View {
      @State private var copilotAuthEnvVarInput: String = ""
      @State private var isTestingCopilot = false
      @State private var copilotTestResult: String?
+     @State private var updatesExpanded: Bool = false
 
      /// The Copilot provider from the monitor (cast to CopilotProvider for credential access)
     private var copilotProvider: CopilotProvider? {
         monitor.provider(for: "copilot") as? CopilotProvider
-    }
-
-    /// Binding to the Copilot provider's isEnabled state
-    private var copilotEnabledBinding: Binding<Bool> {
-        Binding(
-            get: { copilotProvider?.isEnabled ?? false },
-            set: { newValue in monitor.setProviderEnabled("copilot", enabled: newValue) }
-        )
     }
 
     /// Binding to the Copilot provider's username
@@ -50,6 +46,18 @@ struct SettingsContentView: View {
             get: { copilotProvider?.username ?? "" },
             set: { newValue in copilotProvider?.username = newValue }
         )
+    }
+
+    private var isCopilotEnabled: Bool {
+        monitor.provider(for: "copilot")?.isEnabled ?? false
+    }
+
+    private var isZaiEnabled: Bool {
+        monitor.provider(for: "zai")?.isEnabled ?? false
+    }
+
+    private var isClaudeEnabled: Bool {
+        monitor.provider(for: "claude")?.isEnabled ?? false
     }
 
     /// Maximum height for the settings view to ensure it fits on small screens
@@ -72,9 +80,15 @@ struct SettingsContentView: View {
                 VStack(spacing: 12) {
                     themeCard
                     providersCard
-                    claudeBudgetCard
-                    copilotCard
-                    zaiConfigCard
+                    if isClaudeEnabled {
+                        claudeBudgetCard
+                    }
+                    if isCopilotEnabled {
+                        copilotCard
+                    }
+                    if isZaiEnabled {
+                        zaiConfigCard
+                    }
                     #if ENABLE_SPARKLE
                     updatesCard
                     #endif
@@ -166,31 +180,10 @@ struct SettingsContentView: View {
     // MARK: - Providers Card
 
     private var providersCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(theme.accentGradient)
-                        .frame(width: 32, height: 32)
-
-                    Image(systemName: "cpu")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Providers")
-                        .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
-                        .foregroundStyle(theme.textPrimary)
-
-                    Text("Enable or disable AI providers")
-                        .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textTertiary)
-                }
-
-                Spacer()
-            }
+        DisclosureGroup(isExpanded: $providersExpanded) {
+            Divider()
+                .background(theme.glassBorder)
+                .padding(.vertical, 12)
 
             // Provider toggles
             VStack(spacing: 8) {
@@ -198,6 +191,8 @@ struct SettingsContentView: View {
                     providerToggleRow(provider: provider)
                 }
             }
+        } label: {
+            providersHeader
         }
         .padding(14)
         .background(
@@ -208,6 +203,36 @@ struct SettingsContentView: View {
                         .stroke(theme.glassBorder, lineWidth: 1)
                 )
         )
+    }
+
+    private var providersHeader: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        isChristmas
+                            ? AppTheme.christmasAccentGradient
+                            : AppTheme.accentGradient(for: colorScheme)
+                    )
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: "cpu")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Providers")
+                    .font(AppTheme.titleFont(size: 14))
+                    .foregroundStyle(isChristmas ? AppTheme.christmasTextPrimary : AppTheme.textPrimary(for: colorScheme))
+
+                Text("Enable or disable AI providers")
+                    .font(AppTheme.captionFont(size: 10))
+                    .foregroundStyle(isChristmas ? AppTheme.christmasTextTertiary : AppTheme.textTertiary(for: colorScheme))
+            }
+
+            Spacer()
+        }
     }
 
     private func providerToggleRow(provider: any AIProvider) -> some View {
@@ -223,7 +248,21 @@ struct SettingsContentView: View {
 
             Toggle("", isOn: Binding(
                 get: { provider.isEnabled },
-                set: { monitor.setProviderEnabled(provider.id, enabled: $0) }
+                set: { newValue in
+                    monitor.setProviderEnabled(provider.id, enabled: newValue)
+                    if !newValue {
+                        switch provider.id {
+                        case "copilot":
+                            copilotIsExpanded = false
+                        case "zai":
+                            zaiConfigExpanded = false
+                        case "claude":
+                            claudeBudgetExpanded = false
+                        default:
+                            break
+                        }
+                    }
+                }
             ))
             .toggleStyle(.switch)
             .tint(theme.accentPrimary)
@@ -280,19 +319,21 @@ struct SettingsContentView: View {
     // MARK: - Claude Budget Card
 
     private var claudeBudgetCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header row with icon, title, toggle
-            claudeBudgetHeader
-
-            // Expandable content
-            if settings.claudeApiBudgetEnabled {
+        DisclosureGroup(isExpanded: $claudeBudgetExpanded) {
+            if isClaudeEnabled {
                 Divider()
                     .background(theme.glassBorder)
                     .padding(.vertical, 12)
 
                 claudeBudgetForm
+                    .disabled(!settings.claudeApiBudgetEnabled)
+                    .opacity(settings.claudeApiBudgetEnabled ? 1 : 0.6)
             }
+        } label: {
+            // Header row with icon, title, toggle
+            claudeBudgetHeader
         }
+        .disabled(!isClaudeEnabled)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
@@ -406,19 +447,18 @@ struct SettingsContentView: View {
     // MARK: - Copilot Card
 
     private var copilotCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header row with icon, title, toggle
-            copilotHeader
-
-            // Expandable content
-            if copilotProvider?.isEnabled == true {
+        DisclosureGroup(isExpanded: $copilotIsExpanded) {
+            if isCopilotEnabled {
                 Divider()
                     .background(theme.glassBorder)
                     .padding(.vertical, 12)
 
                 copilotForm
             }
+        } label: {
+            copilotHeader
         }
+        .disabled(!isCopilotEnabled)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
@@ -462,9 +502,9 @@ struct SettingsContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("GitHub Copilot")
-                    .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
-                    .foregroundStyle(theme.textPrimary)
+                Text("GitHub Copilot Configuration")
+                    .font(AppTheme.titleFont(size: 14))
+                    .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
 
                 Text("Premium usage tracking")
                     .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
@@ -472,12 +512,6 @@ struct SettingsContentView: View {
             }
 
             Spacer()
-
-            Toggle("", isOn: copilotEnabledBinding)
-                .toggleStyle(.switch)
-                .tint(theme.accentPrimary)
-                .scaleEffect(0.8)
-                .labelsHidden()
         }
     }
 
@@ -698,55 +732,8 @@ struct SettingsContentView: View {
     @State private var zaiConfigExpanded: Bool = false
 
     private var zaiConfigCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header (always visible, clickable to expand)
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    zaiConfigExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 0.2, green: 0.6, blue: 0.9),
-                                        Color(red: 0.15, green: 0.45, blue: 0.8)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 32, height: 32)
-
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Z.ai / GLM Configuration")
-                            .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
-                            .foregroundStyle(theme.textPrimary)
-
-                        Text("Authentication fallback settings")
-                            .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textTertiary)
-                    }
-
-                    Spacer()
-
-                    // Expand/collapse indicator
-                    Image(systemName: zaiConfigExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(theme.textTertiary)
-                }
-            }
-            .buttonStyle(.plain)
-
-            // Expanded content
-            if zaiConfigExpanded {
+        DisclosureGroup(isExpanded: $zaiConfigExpanded) {
+            if isZaiEnabled {
                 Divider()
                     .background(theme.glassBorder)
                     .padding(.vertical, 12)
@@ -810,9 +797,9 @@ struct SettingsContentView: View {
                                             .stroke(theme.glassBorder, lineWidth: 1)
                                     )
                             )
-                    .onChange(of: glmAuthEnvVarInput) { _, newValue in
-                        UserDefaultsProviderSettingsRepository.shared.setGlmAuthEnvVar(newValue)
-                    }
+                            .onChange(of: glmAuthEnvVarInput) { _, newValue in
+                                UserDefaultsProviderSettingsRepository.shared.setGlmAuthEnvVar(newValue)
+                            }
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -822,7 +809,41 @@ struct SettingsContentView: View {
                     }
                 }
             }
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.2, green: 0.6, blue: 0.9),
+                                    Color(red: 0.15, green: 0.45, blue: 0.8)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Z.ai / GLM Configuration")
+                        .font(AppTheme.titleFont(size: 14))
+                        .foregroundStyle(isChristmas ? AppTheme.christmasTextPrimary : AppTheme.textPrimary(for: colorScheme))
+
+                    Text("Authentication fallback settings")
+                        .font(AppTheme.captionFont(size: 10))
+                        .foregroundStyle(isChristmas ? AppTheme.christmasTextTertiary : AppTheme.textTertiary(for: colorScheme))
+                }
+
+                Spacer()
+            }
         }
+        .disabled(!isZaiEnabled)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
@@ -843,144 +864,114 @@ struct SettingsContentView: View {
 
     // MARK: - Updates Card
 
-    #if ENABLE_SPARKLE
+#if ENABLE_SPARKLE
     private var updatesCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.3, green: 0.7, blue: 0.4),
-                                    Color(red: 0.2, green: 0.55, blue: 0.35)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 32, height: 32)
+        DisclosureGroup(isExpanded: $updatesExpanded) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Show different content based on updater availability
+                if sparkleUpdater?.isAvailable == true {
+                    // Check for Updates Button
+                    Button {
+                        sparkleUpdater?.checkForUpdates()
+                    } label: {
+                        HStack(spacing: 6) {
+                            if sparkleUpdater?.isCheckingForUpdates == true {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                    .frame(width: 14, height: 14)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
 
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Updates")
-                        .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
-                        .foregroundStyle(theme.textPrimary)
-
-                    Text("Version \(appVersion)")
-                        .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textTertiary)
-                }
-
-                Spacer()
-            }
-
-            // Show different content based on updater availability
-            if sparkleUpdater?.isAvailable == true {
-                // Check for Updates Button
-                Button {
-                    sparkleUpdater?.checkForUpdates()
-                } label: {
-                    HStack(spacing: 6) {
-                        if sparkleUpdater?.isCheckingForUpdates == true {
-                            ProgressView()
-                                .scaleEffect(0.6)
-                                .frame(width: 14, height: 14)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 11, weight: .semibold))
+                            Text(sparkleUpdater?.isCheckingForUpdates == true ? "Checking..." : "Check for Updates")
+                                .font(AppTheme.bodyFont(size: 11))
                         }
-
-                        Text(sparkleUpdater?.isCheckingForUpdates == true ? "Checking..." : "Check for Updates")
-                            .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 0.3, green: 0.7, blue: 0.4),
-                                        Color(red: 0.2, green: 0.55, blue: 0.35)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.3, green: 0.7, blue: 0.4),
+                                            Color(red: 0.2, green: 0.55, blue: 0.35)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
                                 )
-                            )
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(sparkleUpdater?.canCheckForUpdates != true || sparkleUpdater?.isCheckingForUpdates == true)
-                .opacity(sparkleUpdater?.canCheckForUpdates == true ? 1 : 0.6)
-
-                // Last check info
-                if let lastCheck = sparkleUpdater?.lastUpdateCheckDate {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock.fill")
-                            .font(.system(size: 8))
-
-                        Text("Last checked: \(lastCheck.formatted(date: .abbreviated, time: .shortened))")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        )
                     }
-                    .foregroundStyle(theme.textTertiary)
-                }
+                    .buttonStyle(.plain)
+                    .disabled(sparkleUpdater?.canCheckForUpdates != true || sparkleUpdater?.isCheckingForUpdates == true)
+                    .opacity(sparkleUpdater?.canCheckForUpdates == true ? 1 : 0.6)
 
-                // Auto updates toggle
-                HStack {
-                    Text("Check automatically")
-                        .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textPrimary)
+                    // Last check info
+                    if let lastCheck = sparkleUpdater?.lastUpdateCheckDate {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.fill")
+                                .font(.system(size: 8))
 
-                    Spacer()
-
-                    Toggle("", isOn: Binding(
-                        get: { sparkleUpdater?.automaticallyChecksForUpdates ?? true },
-                        set: { sparkleUpdater?.automaticallyChecksForUpdates = $0 }
-                    ))
-                    .toggleStyle(.switch)
-                    .tint(theme.accentPrimary)
-                    .scaleEffect(0.8)
-                    .labelsHidden()
-                }
-
-                // Beta updates toggle
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Include beta versions")
-                            .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textPrimary)
-
-                        Text("Get early access to new features")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                            .foregroundStyle(theme.textTertiary)
+                            Text("Last checked: \(lastCheck.formatted(date: .abbreviated, time: .shortened))")
+                                .font(AppTheme.captionFont(size: 9))
+                        }
+                        .foregroundStyle(isChristmas ? AppTheme.christmasTextTertiary : AppTheme.textTertiary(for: colorScheme))
                     }
 
-                    Spacer()
+                    // Auto updates toggle
+                    HStack {
+                        Text("Check automatically")
+                            .font(AppTheme.bodyFont(size: 11))
+                            .foregroundStyle(isChristmas ? AppTheme.christmasTextPrimary : AppTheme.textPrimary(for: colorScheme))
 
-                    Toggle("", isOn: $settings.receiveBetaUpdates)
+                        Spacer()
+
+                        Toggle("", isOn: Binding(
+                            get: { sparkleUpdater?.automaticallyChecksForUpdates ?? true },
+                            set: { sparkleUpdater?.automaticallyChecksForUpdates = $0 }
+                        ))
                         .toggleStyle(.switch)
                         .tint(theme.accentPrimary)
                         .scaleEffect(0.8)
                         .labelsHidden()
+                    }
+
+                    // Beta updates toggle
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Include beta versions")
+                                .font(AppTheme.bodyFont(size: 11))
+                                .foregroundStyle(isChristmas ? AppTheme.christmasTextPrimary : AppTheme.textPrimary(for: colorScheme))
+
+                            Text("Get early access to new features")
+                                .font(AppTheme.captionFont(size: 9))
+                                .foregroundStyle(isChristmas ? AppTheme.christmasTextTertiary : AppTheme.textTertiary(for: colorScheme))
+                        }
+
+                        Spacer()
+
+                        Toggle("", isOn: $settings.receiveBetaUpdates)
+                            .toggleStyle(.switch)
+                            .tint(AppTheme.purpleVibrant(for: colorScheme))
+                            .scaleEffect(0.8)
+                            .labelsHidden()
+                    }
+                } else {
+                    // Debug mode message
+                    HStack(spacing: 6) {
+                        Image(systemName: "hammer.fill")
+                            .font(.system(size: 10))
+                        Text("Updates unavailable in debug builds")
+                            .font(AppTheme.captionFont(size: 10))
+                    }
+                    .foregroundStyle(isChristmas ? AppTheme.christmasTextTertiary : AppTheme.textTertiary(for: colorScheme))
                 }
-            } else {
-                // Debug mode message
-                HStack(spacing: 6) {
-                    Image(systemName: "hammer.fill")
-                        .font(.system(size: 10))
-                    Text("Updates unavailable in debug builds")
-                        .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
-                }
-                .foregroundStyle(theme.textTertiary)
             }
+        } label: {
+            updatesHeader
         }
         .padding(14)
         .background(
@@ -998,6 +989,41 @@ struct SettingsContentView: View {
                         )
                 )
         )
+    }
+
+    private var updatesHeader: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.3, green: 0.7, blue: 0.4),
+                                Color(red: 0.2, green: 0.55, blue: 0.35)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Updates")
+                    .font(AppTheme.titleFont(size: 14))
+                    .foregroundStyle(isChristmas ? AppTheme.christmasTextPrimary : AppTheme.textPrimary(for: colorScheme))
+
+                Text("Version \(appVersion)")
+                    .font(AppTheme.captionFont(size: 10))
+                    .foregroundStyle(isChristmas ? AppTheme.christmasTextTertiary : AppTheme.textTertiary(for: colorScheme))
+            }
+
+            Spacer()
+        }
     }
 
     /// The app version from the bundle
