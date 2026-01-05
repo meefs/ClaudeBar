@@ -43,62 +43,54 @@ public final class CopilotProvider: AIProvider, @unchecked Sendable {
     /// The GitHub username for API calls
     public var username: String {
         didSet {
-            credentialRepository.save(username, forKey: CredentialKey.githubUsername)
+            settingsRepository.saveGithubUsername(username)
         }
     }
 
     /// Whether a GitHub token is configured
     public var hasToken: Bool {
-        credentialRepository.exists(forKey: CredentialKey.githubToken)
+        settingsRepository.hasGithubToken()
     }
 
     // MARK: - Internal
 
     /// The probe used to fetch usage data
     private let probe: any UsageProbe
-    private let settingsRepository: any ProviderSettingsRepository
-    private let credentialRepository: any CredentialRepository
-    private let configRepository: any ProviderConfigRepository
+    private let settingsRepository: any CopilotSettingsRepository
 
     // MARK: - Initialization
 
     /// Creates a Copilot provider with the specified dependencies
     /// - Parameter probe: The probe to use for fetching usage data
-    /// - Parameter settingsRepository: The repository for persisting settings
-    /// - Parameter credentialRepository: The repository for credentials (token, username)
-    /// - Parameter configRepository: The repository for provider-specific configuration
+    /// - Parameter settingsRepository: The repository for persisting Copilot settings and credentials
     public init(
         probe: any UsageProbe,
-        settingsRepository: any ProviderSettingsRepository,
-        credentialRepository: any CredentialRepository,
-        configRepository: any ProviderConfigRepository
+        settingsRepository: any CopilotSettingsRepository
     ) {
         self.probe = probe
         self.settingsRepository = settingsRepository
-        self.credentialRepository = credentialRepository
-        self.configRepository = configRepository
         // Copilot defaults to false (requires setup)
         self.isEnabled = settingsRepository.isEnabled(forProvider: "copilot", defaultValue: false)
         // Load persisted username
-        self.username = credentialRepository.get(forKey: CredentialKey.githubUsername) ?? ""
+        self.username = settingsRepository.getGithubUsername() ?? ""
     }
 
     // MARK: - Credential Management
 
     /// Saves the GitHub token
     public func saveToken(_ token: String) {
-        credentialRepository.save(token, forKey: CredentialKey.githubToken)
+        settingsRepository.saveGithubToken(token)
     }
 
     /// Retrieves the GitHub token
     public func getToken() -> String? {
-        credentialRepository.get(forKey: CredentialKey.githubToken)
+        settingsRepository.getGithubToken()
     }
 
     /// Deletes the GitHub token and username
     public func deleteCredentials() {
-        credentialRepository.delete(forKey: CredentialKey.githubToken)
-        credentialRepository.delete(forKey: CredentialKey.githubUsername)
+        settingsRepository.deleteGithubToken()
+        settingsRepository.deleteGithubUsername()
         username = ""
     }
 

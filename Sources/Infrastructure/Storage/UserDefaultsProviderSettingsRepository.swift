@@ -1,9 +1,9 @@
 import Foundation
 import Domain
 
-/// UserDefaults-based implementation of ProviderSettingsRepository.
-/// Persists provider settings like isEnabled state.
-public final class UserDefaultsProviderSettingsRepository: ProviderSettingsRepository, @unchecked Sendable {
+/// UserDefaults-based implementation of ProviderSettingsRepository and its sub-protocols.
+/// Persists provider settings like isEnabled state and provider-specific configuration.
+public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -31,30 +31,7 @@ public final class UserDefaultsProviderSettingsRepository: ProviderSettingsRepos
         userDefaults.set(enabled, forKey: key)
     }
 
-    // MARK: - Key Generation
-
-    /// Generates the UserDefaults key for a provider's enabled state
-    private static func enabledKey(forProvider id: String) -> String {
-        "provider.\(id).isEnabled"
-    }
-}
-
-/// UserDefaults-based implementation of ProviderConfigRepository.
-/// Persists provider-specific configuration settings.
-public final class UserDefaultsProviderConfigRepository: ProviderConfigRepository, @unchecked Sendable {
-    /// Shared singleton instance
-    public static let shared = UserDefaultsProviderConfigRepository()
-
-    /// The UserDefaults instance to use
-    private let userDefaults: UserDefaults
-
-    /// Creates a new repository with the specified UserDefaults instance
-    /// - Parameter userDefaults: The UserDefaults to use (defaults to .standard)
-    public init(userDefaults: UserDefaults = .standard) {
-        self.userDefaults = userDefaults
-    }
-
-    // MARK: - ProviderConfigRepository
+    // MARK: - ZaiSettingsRepository
 
     public func zaiConfigPath() -> String {
         userDefaults.string(forKey: Keys.zaiConfigPath) ?? ""
@@ -72,6 +49,8 @@ public final class UserDefaultsProviderConfigRepository: ProviderConfigRepositor
         userDefaults.set(envVar, forKey: Keys.glmAuthEnvVar)
     }
 
+    // MARK: - CopilotSettingsRepository (Configuration)
+
     public func copilotAuthEnvVar() -> String {
         userDefaults.string(forKey: Keys.copilotAuthEnvVar) ?? ""
     }
@@ -80,11 +59,49 @@ public final class UserDefaultsProviderConfigRepository: ProviderConfigRepositor
         userDefaults.set(envVar, forKey: Keys.copilotAuthEnvVar)
     }
 
+    // MARK: - CopilotSettingsRepository (Credentials)
+
+    public func saveGithubToken(_ token: String) {
+        userDefaults.set(token, forKey: Keys.githubToken)
+    }
+
+    public func getGithubToken() -> String? {
+        userDefaults.string(forKey: Keys.githubToken)
+    }
+
+    public func deleteGithubToken() {
+        userDefaults.removeObject(forKey: Keys.githubToken)
+    }
+
+    public func hasGithubToken() -> Bool {
+        userDefaults.object(forKey: Keys.githubToken) != nil
+    }
+
+    public func saveGithubUsername(_ username: String) {
+        userDefaults.set(username, forKey: Keys.githubUsername)
+    }
+
+    public func getGithubUsername() -> String? {
+        userDefaults.string(forKey: Keys.githubUsername)
+    }
+
+    public func deleteGithubUsername() {
+        userDefaults.removeObject(forKey: Keys.githubUsername)
+    }
+
     // MARK: - Keys
 
     private enum Keys {
         static let zaiConfigPath = "providerConfig.zaiConfigPath"
         static let glmAuthEnvVar = "providerConfig.glmAuthEnvVar"
         static let copilotAuthEnvVar = "providerConfig.copilotAuthEnvVar"
+        // Credentials (kept compatible with old UserDefaultsCredentialRepository keys)
+        static let githubToken = "com.claudebar.credentials.github-copilot-token"
+        static let githubUsername = "com.claudebar.credentials.github-username"
+    }
+
+    /// Generates the UserDefaults key for a provider's enabled state
+    private static func enabledKey(forProvider id: String) -> String {
+        "provider.\(id).isEnabled"
     }
 }

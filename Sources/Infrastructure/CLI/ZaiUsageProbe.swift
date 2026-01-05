@@ -14,7 +14,7 @@ enum ZaiPlatform: String, Sendable {
 public struct ZaiUsageProbe: UsageProbe {
     private let cliExecutor: any CLIExecutor
     private let networkClient: any NetworkClient
-    private let configRepository: any ProviderConfigRepository
+    private let settingsRepository: any ZaiSettingsRepository
     private let timeout: TimeInterval
 
     // Claude config file location
@@ -26,16 +26,17 @@ public struct ZaiUsageProbe: UsageProbe {
     /// - Parameters:
     ///   - cliExecutor: Executor for running CLI commands (defaults to DefaultCLIExecutor)
     ///   - networkClient: Client for making network requests (defaults to URLSession.shared)
+    ///   - settingsRepository: Repository for Z.ai settings (required, explicit injection)
     ///   - timeout: Timeout for operations in seconds (defaults to 10.0)
     public init(
         cliExecutor: (any CLIExecutor)? = nil,
         networkClient: (any NetworkClient)? = nil,
-        configRepository: any ProviderConfigRepository = UserDefaultsProviderConfigRepository.shared,
+        settingsRepository: any ZaiSettingsRepository,
         timeout: TimeInterval = 10.0
     ) {
         self.cliExecutor = cliExecutor ?? DefaultCLIExecutor()
         self.networkClient = networkClient ?? URLSession.shared
-        self.configRepository = configRepository
+        self.settingsRepository = settingsRepository
         self.timeout = timeout
     }
 
@@ -136,7 +137,7 @@ public struct ZaiUsageProbe: UsageProbe {
 
     private func readClaudeConfig() async throws -> (config: String, path: String) {
         let configPath: URL
-        let customPath = configRepository.zaiConfigPath()
+        let customPath = settingsRepository.zaiConfigPath()
         if !customPath.isEmpty {
             configPath = URL(fileURLWithPath: customPath)
         } else {
@@ -162,7 +163,7 @@ public struct ZaiUsageProbe: UsageProbe {
             return configApiKey
         }
 
-        let envVarName = configRepository.glmAuthEnvVar()
+        let envVarName = settingsRepository.glmAuthEnvVar()
         guard !envVarName.isEmpty else {
             AppLog.probes.error("Zai probe failed: No API key found (config file: \(configPath), env var: not set)")
             throw ProbeError.authenticationRequired

@@ -7,57 +7,52 @@ import Mockable
 @Suite("CopilotUsageProbe Tests")
 struct CopilotUsageProbeTests {
 
+    // MARK: - Test Helpers
+
+    private func makeSettingsRepository(
+        username: String = "",
+        hasToken: Bool = false,
+        copilotAuthEnvVar: String = ""
+    ) -> UserDefaultsProviderSettingsRepository {
+        let suiteName = "com.claudebar.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let repo = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+        repo.setEnabled(true, forProvider: "copilot")
+        if !username.isEmpty {
+            repo.saveGithubUsername(username)
+        }
+        if hasToken {
+            repo.saveGithubToken("ghp_test_token")
+        }
+        if !copilotAuthEnvVar.isEmpty {
+            repo.setCopilotAuthEnvVar(copilotAuthEnvVar)
+        }
+        return repo
+    }
+
     // MARK: - isAvailable Tests
 
     @Test
     func `isAvailable returns true when token and username are configured`() async {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn("ghp_test_token")
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn("testuser")
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true)
+        let probe = CopilotUsageProbe(settingsRepository: settings)
 
-        let probe = CopilotUsageProbe(credentialRepository: mockCredentials)
-
-        // When & Then
         #expect(await probe.isAvailable() == true)
     }
 
     @Test
     func `isAvailable returns false when token is missing`() async {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn(nil)
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn("testuser")
+        let settings = makeSettingsRepository(username: "testuser", hasToken: false)
+        let probe = CopilotUsageProbe(settingsRepository: settings)
 
-        let probe = CopilotUsageProbe(credentialRepository: mockCredentials)
-
-        // When & Then
         #expect(await probe.isAvailable() == false)
     }
 
     @Test
     func `isAvailable returns false when username is missing`() async {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn("ghp_test_token")
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn(nil)
+        let settings = makeSettingsRepository(username: "", hasToken: true)
+        let probe = CopilotUsageProbe(settingsRepository: settings)
 
-        let probe = CopilotUsageProbe(credentialRepository: mockCredentials)
-
-        // When & Then
-        #expect(await probe.isAvailable() == false)
-    }
-
-    @Test
-    func `isAvailable returns false when token is empty`() async {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn("")
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn("testuser")
-
-        let probe = CopilotUsageProbe(credentialRepository: mockCredentials)
-
-        // When & Then
         #expect(await probe.isAvailable() == false)
     }
 
@@ -65,14 +60,9 @@ struct CopilotUsageProbeTests {
 
     @Test
     func `probe throws authenticationRequired when token is missing`() async throws {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn(nil)
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn("testuser")
+        let settings = makeSettingsRepository(username: "testuser", hasToken: false)
+        let probe = CopilotUsageProbe(settingsRepository: settings)
 
-        let probe = CopilotUsageProbe(credentialRepository: mockCredentials)
-
-        // When & Then
         await #expect(throws: ProbeError.authenticationRequired) {
             try await probe.probe()
         }
@@ -80,14 +70,9 @@ struct CopilotUsageProbeTests {
 
     @Test
     func `probe throws executionFailed when username is missing`() async throws {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn("ghp_token")
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn(nil)
+        let settings = makeSettingsRepository(username: "", hasToken: true)
+        let probe = CopilotUsageProbe(settingsRepository: settings)
 
-        let probe = CopilotUsageProbe(credentialRepository: mockCredentials)
-
-        // When & Then
         await #expect(throws: ProbeError.self) {
             try await probe.probe()
         }
@@ -95,11 +80,7 @@ struct CopilotUsageProbeTests {
 
     @Test
     func `probe parses valid response correctly`() async throws {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn("ghp_token")
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn("testuser")
-
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true)
         let mockNetwork = MockNetworkClient()
         let responseJSON = """
         {
@@ -134,31 +115,24 @@ struct CopilotUsageProbeTests {
 
         let probe = CopilotUsageProbe(
             networkClient: mockNetwork,
-            credentialRepository: mockCredentials
+            settingsRepository: settings
         )
 
-        // When
         let snapshot = try await probe.probe()
 
-        // Then
         #expect(snapshot.providerId == "copilot")
         #expect(snapshot.accountEmail == "testuser")
         #expect(snapshot.quotas.count == 1)
 
         let quota = snapshot.quotas.first!
         #expect(quota.quotaType == .session)
-        // 100 used out of 2000 = 95% remaining
         #expect(quota.percentRemaining == 95.0)
         #expect(quota.resetText == "100/2000 requests")
     }
 
     @Test
     func `probe calculates percentage correctly with multiple items`() async throws {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn("ghp_token")
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn("testuser")
-
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true)
         let mockNetwork = MockNetworkClient()
         let responseJSON = """
         {
@@ -197,26 +171,19 @@ struct CopilotUsageProbeTests {
 
         let probe = CopilotUsageProbe(
             networkClient: mockNetwork,
-            credentialRepository: mockCredentials
+            settingsRepository: settings
         )
 
-        // When
         let snapshot = try await probe.probe()
 
-        // Then
         let quota = snapshot.quotas.first!
-        // 50 + 150 = 200 used (Actions excluded), 2000 - 200 = 1800 remaining = 90%
         #expect(quota.percentRemaining == 90.0)
         #expect(quota.resetText == "200/2000 requests")
     }
 
     @Test
     func `probe returns 100 percent remaining when no usage`() async throws {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn("ghp_token")
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn("testuser")
-
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true)
         let mockNetwork = MockNetworkClient()
         let responseJSON = """
         {
@@ -237,13 +204,11 @@ struct CopilotUsageProbeTests {
 
         let probe = CopilotUsageProbe(
             networkClient: mockNetwork,
-            credentialRepository: mockCredentials
+            settingsRepository: settings
         )
 
-        // When
         let snapshot = try await probe.probe()
 
-        // Then
         let quota = snapshot.quotas.first!
         #expect(quota.percentRemaining == 100.0)
         #expect(quota.resetText == "0/2000 requests")
@@ -253,11 +218,7 @@ struct CopilotUsageProbeTests {
 
     @Test
     func `probe throws authenticationRequired on 401 response`() async throws {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn("ghp_token")
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn("testuser")
-
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true)
         let mockNetwork = MockNetworkClient()
         let response = HTTPURLResponse(
             url: URL(string: "https://api.github.com")!,
@@ -270,10 +231,9 @@ struct CopilotUsageProbeTests {
 
         let probe = CopilotUsageProbe(
             networkClient: mockNetwork,
-            credentialRepository: mockCredentials
+            settingsRepository: settings
         )
 
-        // When & Then
         await #expect(throws: ProbeError.authenticationRequired) {
             try await probe.probe()
         }
@@ -281,11 +241,7 @@ struct CopilotUsageProbeTests {
 
     @Test
     func `probe throws executionFailed on 403 response`() async throws {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn("ghp_token")
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn("testuser")
-
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true)
         let mockNetwork = MockNetworkClient()
         let response = HTTPURLResponse(
             url: URL(string: "https://api.github.com")!,
@@ -298,10 +254,9 @@ struct CopilotUsageProbeTests {
 
         let probe = CopilotUsageProbe(
             networkClient: mockNetwork,
-            credentialRepository: mockCredentials
+            settingsRepository: settings
         )
 
-        // When & Then
         await #expect(throws: ProbeError.self) {
             try await probe.probe()
         }
@@ -309,11 +264,7 @@ struct CopilotUsageProbeTests {
 
     @Test
     func `probe throws parseFailed on invalid JSON`() async throws {
-        // Given
-        let mockCredentials = MockCredentialRepository()
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubToken)).willReturn("ghp_token")
-        given(mockCredentials).get(forKey: .value(CredentialKey.githubUsername)).willReturn("testuser")
-
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true)
         let mockNetwork = MockNetworkClient()
         let invalidJSON = "not valid json".data(using: .utf8)!
         let response = HTTPURLResponse(
@@ -327,10 +278,9 @@ struct CopilotUsageProbeTests {
 
         let probe = CopilotUsageProbe(
             networkClient: mockNetwork,
-            credentialRepository: mockCredentials
+            settingsRepository: settings
         )
 
-        // When & Then
         await #expect(throws: ProbeError.self) {
             try await probe.probe()
         }

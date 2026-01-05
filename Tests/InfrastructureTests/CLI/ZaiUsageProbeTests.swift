@@ -7,6 +7,16 @@ import Mockable
 @Suite
 struct ZaiUsageProbeTests {
 
+    // MARK: - Test Helpers
+
+    private func makeSettingsRepository() -> UserDefaultsProviderSettingsRepository {
+        let suiteName = "com.claudebar.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let repo = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+        repo.setEnabled(true, forProvider: "zai")
+        return repo
+    }
+
     // MARK: - Sample Data
 
     static let sampleQuotaLimitResponse = """
@@ -69,7 +79,7 @@ struct ZaiUsageProbeTests {
             autoResponses: .any
         ).willReturn(CLIResult(output: Self.sampleClaudeConfigWithZai, exitCode: 0))
 
-        let probe = ZaiUsageProbe(cliExecutor: mockExecutor)
+        let probe = ZaiUsageProbe(cliExecutor: mockExecutor, settingsRepository: makeSettingsRepository())
 
         // When & Then
         #expect(await probe.isAvailable() == true)
@@ -91,7 +101,7 @@ struct ZaiUsageProbeTests {
             autoResponses: .any
         ).willReturn(CLIResult(output: Self.sampleClaudeConfigWithoutZai, exitCode: 0))
 
-        let probe = ZaiUsageProbe(cliExecutor: mockExecutor)
+        let probe = ZaiUsageProbe(cliExecutor: mockExecutor, settingsRepository: makeSettingsRepository())
 
         // When & Then
         #expect(await probe.isAvailable() == false)
@@ -103,7 +113,7 @@ struct ZaiUsageProbeTests {
         let mockExecutor = MockCLIExecutor()
         given(mockExecutor).locate(.any).willReturn(nil)
 
-        let probe = ZaiUsageProbe(cliExecutor: mockExecutor)
+        let probe = ZaiUsageProbe(cliExecutor: mockExecutor, settingsRepository: makeSettingsRepository())
 
         // When & Then
         #expect(await probe.isAvailable() == false)
@@ -125,7 +135,7 @@ struct ZaiUsageProbeTests {
             autoResponses: .any
         ).willThrow(ProbeError.executionFailed("File not found"))
 
-        let probe = ZaiUsageProbe(cliExecutor: mockExecutor)
+        let probe = ZaiUsageProbe(cliExecutor: mockExecutor, settingsRepository: makeSettingsRepository())
 
         // When & Then
         #expect(await probe.isAvailable() == false)
@@ -158,7 +168,7 @@ struct ZaiUsageProbeTests {
             autoResponses: .any
         ).willReturn(CLIResult(output: configWithZhipu, exitCode: 0))
 
-        let probe = ZaiUsageProbe(cliExecutor: mockExecutor)
+        let probe = ZaiUsageProbe(cliExecutor: mockExecutor, settingsRepository: makeSettingsRepository())
 
         // When & Then
         #expect(await probe.isAvailable() == true)
@@ -230,7 +240,7 @@ struct ZaiUsageProbeTests {
         let mockExecutor = MockCLIExecutor()
         given(mockExecutor).locate(.any).willReturn(nil)
 
-        let probe = ZaiUsageProbe(cliExecutor: mockExecutor)
+        let probe = ZaiUsageProbe(cliExecutor: mockExecutor, settingsRepository: makeSettingsRepository())
 
         // When & Then
         await #expect(throws: ProbeError.cliNotFound("Claude")) {
@@ -254,7 +264,7 @@ struct ZaiUsageProbeTests {
             autoResponses: .any
         ).willReturn(CLIResult(output: Self.sampleClaudeConfigEmpty, exitCode: 0))
 
-        let probe = ZaiUsageProbe(cliExecutor: mockExecutor)
+        let probe = ZaiUsageProbe(cliExecutor: mockExecutor, settingsRepository: makeSettingsRepository())
 
         // When & Then
         await #expect(throws: ProbeError.authenticationRequired) {
@@ -294,7 +304,8 @@ struct ZaiUsageProbeTests {
 
         let probe = ZaiUsageProbe(
             cliExecutor: mockExecutor,
-            networkClient: mockNetwork
+            networkClient: mockNetwork,
+            settingsRepository: makeSettingsRepository()
         )
 
         // When
@@ -337,7 +348,8 @@ struct ZaiUsageProbeTests {
 
         let probe = ZaiUsageProbe(
             cliExecutor: mockExecutor,
-            networkClient: mockNetwork
+            networkClient: mockNetwork,
+            settingsRepository: makeSettingsRepository()
         )
 
         // When & Then
@@ -374,7 +386,8 @@ struct ZaiUsageProbeTests {
 
         let probe = ZaiUsageProbe(
             cliExecutor: mockExecutor,
-            networkClient: mockNetwork
+            networkClient: mockNetwork,
+            settingsRepository: makeSettingsRepository()
         )
 
         // When & Then
@@ -412,7 +425,8 @@ struct ZaiUsageProbeTests {
 
         let probe = ZaiUsageProbe(
             cliExecutor: mockExecutor,
-            networkClient: mockNetwork
+            networkClient: mockNetwork,
+            settingsRepository: makeSettingsRepository()
         )
 
         // When & Then

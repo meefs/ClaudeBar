@@ -1,12 +1,13 @@
 import Foundation
 import Mockable
 @testable import Domain
+@testable import Infrastructure
 
-/// Shared test helper factory for creating mock repositories
+/// Shared test helper factory for creating mock/test repositories
 /// Eliminates duplication across provider tests (CopilotProvider, ZaiProvider, etc.)
 struct MockRepositoryFactory {
-    
-    /// Creates a mock settings repository for provider tests
+
+    /// Creates a mock settings repository for provider tests (base ProviderSettingsRepository)
     /// - Parameter enabled: Whether the provider is enabled (defaults to true)
     /// - Returns: A configured MockProviderSettingsRepository
     static func makeSettingsRepository(enabled: Bool = true) -> MockProviderSettingsRepository {
@@ -16,37 +17,55 @@ struct MockRepositoryFactory {
         given(mock).setEnabled(.any, forProvider: .any).willReturn()
         return mock
     }
-    
-    /// Creates a mock credential repository for provider tests
-    /// - Parameter username: The username to return (empty string = nil)
-    /// - Parameter hasToken: Whether the token exists
-    /// - Returns: A configured MockCredentialRepository
-    static func makeCredentialRepository(username: String = "", hasToken: Bool = false) -> MockCredentialRepository {
-        let mock = MockCredentialRepository()
-        given(mock).get(forKey: .any).willReturn(username.isEmpty ? nil : username)
-        given(mock).exists(forKey: .any).willReturn(hasToken)
-        given(mock).save(.any, forKey: .any).willReturn()
-        given(mock).delete(forKey: .any).willReturn()
-        return mock
-    }
-    
-    /// Creates a mock config repository for provider tests
-    /// - Parameter zaiConfigPath: The Z.ai config path to return
-    /// - Parameter glmAuthEnvVar: The GLM auth env var to return
-    /// - Parameter copilotAuthEnvVar: The Copilot auth env var to return
-    /// - Returns: A configured MockProviderConfigRepository
-    static func makeConfigRepository(
+
+    /// Creates a Z.ai settings repository for tests using isolated UserDefaults
+    /// - Parameter enabled: Whether the provider is enabled (defaults to true)
+    /// - Parameter zaiConfigPath: The Z.ai config path
+    /// - Parameter glmAuthEnvVar: The GLM auth env var
+    /// - Returns: A UserDefaultsProviderSettingsRepository with test suite
+    static func makeZaiSettingsRepository(
+        enabled: Bool = true,
         zaiConfigPath: String = "",
-        glmAuthEnvVar: String = "",
-        copilotAuthEnvVar: String = ""
-    ) -> MockProviderConfigRepository {
-        let mock = MockProviderConfigRepository()
-        given(mock).zaiConfigPath().willReturn(zaiConfigPath)
-        given(mock).glmAuthEnvVar().willReturn(glmAuthEnvVar)
-        given(mock).copilotAuthEnvVar().willReturn(copilotAuthEnvVar)
-        given(mock).setZaiConfigPath(.any).willReturn()
-        given(mock).setGlmAuthEnvVar(.any).willReturn()
-        given(mock).setCopilotAuthEnvVar(.any).willReturn()
-        return mock
+        glmAuthEnvVar: String = ""
+    ) -> UserDefaultsProviderSettingsRepository {
+        let suiteName = "com.claudebar.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let repo = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+        repo.setEnabled(enabled, forProvider: "zai")
+        if !zaiConfigPath.isEmpty {
+            repo.setZaiConfigPath(zaiConfigPath)
+        }
+        if !glmAuthEnvVar.isEmpty {
+            repo.setGlmAuthEnvVar(glmAuthEnvVar)
+        }
+        return repo
+    }
+
+    /// Creates a Copilot settings repository for tests using isolated UserDefaults
+    /// - Parameter enabled: Whether the provider is enabled (defaults to false for Copilot)
+    /// - Parameter copilotAuthEnvVar: The Copilot auth env var
+    /// - Parameter username: The GitHub username (empty = none)
+    /// - Parameter hasToken: Whether a token is saved
+    /// - Returns: A UserDefaultsProviderSettingsRepository with test suite
+    static func makeCopilotSettingsRepository(
+        enabled: Bool = false,
+        copilotAuthEnvVar: String = "",
+        username: String = "",
+        hasToken: Bool = false
+    ) -> UserDefaultsProviderSettingsRepository {
+        let suiteName = "com.claudebar.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let repo = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+        repo.setEnabled(enabled, forProvider: "copilot")
+        if !copilotAuthEnvVar.isEmpty {
+            repo.setCopilotAuthEnvVar(copilotAuthEnvVar)
+        }
+        if !username.isEmpty {
+            repo.saveGithubUsername(username)
+        }
+        if hasToken {
+            repo.saveGithubToken("test-token-\(UUID().uuidString)")
+        }
+        return repo
     }
 }

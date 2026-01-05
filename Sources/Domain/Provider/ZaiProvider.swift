@@ -42,16 +42,16 @@ public final class ZaiProvider: AIProvider, @unchecked Sendable {
 
     /// The probe used to fetch usage data
     private let probe: any UsageProbe
-    private let settingsRepository: any ProviderSettingsRepository
+    private let settingsRepository: any ZaiSettingsRepository
 
     // MARK: - Initialization
 
     /// Creates a Z.ai provider with the specified probe
     /// - Parameter probe: The probe to use for fetching usage data
-    /// - Parameter settingsRepository: The repository for persisting settings
+    /// - Parameter settingsRepository: The repository for persisting Z.ai settings
     public init(
         probe: any UsageProbe,
-        settingsRepository: any ProviderSettingsRepository
+        settingsRepository: any ZaiSettingsRepository
     ) {
         self.probe = probe
         self.settingsRepository = settingsRepository

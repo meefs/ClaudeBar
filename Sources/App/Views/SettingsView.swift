@@ -95,9 +95,9 @@ struct SettingsContentView: View {
             if settings.claudeApiBudget > 0 {
                 budgetInput = String(describing: settings.claudeApiBudget)
             }
-            zaiConfigPathInput = UserDefaultsProviderConfigRepository.shared.zaiConfigPath()
-            glmAuthEnvVarInput = UserDefaultsProviderConfigRepository.shared.glmAuthEnvVar()
-            copilotAuthEnvVarInput = UserDefaultsProviderConfigRepository.shared.copilotAuthEnvVar()
+            zaiConfigPathInput = UserDefaultsProviderSettingsRepository.shared.zaiConfigPath()
+            glmAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.glmAuthEnvVar()
+            copilotAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.copilotAuthEnvVar()
         }
     }
 
@@ -642,7 +642,7 @@ struct SettingsContentView: View {
                             )
                     )
                     .onChange(of: copilotAuthEnvVarInput) { _, newValue in
-                        UserDefaultsProviderConfigRepository.shared.setCopilotAuthEnvVar(newValue)
+                        UserDefaultsProviderSettingsRepository.shared.setCopilotAuthEnvVar(newValue)
                     }
             }
 
@@ -824,7 +824,7 @@ struct SettingsContentView: View {
                                     )
                             )
                             .onChange(of: zaiConfigPathInput) { _, newValue in
-                                UserDefaultsProviderConfigRepository.shared.setZaiConfigPath(newValue)
+                                UserDefaultsProviderSettingsRepository.shared.setZaiConfigPath(newValue)
                             }
                     }
 
@@ -848,7 +848,7 @@ struct SettingsContentView: View {
                                     )
                             )
                     .onChange(of: glmAuthEnvVarInput) { _, newValue in
-                        UserDefaultsProviderConfigRepository.shared.setGlmAuthEnvVar(newValue)
+                        UserDefaultsProviderSettingsRepository.shared.setGlmAuthEnvVar(newValue)
                     }
                     }
 
@@ -1208,7 +1208,7 @@ struct SettingsContentView: View {
         copilotTestResult = nil
 
         // Save current inputs
-        UserDefaultsProviderConfigRepository.shared.setCopilotAuthEnvVar(copilotAuthEnvVarInput)
+        UserDefaultsProviderSettingsRepository.shared.setCopilotAuthEnvVar(copilotAuthEnvVarInput)
         if !copilotTokenInput.isEmpty {
             AppLog.credentials.info("Saving Copilot token for connection test")
             copilotProvider?.saveToken(copilotTokenInput)
