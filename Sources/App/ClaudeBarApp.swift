@@ -22,10 +22,12 @@ struct ClaudeBarApp: App {
     init() {
         AppLog.ui.info("ClaudeBar initializing...")
 
-        // Create the shared repositories
+        // Create the shared repository
+        // UserDefaultsProviderSettingsRepository implements all sub-protocols:
+        // - ProviderSettingsRepository (base)
+        // - ZaiSettingsRepository (Z.ai specific config)
+        // - CopilotSettingsRepository (Copilot specific config + credentials)
         let settingsRepository = UserDefaultsProviderSettingsRepository.shared
-        let credentialRepository = UserDefaultsCredentialRepository.shared
-        let configRepository = UserDefaultsProviderConfigRepository.shared
 
         // Create all providers with their probes (rich domain models)
         // Each provider manages its own isEnabled state (persisted via ProviderSettingsRepository)
@@ -35,8 +37,14 @@ struct ClaudeBarApp: App {
             CodexProvider(probe: CodexUsageProbe(), settingsRepository: settingsRepository),
             GeminiProvider(probe: GeminiUsageProbe(), settingsRepository: settingsRepository),
             AntigravityProvider(probe: AntigravityUsageProbe(), settingsRepository: settingsRepository),
-            ZaiProvider(probe: ZaiUsageProbe(), settingsRepository: settingsRepository),
-            CopilotProvider(probe: CopilotUsageProbe(), settingsRepository: settingsRepository, credentialRepository: credentialRepository, configRepository: configRepository),
+            ZaiProvider(
+                probe: ZaiUsageProbe(settingsRepository: settingsRepository),
+                settingsRepository: settingsRepository
+            ),
+            CopilotProvider(
+                probe: CopilotUsageProbe(settingsRepository: settingsRepository),
+                settingsRepository: settingsRepository
+            ),
         ])
         AppLog.providers.info("Created \(repository.all.count) providers")
 
