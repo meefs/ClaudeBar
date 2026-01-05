@@ -24,20 +24,27 @@ struct SettingsContentView: View {
     @State private var copilotIsExpanded: Bool = false
     @State private var claudeBudgetExpanded: Bool = false
     @State private var providersExpanded: Bool = false
+    @State private var zaiConfigExpanded: Bool = false
+    @State private var updatesExpanded: Bool = false
 
-     // Budget input state
-     @State private var budgetInput: String = ""
+    // Budget input state
+    @State private var budgetInput: String = ""
 
-     @State private var zaiConfigPathInput: String = ""
-     @State private var glmAuthEnvVarInput: String = ""
-     @State private var copilotAuthEnvVarInput: String = ""
-     @State private var isTestingCopilot = false
-     @State private var copilotTestResult: String?
-     @State private var updatesExpanded: Bool = false
+    @State private var zaiConfigPathInput: String = ""
+    @State private var glmAuthEnvVarInput: String = ""
+    @State private var copilotAuthEnvVarInput: String = ""
+    @State private var isTestingCopilot = false
+    @State private var copilotTestResult: String?
 
-     /// The Copilot provider from the monitor (cast to CopilotProvider for credential access)
+    private enum ProviderID {
+        static let claude = "claude"
+        static let copilot = "copilot"
+        static let zai = "zai"
+    }
+
+    /// The Copilot provider from the monitor (cast to CopilotProvider for credential access)
     private var copilotProvider: CopilotProvider? {
-        monitor.provider(for: "copilot") as? CopilotProvider
+        monitor.provider(for: ProviderID.copilot) as? CopilotProvider
     }
 
     /// Binding to the Copilot provider's username
@@ -49,15 +56,15 @@ struct SettingsContentView: View {
     }
 
     private var isCopilotEnabled: Bool {
-        monitor.provider(for: "copilot")?.isEnabled ?? false
+        monitor.provider(for: ProviderID.copilot)?.isEnabled ?? false
     }
 
     private var isZaiEnabled: Bool {
-        monitor.provider(for: "zai")?.isEnabled ?? false
+        monitor.provider(for: ProviderID.zai)?.isEnabled ?? false
     }
 
     private var isClaudeEnabled: Bool {
-        monitor.provider(for: "claude")?.isEnabled ?? false
+        monitor.provider(for: ProviderID.claude)?.isEnabled ?? false
     }
 
     /// Maximum height for the settings view to ensure it fits on small screens
@@ -82,12 +89,15 @@ struct SettingsContentView: View {
                     providersCard
                     if isClaudeEnabled {
                         claudeBudgetCard
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     if isCopilotEnabled {
                         copilotCard
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     if isZaiEnabled {
                         zaiConfigCard
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     #if ENABLE_SPARKLE
                     updatesCard
@@ -249,17 +259,19 @@ struct SettingsContentView: View {
             Toggle("", isOn: Binding(
                 get: { provider.isEnabled },
                 set: { newValue in
-                    monitor.setProviderEnabled(provider.id, enabled: newValue)
-                    if !newValue {
-                        switch provider.id {
-                        case "copilot":
-                            copilotIsExpanded = false
-                        case "zai":
-                            zaiConfigExpanded = false
-                        case "claude":
-                            claudeBudgetExpanded = false
-                        default:
-                            break
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        monitor.setProviderEnabled(provider.id, enabled: newValue)
+                        if !newValue {
+                            switch provider.id {
+                            case ProviderID.copilot:
+                                copilotIsExpanded = false
+                            case ProviderID.zai:
+                                zaiConfigExpanded = false
+                            case ProviderID.claude:
+                                claudeBudgetExpanded = false
+                            default:
+                                break
+                            }
                         }
                     }
                 }
@@ -320,20 +332,17 @@ struct SettingsContentView: View {
 
     private var claudeBudgetCard: some View {
         DisclosureGroup(isExpanded: $claudeBudgetExpanded) {
-            if isClaudeEnabled {
-                Divider()
-                    .background(theme.glassBorder)
-                    .padding(.vertical, 12)
+            Divider()
+                .background(AppTheme.glassBorder(for: colorScheme))
+                .padding(.vertical, 12)
 
-                claudeBudgetForm
-                    .disabled(!settings.claudeApiBudgetEnabled)
-                    .opacity(settings.claudeApiBudgetEnabled ? 1 : 0.6)
-            }
+            claudeBudgetForm
+                .disabled(!settings.claudeApiBudgetEnabled)
+                .opacity(settings.claudeApiBudgetEnabled ? 1 : 0.6)
         } label: {
             // Header row with icon, title, toggle
             claudeBudgetHeader
         }
-        .disabled(!isClaudeEnabled)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
@@ -448,17 +457,14 @@ struct SettingsContentView: View {
 
     private var copilotCard: some View {
         DisclosureGroup(isExpanded: $copilotIsExpanded) {
-            if isCopilotEnabled {
-                Divider()
-                    .background(theme.glassBorder)
-                    .padding(.vertical, 12)
+            Divider()
+                .background(AppTheme.glassBorder(for: colorScheme))
+                .padding(.vertical, 12)
 
-                copilotForm
-            }
+            copilotForm
         } label: {
             copilotHeader
         }
-        .disabled(!isCopilotEnabled)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
@@ -729,84 +735,80 @@ struct SettingsContentView: View {
 
     // MARK: - Z.ai Config Card
 
-    @State private var zaiConfigExpanded: Bool = false
-
     private var zaiConfigCard: some View {
         DisclosureGroup(isExpanded: $zaiConfigExpanded) {
-            if isZaiEnabled {
-                Divider()
-                    .background(theme.glassBorder)
-                    .padding(.vertical, 12)
+            Divider()
+                .background(AppTheme.glassBorder(for: colorScheme))
+                .padding(.vertical, 12)
 
-                VStack(alignment: .leading, spacing: 14) {
-                    // Explanation text
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("TOKEN LOOKUP ORDER")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                            .foregroundStyle(theme.textSecondary)
-                            .tracking(0.5)
+            VStack(alignment: .leading, spacing: 14) {
+                // Explanation text
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("TOKEN LOOKUP ORDER")
+                        .font(AppTheme.captionFont(size: 9))
+                        .foregroundStyle(AppTheme.textSecondary(for: colorScheme))
+                        .tracking(0.5)
 
-                        Text("1. First looks for token in the settings.json file")
-                            .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textTertiary)
-                        Text("2. Falls back to environment variable if not found in file")
-                            .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textTertiary)
-                    }
+                    Text("1. First looks for token in the settings.json file")
+                        .font(AppTheme.captionFont(size: 10))
+                        .foregroundStyle(AppTheme.textTertiary(for: colorScheme))
+                    Text("2. Falls back to environment variable if not found in file")
+                        .font(AppTheme.captionFont(size: 10))
+                        .foregroundStyle(AppTheme.textTertiary(for: colorScheme))
+                }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("SETTINGS.JSON PATH")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                            .foregroundStyle(theme.textSecondary)
-                            .tracking(0.5)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("SETTINGS.JSON PATH")
+                        .font(AppTheme.captionFont(size: 9))
+                        .foregroundStyle(AppTheme.textSecondary(for: colorScheme))
+                        .tracking(0.5)
 
-                        TextField("", text: $zaiConfigPathInput, prompt: Text("~/.claude/settings.json").foregroundStyle(theme.textTertiary))
-                            .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textPrimary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(theme.glassBackground)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(theme.glassBorder, lineWidth: 1)
-                                    )
-                            )
-                            .onChange(of: zaiConfigPathInput) { _, newValue in
-                                UserDefaultsProviderSettingsRepository.shared.setZaiConfigPath(newValue)
-                            }
-                    }
+                    TextField("", text: $zaiConfigPathInput, prompt: Text("~/.claude/settings.json").foregroundStyle(AppTheme.textTertiary(for: colorScheme)))
+                        .font(AppTheme.bodyFont(size: 12))
+                        .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(AppTheme.glassBorder(for: colorScheme), lineWidth: 1)
+                                )
+                        )
+                        .onChange(of: zaiConfigPathInput) { _, newValue in
+                            UserDefaultsProviderSettingsRepository.shared.setZaiConfigPath(newValue)
+                        }
+                }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("AUTH TOKEN ENV VAR (FALLBACK)")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                            .foregroundStyle(theme.textSecondary)
-                            .tracking(0.5)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("AUTH TOKEN ENV VAR (FALLBACK)")
+                        .font(AppTheme.captionFont(size: 9))
+                        .foregroundStyle(AppTheme.textSecondary(for: colorScheme))
+                        .tracking(0.5)
 
-                        TextField("", text: $glmAuthEnvVarInput, prompt: Text("GLM_AUTH_TOKEN").foregroundStyle(theme.textTertiary))
-                            .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textPrimary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(theme.glassBackground)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(theme.glassBorder, lineWidth: 1)
-                                    )
-                            )
-                            .onChange(of: glmAuthEnvVarInput) { _, newValue in
-                                UserDefaultsProviderSettingsRepository.shared.setGlmAuthEnvVar(newValue)
-                            }
-                    }
+                    TextField("", text: $glmAuthEnvVarInput, prompt: Text("GLM_AUTH_TOKEN").foregroundStyle(AppTheme.textTertiary(for: colorScheme)))
+                        .font(AppTheme.bodyFont(size: 12))
+                        .foregroundStyle(AppTheme.textPrimary(for: colorScheme))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(AppTheme.glassBorder(for: colorScheme), lineWidth: 1)
+                                )
+                        )
+                        .onChange(of: glmAuthEnvVarInput) { _, newValue in
+                            UserDefaultsProviderSettingsRepository.shared.setGlmAuthEnvVar(newValue)
+                        }
+                }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Leave both empty to use default path with no env var fallback")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                            .foregroundStyle(theme.textTertiary)
-                    }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Leave both empty to use default path with no env var fallback")
+                        .font(AppTheme.captionFont(size: 9))
+                        .foregroundStyle(AppTheme.textTertiary(for: colorScheme))
                 }
             }
         } label: {
@@ -843,7 +845,6 @@ struct SettingsContentView: View {
                 Spacer()
             }
         }
-        .disabled(!isZaiEnabled)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
@@ -1189,22 +1190,17 @@ struct SettingsContentView: View {
             copilotTokenInput = ""
         }
 
-        do {
-            // Try to refresh the copilot provider
-            AppLog.credentials.info("Testing Copilot connection via provider refresh")
-            await monitor.refresh(providerId: "copilot")
+        // Try to refresh the copilot provider
+        AppLog.credentials.info("Testing Copilot connection via provider refresh")
+        await monitor.refresh(providerId: ProviderID.copilot)
 
-            // Check if there's an error after refresh
-            if let error = monitor.provider(for: "copilot")?.lastError {
-                AppLog.credentials.error("Copilot connection test failed: \(error.localizedDescription)")
-                copilotTestResult = "Failed: \(error.localizedDescription)"
-            } else {
-                AppLog.credentials.info("Copilot connection test succeeded")
-                copilotTestResult = "Success: Connection verified"
-            }
-        } catch {
-            AppLog.credentials.error("Copilot connection test threw error: \(error.localizedDescription)")
+        // Check if there's an error after refresh
+        if let error = monitor.provider(for: ProviderID.copilot)?.lastError {
+            AppLog.credentials.error("Copilot connection test failed: \(error.localizedDescription)")
             copilotTestResult = "Failed: \(error.localizedDescription)"
+        } else {
+            AppLog.credentials.info("Copilot connection test succeeded")
+            copilotTestResult = "Success: Connection verified"
         }
 
         isTestingCopilot = false

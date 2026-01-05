@@ -60,6 +60,7 @@ struct CostUsageTests {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.currencyCode = "USD"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
         return formatter.string(from: value as NSDecimalNumber) ?? "$\(value)"
