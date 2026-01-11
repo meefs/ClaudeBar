@@ -3,8 +3,8 @@ import Foundation
 /// Finds where CLI tools are installed on the system.
 ///
 /// Uses the user's login shell to run `which`, ensuring access to the full PATH
-/// from their shell configuration (.zshrc, .bashrc, etc.). This supports tools
-/// installed via nix-darwin, Homebrew, npm, and other package managers.
+/// from their shell configuration (.zshrc, .bashrc, config.nu, etc.). This supports
+/// tools installed via nix-darwin, Homebrew, npm, and other package managers.
 ///
 /// Usage:
 /// ```swift
@@ -31,23 +31,26 @@ public struct BinaryLocator: Sendable {
     /// - Parameter tool: The name of the CLI tool
     /// - Returns: The full path to the tool if found, nil otherwise
     public static func which(_ tool: String) -> String? {
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let shellPath = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let shell = Shell.detect(from: shellPath)
+
         let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: shell)
-        // -l = login shell (sources .zshrc/.bashrc), -c = run command
-        proc.arguments = ["-l", "-c", "which \(tool)"]
+        proc.executableURL = URL(fileURLWithPath: shellPath)
+        proc.arguments = shell.whichArguments(for: tool)
+
         let pipe = Pipe()
         proc.standardOutput = pipe
         proc.standardError = FileHandle.nullDevice
+
         do {
             try proc.run()
             proc.waitUntilExit()
             guard proc.terminationStatus == 0 else { return nil }
+
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let path = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-                !path.isEmpty else { return nil }
-            return path
+            guard let output = String(data: data, encoding: .utf8) else { return nil }
+
+            return shell.parseWhichOutput(output)
         } catch {
             return nil
         }
@@ -57,28 +60,31 @@ public struct BinaryLocator: Sendable {
     ///
     /// - Returns: The full PATH string from the user's shell, or system PATH as fallback
     public static func shellPath() -> String {
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let shellPath = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let shell = Shell.detect(from: shellPath)
+
         let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: shell)
-        proc.arguments = ["-l", "-c", "echo $PATH"]
+        proc.executableURL = URL(fileURLWithPath: shellPath)
+        proc.arguments = shell.pathArguments()
+
         let pipe = Pipe()
         proc.standardOutput = pipe
         proc.standardError = FileHandle.nullDevice
+
+        let fallback = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+
         do {
             try proc.run()
             proc.waitUntilExit()
-            guard proc.terminationStatus == 0 else {
-                return ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
-            }
+            guard proc.terminationStatus == 0 else { return fallback }
+
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let path = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-                !path.isEmpty else {
-                return ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
-            }
-            return path
+            guard let output = String(data: data, encoding: .utf8) else { return fallback }
+
+            let path = shell.parsePathOutput(output)
+            return path.isEmpty ? fallback : path
         } catch {
-            return ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+            return fallback
         }
     }
 }
