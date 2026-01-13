@@ -295,9 +295,8 @@ struct SettingsContentView: View {
         HStack {
             // Back button
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showSettings = false
-                }
+                // Avoid window resize animation glitches in MenuBarExtra.
+                showSettings = false
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.left")

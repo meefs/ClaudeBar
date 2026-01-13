@@ -532,9 +532,8 @@ struct MenuContentView: View {
 
             // Settings Button with update indicator
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showSettings = true
-                }
+                // Avoid window resize animation glitches in MenuBarExtra.
+                showSettings = true
             } label: {
                 ZStack {
                     Circle()
