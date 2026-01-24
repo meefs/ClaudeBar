@@ -147,8 +147,13 @@ struct SettingsContentView: View {
             copilotMonthlyLimit = UserDefaultsProviderSettingsRepository.shared.copilotMonthlyLimit() ?? 50
             copilotManualOverrideEnabled = UserDefaultsProviderSettingsRepository.shared.copilotManualOverrideEnabled()
             copilotApiReturnedEmpty = UserDefaultsProviderSettingsRepository.shared.copilotApiReturnedEmpty()
-            if let usage = UserDefaultsProviderSettingsRepository.shared.copilotManualUsage() {
-                copilotManualUsageInput = String(usage)
+            if let value = UserDefaultsProviderSettingsRepository.shared.copilotManualUsageValue() {
+                let isPercent = UserDefaultsProviderSettingsRepository.shared.copilotManualUsageIsPercent()
+                if isPercent {
+                    copilotManualUsageInput = String(Int(value)) + "%"
+                } else {
+                    copilotManualUsageInput = String(Int(value))
+                }
             }
 
             // Initialize Bedrock settings
@@ -788,32 +793,41 @@ struct SettingsContentView: View {
                         .foregroundStyle(theme.textSecondary)
                         .tracking(0.5)
 
-                    HStack(spacing: 6) {
-                        TextField("", text: $copilotManualUsageInput, prompt: Text("0").foregroundStyle(theme.textTertiary))
-                            .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textPrimary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(theme.glassBackground)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(theme.glassBorder, lineWidth: 1)
-                                    )
-                            )
-                            .onChange(of: copilotManualUsageInput) { _, newValue in
-                                if let value = Int(newValue) {
-                                    UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsage(value)
+                    TextField("", text: $copilotManualUsageInput, prompt: Text("99 or 198%").foregroundStyle(theme.textTertiary))
+                        .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textPrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(theme.glassBackground)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(theme.glassBorder, lineWidth: 1)
+                                )
+                        )
+                        .onChange(of: copilotManualUsageInput) { _, newValue in
+                            // Parse input: if ends with %, treat as percentage; otherwise as request count
+                            let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+                            
+                            if trimmed.hasSuffix("%") {
+                                // Percentage input (e.g., "198%")
+                                let numberPart = trimmed.dropLast()
+                                if let value = Double(numberPart), value >= 0 {
+                                    UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(value)
+                                    UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageIsPercent(true)
                                 }
+                            } else if let value = Double(trimmed), value >= 0 {
+                                // Request count input (e.g., "99")
+                                UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(value)
+                                UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageIsPercent(false)
+                            } else if trimmed.isEmpty {
+                                // Clear value if input is empty
+                                UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(nil)
                             }
-                        
-                        Text("requests")
-                            .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textSecondary)
-                    }
+                        }
 
-                    Text("Enter your usage from GitHub settings")
+                    Text("Enter request count (e.g., 99) or percentage (e.g., 198%)")
                         .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
                         .foregroundStyle(theme.textTertiary)
                 }

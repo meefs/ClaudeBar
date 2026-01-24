@@ -56,11 +56,18 @@ public protocol CopilotSettingsRepository: ProviderSettingsRepository {
 
     // MARK: - Manual Usage Override (for org-based subscriptions)
 
-    /// Gets the manually entered usage count (nil = use API data)
-    func copilotManualUsage() -> Int?
+    /// Gets the manually entered usage value (nil = use API data)
+    /// Can be either a request count or percentage depending on `copilotManualUsageIsPercent()`
+    func copilotManualUsageValue() -> Double?
 
-    /// Sets the manually entered usage count
-    func setCopilotManualUsage(_ usage: Int?)
+    /// Sets the manually entered usage value
+    func setCopilotManualUsageValue(_ value: Double?)
+
+    /// Gets whether the manual usage value is a percentage (true) or request count (false)
+    func copilotManualUsageIsPercent() -> Bool
+
+    /// Sets whether the manual usage value is a percentage
+    func setCopilotManualUsageIsPercent(_ isPercent: Bool)
 
     /// Gets whether manual override is enabled (auto-enabled when API returns empty)
     func copilotManualOverrideEnabled() -> Bool
@@ -73,6 +80,17 @@ public protocol CopilotSettingsRepository: ProviderSettingsRepository {
 
     /// Sets whether the API returned empty data
     func setCopilotApiReturnedEmpty(_ empty: Bool)
+
+    // MARK: - Usage Period Tracking
+
+    /// Gets the last known usage period month (1-12)
+    func copilotLastUsagePeriodMonth() -> Int?
+
+    /// Gets the last known usage period year
+    func copilotLastUsagePeriodYear() -> Int?
+
+    /// Sets the last known usage period
+    func setCopilotLastUsagePeriod(month: Int, year: Int)
 
     // MARK: - Credentials
 

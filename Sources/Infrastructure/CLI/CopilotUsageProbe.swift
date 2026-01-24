@@ -145,6 +145,20 @@ public struct CopilotUsageProbe: UsageProbe {
 
         AppLog.probes.debug("Copilot: Found \(copilotItems.count) Copilot items for \(response.timePeriod.month)/\(response.timePeriod.year)")
 
+        // Check if usage period changed (new billing month)
+        let currentMonth = response.timePeriod.month
+        let currentYear = response.timePeriod.year
+        let lastMonth = settingsRepository.copilotLastUsagePeriodMonth()
+        let lastYear = settingsRepository.copilotLastUsagePeriodYear()
+        
+        if let lastMonth, let lastYear, (currentMonth != lastMonth || currentYear != lastYear) {
+            AppLog.probes.info("Copilot: Usage period changed from \(lastMonth)/\(lastYear) to \(currentMonth)/\(currentYear) - clearing manual entry")
+            settingsRepository.setCopilotManualUsageValue(nil)
+        }
+        
+        // Update stored period
+        settingsRepository.setCopilotLastUsagePeriod(month: currentMonth, year: currentYear)
+
         // Detect if API returned empty data (common for org-based Copilot Business)
         let apiReturnedEmpty = items.isEmpty
         if apiReturnedEmpty {
@@ -187,15 +201,33 @@ public struct CopilotUsageProbe: UsageProbe {
         let isManual: Bool
         
         if manualOverrideEnabled {
-            used = Double(settingsRepository.copilotManualUsage() ?? 0)
+            // Check if manual value is set
+            guard let manualValue = settingsRepository.copilotManualUsageValue() else {
+                AppLog.probes.warning("Copilot: Manual override enabled but no value set")
+                throw ProbeError.executionFailed("Manual usage override enabled but no value entered. Please enter your current usage from GitHub settings.")
+            }
+            
+            let isPercent = settingsRepository.copilotManualUsageIsPercent()
+            
+            if isPercent {
+                // Value is a percentage of quota used (e.g., 198 means 198% used)
+                let percentUsed = manualValue
+                used = (percentUsed / 100.0) * monthlyLimit
+                AppLog.probes.info("Copilot: Using manual override - \(Int(percentUsed))% used = \(Int(used))/\(Int(monthlyLimit))")
+            } else {
+                // Value is request count
+                used = manualValue
+                AppLog.probes.info("Copilot: Using manual override - \(Int(used))/\(Int(monthlyLimit))")
+            }
+            
             isManual = true
-            AppLog.probes.info("Copilot: Using manual override - \(Int(used))/\(Int(monthlyLimit))")
         } else {
             used = totalGrossQuantity
             isManual = false
         }
         
-        let remaining = max(0, monthlyLimit - used)
+        // Allow negative percentages to show over-quota usage
+        let remaining = monthlyLimit - used
         let percentRemaining = (remaining / monthlyLimit) * 100
 
         AppLog.probes.debug("Copilot: Used \(Int(used))/\(Int(monthlyLimit)) this month, \(Int(percentRemaining))% remaining")

@@ -15,8 +15,11 @@ struct CopilotUsageProbeTests {
         copilotAuthEnvVar: String = "",
         monthlyLimit: Int? = nil,
         manualOverrideEnabled: Bool = false,
-        manualUsage: Int? = nil,
-        apiReturnedEmpty: Bool = false
+        manualUsageValue: Double? = nil,
+        manualUsageIsPercent: Bool = false,
+        apiReturnedEmpty: Bool = false,
+        lastUsagePeriodMonth: Int? = nil,
+        lastUsagePeriodYear: Int? = nil
     ) -> UserDefaultsProviderSettingsRepository {
         let suiteName = "com.claudebar.test.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -35,10 +38,14 @@ struct CopilotUsageProbeTests {
             repo.setCopilotMonthlyLimit(monthlyLimit)
         }
         repo.setCopilotManualOverrideEnabled(manualOverrideEnabled)
-        if let manualUsage {
-            repo.setCopilotManualUsage(manualUsage)
+        if let manualUsageValue {
+            repo.setCopilotManualUsageValue(manualUsageValue)
         }
+        repo.setCopilotManualUsageIsPercent(manualUsageIsPercent)
         repo.setCopilotApiReturnedEmpty(apiReturnedEmpty)
+        if let lastUsagePeriodMonth, let lastUsagePeriodYear {
+            repo.setCopilotLastUsagePeriod(month: lastUsagePeriodMonth, year: lastUsagePeriodYear)
+        }
         return repo
     }
 
@@ -393,7 +400,8 @@ struct CopilotUsageProbeTests {
             hasToken: true,
             monthlyLimit: 300,
             manualOverrideEnabled: true,
-            manualUsage: 99
+            manualUsageValue: 99,
+            manualUsageIsPercent: false
         )
         let mockNetwork = MockNetworkClient()
         let responseJSON = """
@@ -432,7 +440,8 @@ struct CopilotUsageProbeTests {
             username: "testuser",
             hasToken: true,
             manualOverrideEnabled: true,
-            manualUsage: 50
+            manualUsageValue: 50,
+            manualUsageIsPercent: false
         )
         let mockNetwork = MockNetworkClient()
         let responseJSON = """
@@ -509,6 +518,217 @@ struct CopilotUsageProbeTests {
 
         // Flag should be cleared when API returns data
         #expect(settings.copilotApiReturnedEmpty() == false)
+    }
+
+    @Test
+    func `probe throws error when manual override enabled but no value set`() async throws {
+        let settings = makeSettingsRepository(
+            username: "testuser",
+            hasToken: true,
+            manualOverrideEnabled: true,
+            manualUsageValue: nil  // No value set
+        )
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2026, "month": 1 },
+          "user": "testuser",
+          "usageItems": []
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        // Should throw when manual override is on but value is nil
+        await #expect(throws: ProbeError.self) {
+            try await probe.probe()
+        }
+    }
+
+    @Test
+    func `probe handles percentage input correctly`() async throws {
+        let settings = makeSettingsRepository(
+            username: "testuser",
+            hasToken: true,
+            monthlyLimit: 300,
+            manualOverrideEnabled: true,
+            manualUsageValue: 198,  // 198% of quota
+            manualUsageIsPercent: true
+        )
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2026, "month": 1 },
+          "user": "testuser",
+          "usageItems": []
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        let snapshot = try await probe.probe()
+
+        let quota = snapshot.quotas.first!
+        // 198% used = -98% remaining (594 requests of 300 limit)
+        #expect(quota.percentRemaining == -98.0)
+        #expect(quota.resetText == "594/300 requests (manual)")
+    }
+
+    @Test
+    func `probe allows negative percentages for over-quota usage`() async throws {
+        let settings = makeSettingsRepository(
+            username: "testuser",
+            hasToken: true,
+            monthlyLimit: 50,
+            manualOverrideEnabled: true,
+            manualUsageValue: 99,  // 99 requests of 50 limit
+            manualUsageIsPercent: false
+        )
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2026, "month": 1 },
+          "user": "testuser",
+          "usageItems": []
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        let snapshot = try await probe.probe()
+
+        let quota = snapshot.quotas.first!
+        // 99/50 = -98% remaining
+        #expect(quota.percentRemaining == -98.0)
+        #expect(quota.resetText == "99/50 requests (manual)")
+    }
+
+    @Test
+    func `probe clears manual entry when usage period changes`() async throws {
+        let settings = makeSettingsRepository(
+            username: "testuser",
+            hasToken: true,
+            monthlyLimit: 300,
+            manualOverrideEnabled: true,
+            manualUsageValue: 99,
+            manualUsageIsPercent: false,
+            lastUsagePeriodMonth: 12,  // December
+            lastUsagePeriodYear: 2025
+        )
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2026, "month": 1 },
+          "user": "testuser",
+          "usageItems": []
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        // Should throw because period changed (Dec 2025 → Jan 2026) and manual value was cleared
+        await #expect(throws: ProbeError.self) {
+            try await probe.probe()
+        }
+
+        // Verify manual value was cleared
+        #expect(settings.copilotManualUsageValue() == nil)
+        // Verify period was updated
+        #expect(settings.copilotLastUsagePeriodMonth() == 1)
+        #expect(settings.copilotLastUsagePeriodYear() == 2026)
+    }
+
+    @Test
+    func `probe preserves manual entry when period remains same`() async throws {
+        let settings = makeSettingsRepository(
+            username: "testuser",
+            hasToken: true,
+            monthlyLimit: 300,
+            manualOverrideEnabled: true,
+            manualUsageValue: 99,
+            manualUsageIsPercent: false,
+            lastUsagePeriodMonth: 1,
+            lastUsagePeriodYear: 2026
+        )
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2026, "month": 1 },
+          "user": "testuser",
+          "usageItems": []
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        let snapshot = try await probe.probe()
+
+        // Manual value should still be there
+        #expect(settings.copilotManualUsageValue() == 99)
+        
+        let quota = snapshot.quotas.first!
+        #expect(quota.percentRemaining == 67.0)  // 99/300 = 33% used, 67% remaining
+        #expect(quota.resetText == "99/300 requests (manual)")
     }
 
     // MARK: - Error Handling Tests
