@@ -59,6 +59,21 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(envVar, forKey: Keys.copilotAuthEnvVar)
     }
 
+    public func copilotMonthlyLimit() -> Int? {
+        guard let intValue = userDefaults.object(forKey: Keys.copilotMonthlyLimit) as? Int else {
+            return nil
+        }
+        return intValue
+    }
+
+    public func setCopilotMonthlyLimit(_ limit: Int?) {
+        if let limit {
+            userDefaults.set(limit, forKey: Keys.copilotMonthlyLimit)
+        } else {
+            userDefaults.removeObject(forKey: Keys.copilotMonthlyLimit)
+        }
+    }
+
     // MARK: - CopilotSettingsRepository (Credentials)
 
     public func saveGithubToken(_ token: String) {
@@ -128,6 +143,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let zaiConfigPath = "providerConfig.zaiConfigPath"
         static let glmAuthEnvVar = "providerConfig.glmAuthEnvVar"
         static let copilotAuthEnvVar = "providerConfig.copilotAuthEnvVar"
+        static let copilotMonthlyLimit = "providerConfig.copilotMonthlyLimit"
         // Bedrock settings
         static let awsProfileName = "providerConfig.awsProfileName"
         static let bedrockRegions = "providerConfig.bedrockRegions"

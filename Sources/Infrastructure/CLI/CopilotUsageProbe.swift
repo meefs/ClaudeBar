@@ -158,8 +158,9 @@ public struct CopilotUsageProbe: UsageProbe {
 
         AppLog.probes.debug("Copilot: gross=\(Int(totalGrossQuantity)), discount=\(Int(totalDiscountQuantity)), net=\(Int(totalNetQuantity)), amount=\(totalNetAmount)")
 
-        // GitHub Copilot Free tier: ~2000 premium requests/month
-        let monthlyLimit: Double = 2000
+        // Use configured monthly limit or default to 50 (Free/Pro tier premium requests)
+        // Note: 2000 is code completions limit, not premium requests limit
+        let monthlyLimit: Double = Double(settingsRepository.copilotMonthlyLimit() ?? 50)
         let used = totalGrossQuantity
         let remaining = max(0, monthlyLimit - used)
         let percentRemaining = (remaining / monthlyLimit) * 100

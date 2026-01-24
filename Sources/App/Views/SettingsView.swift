@@ -34,6 +34,7 @@ struct SettingsContentView: View {
     @State private var zaiConfigPathInput: String = ""
     @State private var glmAuthEnvVarInput: String = ""
     @State private var copilotAuthEnvVarInput: String = ""
+    @State private var copilotMonthlyLimit: Int = 50
     @State private var isTestingCopilot = false
     @State private var copilotTestResult: String?
 
@@ -140,6 +141,7 @@ struct SettingsContentView: View {
             zaiConfigPathInput = UserDefaultsProviderSettingsRepository.shared.zaiConfigPath()
             glmAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.glmAuthEnvVar()
             copilotAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.copilotAuthEnvVar()
+            copilotMonthlyLimit = UserDefaultsProviderSettingsRepository.shared.copilotMonthlyLimit() ?? 50
 
             // Initialize Bedrock settings
             awsProfileNameInput = UserDefaultsProviderSettingsRepository.shared.awsProfileName()
@@ -687,6 +689,41 @@ struct SettingsContentView: View {
                     .onChange(of: copilotAuthEnvVarInput) { _, newValue in
                         UserDefaultsProviderSettingsRepository.shared.setCopilotAuthEnvVar(newValue)
                     }
+            }
+
+            // Monthly Limit (Premium Requests)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("MONTHLY PREMIUM REQUEST LIMIT")
+                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textSecondary)
+                    .tracking(0.5)
+
+                Picker("", selection: $copilotMonthlyLimit) {
+                    Text("Free/Pro (50)").tag(50)
+                    Text("Business (300)").tag(300)
+                    Text("Enterprise (1000)").tag(1000)
+                    Text("Pro+ (1500)").tag(1500)
+                }
+                .pickerStyle(.menu)
+                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                .foregroundStyle(theme.textPrimary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(theme.glassBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(theme.glassBorder, lineWidth: 1)
+                        )
+                )
+                .onChange(of: copilotMonthlyLimit) { _, newValue in
+                    UserDefaultsProviderSettingsRepository.shared.setCopilotMonthlyLimit(newValue)
+                }
+
+                Text("Note: This is for premium requests (Copilot Chat with advanced models), not code completions")
+                    .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
             }
 
             // Explanatory text

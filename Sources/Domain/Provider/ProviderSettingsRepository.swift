@@ -46,6 +46,14 @@ public protocol CopilotSettingsRepository: ProviderSettingsRepository {
     /// Sets the environment variable name for GitHub Copilot token
     func setCopilotAuthEnvVar(_ envVar: String)
 
+    // MARK: - Monthly Limit
+
+    /// Gets the monthly premium request limit for Copilot (nil = use default of 50 for Free/Pro)
+    func copilotMonthlyLimit() -> Int?
+
+    /// Sets the monthly premium request limit for Copilot
+    func setCopilotMonthlyLimit(_ limit: Int?)
+
     // MARK: - Credentials
 
     /// Saves the GitHub token

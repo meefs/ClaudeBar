@@ -12,7 +12,8 @@ struct CopilotUsageProbeTests {
     private func makeSettingsRepository(
         username: String = "",
         hasToken: Bool = false,
-        copilotAuthEnvVar: String = ""
+        copilotAuthEnvVar: String = "",
+        monthlyLimit: Int? = nil
     ) -> UserDefaultsProviderSettingsRepository {
         let suiteName = "com.claudebar.test.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -26,6 +27,9 @@ struct CopilotUsageProbeTests {
         }
         if !copilotAuthEnvVar.isEmpty {
             repo.setCopilotAuthEnvVar(copilotAuthEnvVar)
+        }
+        if let monthlyLimit {
+            repo.setCopilotMonthlyLimit(monthlyLimit)
         }
         return repo
     }
@@ -93,10 +97,10 @@ struct CopilotUsageProbeTests {
               "model": "Claude Sonnet 4",
               "unitType": "requests",
               "pricePerUnit": 0.04,
-              "grossQuantity": 100.0,
-              "grossAmount": 4.0,
-              "discountQuantity": 100.0,
-              "discountAmount": 4.0,
+              "grossQuantity": 10.0,
+              "grossAmount": 0.4,
+              "discountQuantity": 10.0,
+              "discountAmount": 0.4,
               "netQuantity": 0.0,
               "netAmount": 0.0
             }
@@ -126,8 +130,8 @@ struct CopilotUsageProbeTests {
 
         let quota = snapshot.quotas.first!
         #expect(quota.quotaType == .session)
-        #expect(quota.percentRemaining == 95.0)
-        #expect(quota.resetText == "100/2000 requests")
+        #expect(quota.percentRemaining == 80.0)
+        #expect(quota.resetText == "10/50 requests")
     }
 
     @Test
@@ -143,13 +147,13 @@ struct CopilotUsageProbeTests {
               "product": "Copilot",
               "sku": "Copilot Premium Request",
               "model": "Claude Sonnet 4",
-              "grossQuantity": 50.0
+              "grossQuantity": 15.0
             },
             {
               "product": "Copilot",
               "sku": "Copilot Premium Request",
               "model": "GPT-4o",
-              "grossQuantity": 150.0
+              "grossQuantity": 10.0
             },
             {
               "product": "Actions",
@@ -177,8 +181,8 @@ struct CopilotUsageProbeTests {
         let snapshot = try await probe.probe()
 
         let quota = snapshot.quotas.first!
-        #expect(quota.percentRemaining == 90.0)
-        #expect(quota.resetText == "200/2000 requests")
+        #expect(quota.percentRemaining == 50.0)
+        #expect(quota.resetText == "25/50 requests")
     }
 
     @Test
@@ -211,7 +215,132 @@ struct CopilotUsageProbeTests {
 
         let quota = snapshot.quotas.first!
         #expect(quota.percentRemaining == 100.0)
-        #expect(quota.resetText == "0/2000 requests")
+        #expect(quota.resetText == "0/50 requests")
+    }
+
+    @Test
+    func `probe uses custom monthly limit from settings`() async throws {
+        // Business account with 300 limit
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true, monthlyLimit: 300)
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2025, "month": 12 },
+          "user": "testuser",
+          "usageItems": [
+            {
+              "product": "Copilot",
+              "sku": "Copilot Premium Request",
+              "model": "Claude Sonnet 4",
+              "grossQuantity": 100.0
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        let snapshot = try await probe.probe()
+
+        let quota = snapshot.quotas.first!
+        // 100/300 = 33.33% used, 66.67% remaining
+        #expect(quota.percentRemaining.rounded() == 67.0)
+        #expect(quota.resetText == "100/300 requests")
+    }
+
+    @Test
+    func `probe uses default limit when no custom limit set`() async throws {
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true)
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2025, "month": 12 },
+          "user": "testuser",
+          "usageItems": [
+            {
+              "product": "Copilot",
+              "sku": "Copilot Premium Request",
+              "model": "Claude Sonnet 4",
+              "grossQuantity": 25.0
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        let snapshot = try await probe.probe()
+
+        let quota = snapshot.quotas.first!
+        // Should use default 50 (Free/Pro tier premium requests)
+        #expect(quota.percentRemaining == 50.0)
+        #expect(quota.resetText == "25/50 requests")
+    }
+
+    @Test
+    func `probe calculates correctly for Pro Plus account limit`() async throws {
+        // Pro+ account with 1500 limit
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true, monthlyLimit: 1500)
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2025, "month": 12 },
+          "user": "testuser",
+          "usageItems": [
+            {
+              "product": "Copilot",
+              "sku": "Copilot Premium Request",
+              "model": "Claude Sonnet 4",
+              "grossQuantity": 750.0
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        let snapshot = try await probe.probe()
+
+        let quota = snapshot.quotas.first!
+        // 750/1500 = 50% used, 50% remaining
+        #expect(quota.percentRemaining == 50.0)
+        #expect(quota.resetText == "750/1500 requests")
     }
 
     // MARK: - Error Handling Tests
