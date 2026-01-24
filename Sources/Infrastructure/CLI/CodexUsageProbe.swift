@@ -71,7 +71,7 @@ public struct CodexUsageProbe: UsageProbe {
 
         if let primary = limits.primary {
             quotas.append(UsageQuota(
-                percentRemaining: max(0, 100 - primary.usedPercent),
+                percentRemaining: 100 - primary.usedPercent,  // Allow negative when over quota
                 quotaType: .session,
                 providerId: "codex",
                 resetText: primary.resetDescription
@@ -80,7 +80,7 @@ public struct CodexUsageProbe: UsageProbe {
 
         if let secondary = limits.secondary {
             quotas.append(UsageQuota(
-                percentRemaining: max(0, 100 - secondary.usedPercent),
+                percentRemaining: 100 - secondary.usedPercent,  // Allow negative when over quota
                 quotaType: .weekly,
                 providerId: "codex",
                 resetText: secondary.resetDescription

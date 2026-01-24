@@ -137,7 +137,7 @@ struct CodexUsageProbeRPCTests {
         let snapshot = try await probe.probe()
 
         // Then
-        #expect(snapshot.sessionQuota?.percentRemaining == 0) // max(0, 100-110)
+        #expect(snapshot.sessionQuota?.percentRemaining == -10) // 100-110 = -10 (over quota)
     }
 
     @Test
