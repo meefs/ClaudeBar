@@ -74,6 +74,37 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         }
     }
 
+    public func copilotManualUsage() -> Int? {
+        guard let intValue = userDefaults.object(forKey: Keys.copilotManualUsage) as? Int else {
+            return nil
+        }
+        return intValue
+    }
+
+    public func setCopilotManualUsage(_ usage: Int?) {
+        if let usage {
+            userDefaults.set(usage, forKey: Keys.copilotManualUsage)
+        } else {
+            userDefaults.removeObject(forKey: Keys.copilotManualUsage)
+        }
+    }
+
+    public func copilotManualOverrideEnabled() -> Bool {
+        userDefaults.bool(forKey: Keys.copilotManualOverrideEnabled)
+    }
+
+    public func setCopilotManualOverrideEnabled(_ enabled: Bool) {
+        userDefaults.set(enabled, forKey: Keys.copilotManualOverrideEnabled)
+    }
+
+    public func copilotApiReturnedEmpty() -> Bool {
+        userDefaults.bool(forKey: Keys.copilotApiReturnedEmpty)
+    }
+
+    public func setCopilotApiReturnedEmpty(_ empty: Bool) {
+        userDefaults.set(empty, forKey: Keys.copilotApiReturnedEmpty)
+    }
+
     // MARK: - CopilotSettingsRepository (Credentials)
 
     public func saveGithubToken(_ token: String) {
@@ -144,6 +175,9 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let glmAuthEnvVar = "providerConfig.glmAuthEnvVar"
         static let copilotAuthEnvVar = "providerConfig.copilotAuthEnvVar"
         static let copilotMonthlyLimit = "providerConfig.copilotMonthlyLimit"
+        static let copilotManualUsage = "providerConfig.copilotManualUsage"
+        static let copilotManualOverrideEnabled = "providerConfig.copilotManualOverrideEnabled"
+        static let copilotApiReturnedEmpty = "providerConfig.copilotApiReturnedEmpty"
         // Bedrock settings
         static let awsProfileName = "providerConfig.awsProfileName"
         static let bedrockRegions = "providerConfig.bedrockRegions"

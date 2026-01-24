@@ -54,6 +54,26 @@ public protocol CopilotSettingsRepository: ProviderSettingsRepository {
     /// Sets the monthly premium request limit for Copilot
     func setCopilotMonthlyLimit(_ limit: Int?)
 
+    // MARK: - Manual Usage Override (for org-based subscriptions)
+
+    /// Gets the manually entered usage count (nil = use API data)
+    func copilotManualUsage() -> Int?
+
+    /// Sets the manually entered usage count
+    func setCopilotManualUsage(_ usage: Int?)
+
+    /// Gets whether manual override is enabled (auto-enabled when API returns empty)
+    func copilotManualOverrideEnabled() -> Bool
+
+    /// Sets whether manual override is enabled
+    func setCopilotManualOverrideEnabled(_ enabled: Bool)
+
+    /// Gets whether the API returned empty data (persisted state)
+    func copilotApiReturnedEmpty() -> Bool
+
+    /// Sets whether the API returned empty data
+    func setCopilotApiReturnedEmpty(_ empty: Bool)
+
     // MARK: - Credentials
 
     /// Saves the GitHub token

@@ -35,6 +35,9 @@ struct SettingsContentView: View {
     @State private var glmAuthEnvVarInput: String = ""
     @State private var copilotAuthEnvVarInput: String = ""
     @State private var copilotMonthlyLimit: Int = 50
+    @State private var copilotManualOverrideEnabled: Bool = false
+    @State private var copilotManualUsageInput: String = ""
+    @State private var copilotApiReturnedEmpty: Bool = false
     @State private var isTestingCopilot = false
     @State private var copilotTestResult: String?
 
@@ -142,6 +145,11 @@ struct SettingsContentView: View {
             glmAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.glmAuthEnvVar()
             copilotAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.copilotAuthEnvVar()
             copilotMonthlyLimit = UserDefaultsProviderSettingsRepository.shared.copilotMonthlyLimit() ?? 50
+            copilotManualOverrideEnabled = UserDefaultsProviderSettingsRepository.shared.copilotManualOverrideEnabled()
+            copilotApiReturnedEmpty = UserDefaultsProviderSettingsRepository.shared.copilotApiReturnedEmpty()
+            if let usage = UserDefaultsProviderSettingsRepository.shared.copilotManualUsage() {
+                copilotManualUsageInput = String(usage)
+            }
 
             // Initialize Bedrock settings
             awsProfileNameInput = UserDefaultsProviderSettingsRepository.shared.awsProfileName()
@@ -724,6 +732,91 @@ struct SettingsContentView: View {
                 Text("Note: This is for premium requests (Copilot Chat with advanced models), not code completions")
                     .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
+            }
+
+            // Warning banner for org-based subscriptions
+            if copilotApiReturnedEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(theme.statusWarning)
+                        Text("API returned no usage data")
+                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .foregroundStyle(theme.textPrimary)
+                    }
+                    
+                    Text("This is common for Copilot Business subscriptions through an organization.")
+                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                    
+                    Link(destination: URL(string: "https://github.com/settings/copilot/features")!) {
+                        HStack(spacing: 4) {
+                            Text("View usage on GitHub")
+                                .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 8))
+                        }
+                        .foregroundStyle(theme.accentPrimary)
+                    }
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(theme.statusWarning.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(theme.statusWarning.opacity(0.3), lineWidth: 1)
+                        )
+                )
+            }
+
+            // Manual override toggle
+            Toggle("Enable manual usage entry", isOn: $copilotManualOverrideEnabled)
+                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                .foregroundStyle(theme.textPrimary)
+                .toggleStyle(.switch)
+                .onChange(of: copilotManualOverrideEnabled) { _, newValue in
+                    UserDefaultsProviderSettingsRepository.shared.setCopilotManualOverrideEnabled(newValue)
+                }
+
+            // Manual usage input (shown when toggle is on)
+            if copilotManualOverrideEnabled {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("CURRENT PREMIUM REQUEST USAGE")
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                        .tracking(0.5)
+
+                    HStack(spacing: 6) {
+                        TextField("", text: $copilotManualUsageInput, prompt: Text("0").foregroundStyle(theme.textTertiary))
+                            .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textPrimary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(theme.glassBackground)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(theme.glassBorder, lineWidth: 1)
+                                    )
+                            )
+                            .onChange(of: copilotManualUsageInput) { _, newValue in
+                                if let value = Int(newValue) {
+                                    UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsage(value)
+                                }
+                            }
+                        
+                        Text("requests")
+                            .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textSecondary)
+                    }
+
+                    Text("Enter your usage from GitHub settings")
+                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textTertiary)
+                }
             }
 
             // Explanatory text

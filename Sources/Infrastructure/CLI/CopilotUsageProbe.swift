@@ -145,34 +145,71 @@ public struct CopilotUsageProbe: UsageProbe {
 
         AppLog.probes.debug("Copilot: Found \(copilotItems.count) Copilot items for \(response.timePeriod.month)/\(response.timePeriod.year)")
 
+        // Detect if API returned empty data (common for org-based Copilot Business)
+        let apiReturnedEmpty = items.isEmpty
+        if apiReturnedEmpty {
+            AppLog.probes.info("Copilot: API returned no usage items (likely org-based subscription)")
+            settingsRepository.setCopilotApiReturnedEmpty(true)
+            // Auto-enable manual override for org-based subscriptions
+            if !settingsRepository.copilotManualOverrideEnabled() {
+                AppLog.probes.info("Copilot: Auto-enabling manual override")
+                settingsRepository.setCopilotManualOverrideEnabled(true)
+            }
+        } else {
+            // Clear the flag if we got data
+            settingsRepository.setCopilotApiReturnedEmpty(false)
+        }
+
         // Log model breakdown
         let modelBreakdown = Dictionary(grouping: copilotItems) { $0.model ?? "Unknown" }
             .mapValues { items in items.reduce(0) { $0 + ($1.grossQuantity ?? 0) } }
-        AppLog.probes.debug("Copilot models: \(modelBreakdown)")
+        if !copilotItems.isEmpty {
+            AppLog.probes.debug("Copilot models: \(modelBreakdown)")
+        }
 
-        // Calculate totals
+        // Calculate totals from API
         let totalGrossQuantity = copilotItems.reduce(0.0) { $0 + ($1.grossQuantity ?? 0) }
         let totalDiscountQuantity = copilotItems.reduce(0.0) { $0 + ($1.discountQuantity ?? 0) }
         let totalNetQuantity = copilotItems.reduce(0.0) { $0 + ($1.netQuantity ?? 0) }
         let totalNetAmount = copilotItems.reduce(0.0) { $0 + ($1.netAmount ?? 0) }
 
-        AppLog.probes.debug("Copilot: gross=\(Int(totalGrossQuantity)), discount=\(Int(totalDiscountQuantity)), net=\(Int(totalNetQuantity)), amount=\(totalNetAmount)")
+        if !copilotItems.isEmpty {
+            AppLog.probes.debug("Copilot: gross=\(Int(totalGrossQuantity)), discount=\(Int(totalDiscountQuantity)), net=\(Int(totalNetQuantity)), amount=\(totalNetAmount)")
+        }
 
         // Use configured monthly limit or default to 50 (Free/Pro tier premium requests)
         // Note: 2000 is code completions limit, not premium requests limit
         let monthlyLimit: Double = Double(settingsRepository.copilotMonthlyLimit() ?? 50)
-        let used = totalGrossQuantity
+        
+        // Determine usage: manual override or API data
+        let manualOverrideEnabled = settingsRepository.copilotManualOverrideEnabled()
+        let used: Double
+        let isManual: Bool
+        
+        if manualOverrideEnabled {
+            used = Double(settingsRepository.copilotManualUsage() ?? 0)
+            isManual = true
+            AppLog.probes.info("Copilot: Using manual override - \(Int(used))/\(Int(monthlyLimit))")
+        } else {
+            used = totalGrossQuantity
+            isManual = false
+        }
+        
         let remaining = max(0, monthlyLimit - used)
         let percentRemaining = (remaining / monthlyLimit) * 100
 
         AppLog.probes.debug("Copilot: Used \(Int(used))/\(Int(monthlyLimit)) this month, \(Int(percentRemaining))% remaining")
 
-        // Create quota
+        // Create quota with manual indicator
+        let resetText = isManual 
+            ? "\(Int(used))/\(Int(monthlyLimit)) requests (manual)"
+            : "\(Int(used))/\(Int(monthlyLimit)) requests"
+        
         let quota = UsageQuota(
             percentRemaining: percentRemaining,
             quotaType: .session,
             providerId: "copilot",
-            resetText: "\(Int(used))/\(Int(monthlyLimit)) requests"
+            resetText: resetText
         )
 
         return UsageSnapshot(

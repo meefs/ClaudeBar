@@ -13,7 +13,10 @@ struct CopilotUsageProbeTests {
         username: String = "",
         hasToken: Bool = false,
         copilotAuthEnvVar: String = "",
-        monthlyLimit: Int? = nil
+        monthlyLimit: Int? = nil,
+        manualOverrideEnabled: Bool = false,
+        manualUsage: Int? = nil,
+        apiReturnedEmpty: Bool = false
     ) -> UserDefaultsProviderSettingsRepository {
         let suiteName = "com.claudebar.test.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -31,6 +34,11 @@ struct CopilotUsageProbeTests {
         if let monthlyLimit {
             repo.setCopilotMonthlyLimit(monthlyLimit)
         }
+        repo.setCopilotManualOverrideEnabled(manualOverrideEnabled)
+        if let manualUsage {
+            repo.setCopilotManualUsage(manualUsage)
+        }
+        repo.setCopilotApiReturnedEmpty(apiReturnedEmpty)
         return repo
     }
 
@@ -341,6 +349,166 @@ struct CopilotUsageProbeTests {
         // 750/1500 = 50% used, 50% remaining
         #expect(quota.percentRemaining == 50.0)
         #expect(quota.resetText == "750/1500 requests")
+    }
+
+    // MARK: - Manual Override Tests
+
+    @Test
+    func `probe auto-enables manual override when API returns empty usageItems`() async throws {
+        let settings = makeSettingsRepository(username: "testuser", hasToken: true)
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2026, "month": 1 },
+          "user": "testuser",
+          "usageItems": []
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        _ = try await probe.probe()
+
+        // Verify manual override was auto-enabled
+        #expect(settings.copilotManualOverrideEnabled() == true)
+        #expect(settings.copilotApiReturnedEmpty() == true)
+    }
+
+    @Test
+    func `probe uses manual usage when override is enabled`() async throws {
+        let settings = makeSettingsRepository(
+            username: "testuser",
+            hasToken: true,
+            monthlyLimit: 300,
+            manualOverrideEnabled: true,
+            manualUsage: 99
+        )
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2026, "month": 1 },
+          "user": "testuser",
+          "usageItems": []
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        let snapshot = try await probe.probe()
+
+        let quota = snapshot.quotas.first!
+        // Manual usage: 99/300 = 33% used, 67% remaining
+        #expect(quota.percentRemaining == 67.0)
+        #expect(quota.resetText == "99/300 requests (manual)")
+    }
+
+    @Test
+    func `probe shows manual indicator in resetText when using manual override`() async throws {
+        let settings = makeSettingsRepository(
+            username: "testuser",
+            hasToken: true,
+            manualOverrideEnabled: true,
+            manualUsage: 50
+        )
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2026, "month": 1 },
+          "user": "testuser",
+          "usageItems": [
+            {
+              "product": "Copilot",
+              "grossQuantity": 10.0
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        let snapshot = try await probe.probe()
+
+        let quota = snapshot.quotas.first!
+        // Should use manual value (50) not API value (10)
+        #expect(quota.resetText?.contains("(manual)") == true)
+        #expect(quota.resetText == "50/50 requests (manual)")
+    }
+
+    @Test
+    func `probe clears apiReturnedEmpty flag when API returns data`() async throws {
+        let settings = makeSettingsRepository(
+            username: "testuser",
+            hasToken: true,
+            apiReturnedEmpty: true
+        )
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "timePeriod": { "year": 2026, "month": 1 },
+          "user": "testuser",
+          "usageItems": [
+            {
+              "product": "Copilot",
+              "grossQuantity": 10.0
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let probe = CopilotUsageProbe(
+            networkClient: mockNetwork,
+            settingsRepository: settings
+        )
+
+        _ = try await probe.probe()
+
+        // Flag should be cleared when API returns data
+        #expect(settings.copilotApiReturnedEmpty() == false)
     }
 
     // MARK: - Error Handling Tests
