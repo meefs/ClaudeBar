@@ -6,12 +6,6 @@ let project = Project(
         defaultKnownRegions: ["en"],
         developmentRegion: "en"
     ),
-    packages: [
-        .remote(url: "https://github.com/sparkle-project/Sparkle", requirement: .upToNextMajor(from: "2.8.1")),
-        .remote(url: "https://github.com/Kolos65/Mockable.git", requirement: .upToNextMajor(from: "0.5.0")),
-        .remote(url: "https://github.com/migueldeicaza/SwiftTerm.git", requirement: .upToNextMajor(from: "1.5.1")),
-        .remote(url: "https://github.com/awslabs/aws-sdk-swift.git", requirement: .upToNextMajor(from: "1.6.40")),
-    ],
     settings: .settings(
         base: [
             "SWIFT_VERSION": "6.0",
@@ -36,7 +30,7 @@ let project = Project(
             deploymentTargets: .macOS("15.0"),
             sources: ["Sources/Domain/**"],
             dependencies: [
-                .package(product: "Mockable"),
+                .external(name: "Mockable"),
             ],
             settings: .settings(
                 base: [
@@ -55,12 +49,14 @@ let project = Project(
             sources: ["Sources/Infrastructure/**"],
             dependencies: [
                 .target(name: "Domain"),
-                .package(product: "Mockable"),
-                .package(product: "SwiftTerm"),
-                .package(product: "AWSCloudWatch"),
-                .package(product: "AWSSTS"),
-                .package(product: "AWSPricing"),
-                .package(product: "AWSSDKIdentity"),
+                .external(name: "Mockable"),
+                .external(name: "SwiftTerm"),
+                .external(name: "AWSCloudWatch"),
+                .external(name: "AWSSTS"),
+                .external(name: "AWSPricing"),
+                .external(name: "AWSSDKIdentity"),
+                .external(name: "AWSSSO"),
+                .external(name: "AWSSSOOIDC"),
             ],
             settings: .settings(
                 base: [
@@ -85,7 +81,7 @@ let project = Project(
             dependencies: [
                 .target(name: "Domain"),
                 .target(name: "Infrastructure"),
-                .package(product: "Sparkle"),
+                .external(name: "Sparkle"),
             ],
             settings: .settings(
                 base: [
@@ -115,11 +111,13 @@ let project = Project(
             dependencies: [
                 .target(name: "Domain"),
                 .target(name: "Infrastructure"),
-                .package(product: "Mockable"),
-                .package(product: "AWSCloudWatch"),
-                .package(product: "AWSSTS"),
-                .package(product: "AWSPricing"),
-                .package(product: "AWSSDKIdentity"),
+                .external(name: "Mockable"),
+                .external(name: "AWSCloudWatch"),
+                .external(name: "AWSSTS"),
+                .external(name: "AWSPricing"),
+                .external(name: "AWSSDKIdentity"),
+                .external(name: "AWSSSO"),
+                .external(name: "AWSSSOOIDC"),
             ],
             settings: .settings(
                 base: [
@@ -139,11 +137,13 @@ let project = Project(
             dependencies: [
                 .target(name: "Infrastructure"),
                 .target(name: "Domain"),
-                .package(product: "Mockable"),
-                .package(product: "AWSCloudWatch"),
-                .package(product: "AWSSTS"),
-                .package(product: "AWSPricing"),
-                .package(product: "AWSSDKIdentity"),
+                .external(name: "Mockable"),
+                .external(name: "AWSCloudWatch"),
+                .external(name: "AWSSTS"),
+                .external(name: "AWSPricing"),
+                .external(name: "AWSSDKIdentity"),
+                .external(name: "AWSSSO"),
+                .external(name: "AWSSSOOIDC"),
             ],
             settings: .settings(
                 base: [
