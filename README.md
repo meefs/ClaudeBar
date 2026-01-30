@@ -94,51 +94,63 @@ Both are code-signed and notarized for Gatekeeper.
 ```bash
 git clone https://github.com/tddworks/ClaudeBar.git
 cd ClaudeBar
-swift build -c release
+
+# Install Tuist (if not installed)
+brew install tuist
+
+# Install dependencies and build
+tuist install
+tuist build -- -configuration Release
 ```
 
 ## Usage
 
+After building, open the generated Xcode workspace and run the app:
+
 ```bash
-swift run ClaudeBar
+tuist generate
+open ClaudeBar.xcworkspace
 ```
 
-The app will appear in your menu bar. Click to view quota details for each provider.
+Then press `Cmd+R` in Xcode to run. The app will appear in your menu bar. Click to view quota details for each provider.
 
 ## Development
 
-### Command Line (Swift Package Manager)
+The project uses [Tuist](https://tuist.io) for dependency management and Xcode project generation.
 
-```bash
-# Build the project
-swift build
-
-# Run all tests
-swift test
-
-# Run tests with coverage
-swift test --enable-code-coverage
-
-# Run a specific test
-swift test --filter "QuotaMonitorTests"
-```
-
-### Xcode (with SwiftUI Previews)
-
-The project uses [Tuist](https://tuist.io) to generate Xcode projects with `ENABLE_DEBUG_DYLIB` for SwiftUI previews.
+### Quick Start
 
 ```bash
 # Install Tuist (if not installed)
 brew install tuist
 
-# Generate Xcode project
-tuist generate
+# Install dependencies
+tuist install
 
-# Open in Xcode
+# Generate Xcode project and open
+tuist generate
 open ClaudeBar.xcworkspace
 ```
 
-After opening in Xcode, SwiftUI previews will work with `Cmd+Option+Return`.
+### Build & Test
+
+```bash
+# Build the project
+tuist build
+
+# Run all tests
+tuist test
+
+# Run tests with coverage
+tuist test --result-bundle-path TestResults.xcresult -- -enableCodeCoverage YES
+
+# Build release configuration
+tuist build -- -configuration Release
+```
+
+### SwiftUI Previews
+
+After opening in Xcode, SwiftUI previews will work with `Cmd+Option+Return`. The project is configured with `ENABLE_DEBUG_DYLIB` for preview support.
 
 ## Architecture
 
