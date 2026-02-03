@@ -15,11 +15,6 @@ on:
         required: false
         type: boolean
         default: true
-      update_homebrew:
-        description: 'Create PR to update Homebrew Cask'
-        required: false
-        type: boolean
-        default: true
       debug:
         description: 'Enable verbose debug output'
         required: false
@@ -455,47 +450,6 @@ jobs:
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_appcast) || github.event_name == 'push' }}
         id: deployment
         uses: actions/deploy-pages@v4
-
-      - name: Update Homebrew Cask
-        # Only update Homebrew for stable releases (not pre-releases) and when enabled
-        if: |
-          steps.version.outputs.is_prerelease == 'false' &&
-          ((github.event_name == 'workflow_dispatch' && inputs.update_homebrew) || github.event_name == 'push')
-        env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
-        run: |
-          # Skip if token not configured
-          if [ -z "$HOMEBREW_GITHUB_API_TOKEN" ]; then
-            echo "::notice::HOMEBREW_GITHUB_API_TOKEN not set, skipping Homebrew Cask update"
-            echo "To enable automatic Homebrew updates, add a GitHub PAT with public_repo scope as HOMEBREW_GITHUB_API_TOKEN secret"
-            exit 0
-          fi
-
-          VERSION="${{ steps.version.outputs.version }}"
-          DMG_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${DMG_FILE}"
-
-          echo "Updating Homebrew Cask for version $VERSION..."
-          echo "DMG URL: $DMG_URL"
-
-          # Calculate SHA256 of the DMG
-          DMG_SHA256=$(shasum -a 256 "$DMG_FILE" | awk '{print $1}')
-          echo "DMG SHA256: $DMG_SHA256"
-
-          # Create PR to update Homebrew Cask
-          # Using brew bump-cask-pr which handles formula update and PR creation
-          brew bump-cask-pr \
-            --version "$VERSION" \
-            --sha256 "$DMG_SHA256" \
-            --no-browse \
-            --message "Automated release from GitHub Actions" \
-            claudebar || {
-              echo "::warning::Failed to create Homebrew Cask PR. This may be due to:"
-              echo "  - Token permissions (needs public_repo scope)"
-              echo "  - Version already exists in Homebrew"
-              echo "  - Rate limiting"
-              echo "You can manually update by running:"
-              echo "  brew bump-cask-pr --version $VERSION claudebar"
-            }
 
       - name: Cleanup
         if: always()

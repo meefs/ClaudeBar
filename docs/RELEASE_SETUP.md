@@ -4,16 +4,15 @@ This guide explains how to set up the GitHub secrets required for automated rele
 
 ## Overview
 
-The release workflow requires **5 required secrets** and **1 optional secret** to be configured in GitHub:
+The release workflow requires **5 secrets** to be configured in GitHub:
 
-| Secret | Required | Description |
-|--------|----------|-------------|
-| `APPLE_CERTIFICATE_P12` | Yes | Developer ID Application certificate (base64) |
-| `APPLE_CERTIFICATE_PASSWORD` | Yes | Password for the .p12 file |
-| `APP_STORE_CONNECT_API_KEY_P8` | Yes | App Store Connect API key (base64) |
-| `APP_STORE_CONNECT_KEY_ID` | Yes | API Key ID |
-| `APP_STORE_CONNECT_ISSUER_ID` | Yes | Issuer ID |
-| `HOMEBREW_GITHUB_API_TOKEN` | No | GitHub token for Homebrew Cask PR (see [Part 6](#part-6-homebrew-cask-auto-update-optional)) |
+| Secret | Description |
+|--------|-------------|
+| `APPLE_CERTIFICATE_P12` | Developer ID Application certificate (base64) |
+| `APPLE_CERTIFICATE_PASSWORD` | Password for the .p12 file |
+| `APP_STORE_CONNECT_API_KEY_P8` | App Store Connect API key (base64) |
+| `APP_STORE_CONNECT_KEY_ID` | API Key ID |
+| `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID |
 
 ## Prerequisites
 
@@ -166,15 +165,11 @@ Your repository secrets should look like:
 
 ![GitHub Secrets](https://docs.github.com/assets/images/help/repository/repository-settings-secrets.png)
 
-**Required:**
 - `APPLE_CERTIFICATE_P12` ✓
 - `APPLE_CERTIFICATE_PASSWORD` ✓
 - `APP_STORE_CONNECT_API_KEY_P8` ✓
 - `APP_STORE_CONNECT_KEY_ID` ✓
 - `APP_STORE_CONNECT_ISSUER_ID` ✓
-
-**Optional:**
-- `HOMEBREW_GITHUB_API_TOKEN` (for auto-updating Homebrew Cask)
 
 ---
 
@@ -284,7 +279,8 @@ The GitHub Actions workflow will automatically:
 5. Create a GitHub release with DMG and ZIP
 6. Update appcast.xml for Sparkle auto-updates
 7. Mark as pre-release if version contains `-`
-8. Create PR to update Homebrew Cask (stable releases only, if `HOMEBREW_GITHUB_API_TOKEN` is set)
+
+> **Note:** Homebrew Cask updates happen automatically! BrewTestBot monitors GitHub releases and creates PRs to update the cask every ~3 hours. No manual action needed.
 
 ---
 
@@ -371,65 +367,44 @@ The following table documents all supported update scenarios:
 
 ---
 
-## Part 6: Homebrew Cask Auto-Update (Optional)
+## Part 6: Homebrew Cask (Automatic)
 
-ClaudeBar is available on [Homebrew Cask](https://formulae.brew.sh/cask/claudebar). To automatically create PRs to update the Homebrew formula when releasing, configure a GitHub token.
+ClaudeBar is available on [Homebrew Cask](https://formulae.brew.sh/cask/claudebar) and **updates automatically**.
 
-### Why This Is Needed
+### How It Works
 
-The default `GITHUB_TOKEN` only has permissions for your own repository. To create PRs to the [homebrew-cask](https://github.com/Homebrew/homebrew-cask) repository, you need a Personal Access Token (PAT).
+The cask has a `livecheck` block that monitors GitHub releases. Homebrew's **BrewTestBot** automatically:
+1. Detects new releases on GitHub every ~3 hours
+2. Downloads the DMG and calculates SHA256
+3. Creates a PR to update the cask formula
+4. Merges it after CI passes
 
-### Step 6.1: Create a GitHub Personal Access Token
+**No manual action is required** for Homebrew updates.
 
-1. Go to https://github.com/settings/tokens
-2. Click **Generate new token** → **Generate new token (classic)**
-3. Set a **Note**: `Homebrew Cask Updates`
-4. Set **Expiration**: Choose an appropriate duration (e.g., 90 days, 1 year)
-5. Select scopes:
-   - `public_repo` (required for creating PRs to public repos)
-6. Click **Generate token**
-7. **Copy the token immediately** - you won't see it again!
+### Checking Homebrew Status
 
-### Step 6.2: Add to GitHub Secrets
-
-1. Go to your repository → **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret**
-3. Add:
-   - **Name**: `HOMEBREW_GITHUB_API_TOKEN`
-   - **Value**: Paste the token
-
-### What Happens During Release
-
-When you create a stable release (not pre-release):
-
-1. The workflow calculates the SHA256 of the DMG
-2. Runs `brew bump-cask-pr` to:
-   - Fork the homebrew-cask repo (if needed)
-   - Update the formula with new version and SHA256
-   - Create a PR automatically
-
-You'll need to monitor the PR and address any feedback from Homebrew maintainers.
-
-### Manual Update (Alternative)
-
-If you prefer to update Homebrew manually, or if the automation fails:
+After releasing a new version, you can check the cask status:
 
 ```bash
-# After releasing, update the cask manually
-brew bump-cask-pr --version X.Y.Z claudebar
+# Check current Homebrew version
+brew info --cask claudebar
+
+# See the cask formula
+brew cat claudebar
 ```
 
-This command will:
-1. Download the new DMG from GitHub Releases
-2. Calculate the SHA256
-3. Create a PR to update the cask
+The Homebrew version typically updates within a few hours of a GitHub release.
 
-### Token Expiration
+### Manual Update (If Needed)
 
-PATs expire. When your token expires:
-1. The Homebrew step will fail silently (with a warning)
-2. The release will still complete successfully
-3. You'll need to manually update Homebrew or regenerate the token
+In rare cases where the automatic update doesn't work:
+
+```bash
+# Create a PR to update the cask
+brew bump-cask-pr claudebar
+```
+
+Note: This will fail if BrewTestBot has already created a PR.
 
 ---
 
@@ -531,14 +506,14 @@ security find-identity -v -p codesigning
 ### Homebrew Commands
 
 ```bash
-# Manually update Homebrew Cask after release
-brew bump-cask-pr --version X.Y.Z claudebar
-
 # Check current Homebrew Cask version
 brew info --cask claudebar
 
 # Install from Homebrew
 brew install --cask claudebar
+
+# View cask formula
+brew cat claudebar
 ```
 
 ### Links
