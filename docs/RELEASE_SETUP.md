@@ -4,15 +4,16 @@ This guide explains how to set up the GitHub secrets required for automated rele
 
 ## Overview
 
-The release workflow requires **5 secrets** to be configured in GitHub:
+The release workflow requires **5 required secrets** and **1 optional secret** to be configured in GitHub:
 
-| Secret | Description |
-|--------|-------------|
-| `APPLE_CERTIFICATE_P12` | Developer ID Application certificate (base64) |
-| `APPLE_CERTIFICATE_PASSWORD` | Password for the .p12 file |
-| `APP_STORE_CONNECT_API_KEY_P8` | App Store Connect API key (base64) |
-| `APP_STORE_CONNECT_KEY_ID` | API Key ID |
-| `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID |
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `APPLE_CERTIFICATE_P12` | Yes | Developer ID Application certificate (base64) |
+| `APPLE_CERTIFICATE_PASSWORD` | Yes | Password for the .p12 file |
+| `APP_STORE_CONNECT_API_KEY_P8` | Yes | App Store Connect API key (base64) |
+| `APP_STORE_CONNECT_KEY_ID` | Yes | API Key ID |
+| `APP_STORE_CONNECT_ISSUER_ID` | Yes | Issuer ID |
+| `HOMEBREW_GITHUB_API_TOKEN` | No | GitHub token for Homebrew Cask PR (see [Part 6](#part-6-homebrew-cask-auto-update-optional)) |
 
 ## Prerequisites
 
@@ -165,11 +166,15 @@ Your repository secrets should look like:
 
 ![GitHub Secrets](https://docs.github.com/assets/images/help/repository/repository-settings-secrets.png)
 
+**Required:**
 - `APPLE_CERTIFICATE_P12` ✓
 - `APPLE_CERTIFICATE_PASSWORD` ✓
 - `APP_STORE_CONNECT_API_KEY_P8` ✓
 - `APP_STORE_CONNECT_KEY_ID` ✓
 - `APP_STORE_CONNECT_ISSUER_ID` ✓
+
+**Optional:**
+- `HOMEBREW_GITHUB_API_TOKEN` (for auto-updating Homebrew Cask)
 
 ---
 
@@ -279,6 +284,7 @@ The GitHub Actions workflow will automatically:
 5. Create a GitHub release with DMG and ZIP
 6. Update appcast.xml for Sparkle auto-updates
 7. Mark as pre-release if version contains `-`
+8. Create PR to update Homebrew Cask (stable releases only, if `HOMEBREW_GITHUB_API_TOKEN` is set)
 
 ---
 
@@ -362,6 +368,68 @@ The following table documents all supported update scenarios:
 4. v1.0.1 stable  → appcast: [1.0.1, 1.0.1-beta.2]
    All users: get 1.0.1
 ```
+
+---
+
+## Part 6: Homebrew Cask Auto-Update (Optional)
+
+ClaudeBar is available on [Homebrew Cask](https://formulae.brew.sh/cask/claudebar). To automatically create PRs to update the Homebrew formula when releasing, configure a GitHub token.
+
+### Why This Is Needed
+
+The default `GITHUB_TOKEN` only has permissions for your own repository. To create PRs to the [homebrew-cask](https://github.com/Homebrew/homebrew-cask) repository, you need a Personal Access Token (PAT).
+
+### Step 6.1: Create a GitHub Personal Access Token
+
+1. Go to https://github.com/settings/tokens
+2. Click **Generate new token** → **Generate new token (classic)**
+3. Set a **Note**: `Homebrew Cask Updates`
+4. Set **Expiration**: Choose an appropriate duration (e.g., 90 days, 1 year)
+5. Select scopes:
+   - `public_repo` (required for creating PRs to public repos)
+6. Click **Generate token**
+7. **Copy the token immediately** - you won't see it again!
+
+### Step 6.2: Add to GitHub Secrets
+
+1. Go to your repository → **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret**
+3. Add:
+   - **Name**: `HOMEBREW_GITHUB_API_TOKEN`
+   - **Value**: Paste the token
+
+### What Happens During Release
+
+When you create a stable release (not pre-release):
+
+1. The workflow calculates the SHA256 of the DMG
+2. Runs `brew bump-cask-pr` to:
+   - Fork the homebrew-cask repo (if needed)
+   - Update the formula with new version and SHA256
+   - Create a PR automatically
+
+You'll need to monitor the PR and address any feedback from Homebrew maintainers.
+
+### Manual Update (Alternative)
+
+If you prefer to update Homebrew manually, or if the automation fails:
+
+```bash
+# After releasing, update the cask manually
+brew bump-cask-pr --version X.Y.Z claudebar
+```
+
+This command will:
+1. Download the new DMG from GitHub Releases
+2. Calculate the SHA256
+3. Create a PR to update the cask
+
+### Token Expiration
+
+PATs expire. When your token expires:
+1. The Homebrew step will fail silently (with a warning)
+2. The release will still complete successfully
+3. You'll need to manually update Homebrew or regenerate the token
 
 ---
 
@@ -460,8 +528,22 @@ base64 -i AuthKey_XXXX.p8 | tr -d '\n' | pbcopy
 security find-identity -v -p codesigning
 ```
 
+### Homebrew Commands
+
+```bash
+# Manually update Homebrew Cask after release
+brew bump-cask-pr --version X.Y.Z claudebar
+
+# Check current Homebrew Cask version
+brew info --cask claudebar
+
+# Install from Homebrew
+brew install --cask claudebar
+```
+
 ### Links
 
 - [Apple Developer Certificates](https://developer.apple.com/account/resources/certificates)
 - [App Store Connect API Keys](https://appstoreconnect.apple.com/access/api)
 - [Apple Notarization Documentation](https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution)
+- [Homebrew Cask claudebar](https://formulae.brew.sh/cask/claudebar)
