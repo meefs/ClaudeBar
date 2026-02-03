@@ -338,7 +338,7 @@ struct ClaudeAPIUsageProbeTests {
     // MARK: - Error Handling Tests
 
     @Test
-    func `probe throws authenticationRequired on 401 response`() async throws {
+    func `probe throws sessionExpired on 401 response`() async throws {
         let tempDir = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
@@ -358,7 +358,7 @@ struct ClaudeAPIUsageProbeTests {
         let loader = ClaudeCredentialLoader(homeDirectory: tempDir.path, useKeychain: false)
         let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: ProbeError.sessionExpired) {
             try await probe.probe()
         }
     }
@@ -537,7 +537,7 @@ struct ClaudeAPIUsageProbeTokenRefreshTests {
     }
 
     @Test
-    func `probe throws when refresh token request returns invalid_grant`() async throws {
+    func `probe throws sessionExpired when refresh token request returns invalid_grant`() async throws {
         let tempDir = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
@@ -563,7 +563,7 @@ struct ClaudeAPIUsageProbeTokenRefreshTests {
         let loader = ClaudeCredentialLoader(homeDirectory: tempDir.path, useKeychain: false)
         let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
-        await #expect(throws: ProbeError.authenticationRequired) {
+        await #expect(throws: ProbeError.sessionExpired) {
             try await probe.probe()
         }
     }
