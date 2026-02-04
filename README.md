@@ -31,7 +31,7 @@ A macOS menu bar application that monitors AI coding assistant usage quotas. Kee
 ### Christmas Theme
 
 <p align="center">
-  <img src="docs/Christmas-theme.png" alt="ClaudeBar Christmas Theme" width="380"/>
+  <img src="docs/screenshots/Christmas-theme.png" alt="ClaudeBar Christmas Theme" width="380"/>
 </p>
 <p align="center">
   <em>Festive holiday theme with snowfall animation - automatically enabled during the Christmas season!</em>
