@@ -56,10 +56,10 @@ struct BedrockConfigSpec {
             let defaults = UserDefaults(suiteName: suiteName)!
             let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
 
-            // Default is empty
-            #expect(settings.bedrockRegions().isEmpty)
+            // Default is us-east-1
+            #expect(settings.bedrockRegions() == ["us-east-1"])
 
-            // When — user sets regions
+            // When — user sets multiple regions
             settings.setBedrockRegions(["us-east-1", "us-west-2"])
 
             // Then
