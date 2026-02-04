@@ -137,4 +137,69 @@ struct UsageQuotaTests {
         // When & Then
         #expect(quota1 == quota2)
     }
+
+    // MARK: - Display Percent (Remaining vs Used)
+
+    @Test
+    func `displayPercent returns percentRemaining in remaining mode`() {
+        // Given
+        let quota = UsageQuota(percentRemaining: 75, quotaType: .session, providerId: "claude")
+
+        // When & Then
+        #expect(quota.displayPercent(mode: .remaining) == 75)
+    }
+
+    @Test
+    func `displayPercent returns percentUsed in used mode`() {
+        // Given
+        let quota = UsageQuota(percentRemaining: 75, quotaType: .session, providerId: "claude")
+
+        // When & Then
+        #expect(quota.displayPercent(mode: .used) == 25)
+    }
+
+    @Test
+    func `displayPercent handles zero remaining in used mode`() {
+        // Given
+        let quota = UsageQuota(percentRemaining: 0, quotaType: .session, providerId: "claude")
+
+        // When & Then
+        #expect(quota.displayPercent(mode: .used) == 100)
+    }
+
+    @Test
+    func `displayPercent handles full quota in used mode`() {
+        // Given
+        let quota = UsageQuota(percentRemaining: 100, quotaType: .session, providerId: "claude")
+
+        // When & Then
+        #expect(quota.displayPercent(mode: .used) == 0)
+    }
+
+    @Test
+    func `displayPercent handles negative remaining in used mode`() {
+        // Given - negative percentRemaining means over-quota
+        let quota = UsageQuota(percentRemaining: -10, quotaType: .session, providerId: "claude")
+
+        // When & Then - used should be 110 (over 100%)
+        #expect(quota.displayPercent(mode: .used) == 110)
+    }
+
+    @Test
+    func `displayProgressPercent returns percentRemaining in remaining mode`() {
+        // Given
+        let quota = UsageQuota(percentRemaining: 75, quotaType: .session, providerId: "claude")
+
+        // When & Then
+        #expect(quota.displayProgressPercent(mode: .remaining) == 75)
+    }
+
+    @Test
+    func `displayProgressPercent returns percentUsed in used mode`() {
+        // Given
+        let quota = UsageQuota(percentRemaining: 75, quotaType: .session, providerId: "claude")
+
+        // When & Then
+        #expect(quota.displayProgressPercent(mode: .used) == 25)
+    }
 }

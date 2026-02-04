@@ -112,6 +112,7 @@ struct SettingsContentView: View {
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: 12) {
                     themeCard
+                    displayModeCard
                     providersCard
                     if isClaudeEnabled {
                         claudeConfigCard
@@ -240,6 +241,65 @@ struct SettingsContentView: View {
                         .stroke(theme.glassBorder, lineWidth: 1)
                 )
         )
+    }
+
+    // MARK: - Display Mode Card
+
+    private var displayModeCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            displayModeHeader
+            displayModeToggle
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: theme.cardCornerRadius)
+                .fill(theme.cardGradient)
+                .overlay(
+                    RoundedRectangle(cornerRadius: theme.cardCornerRadius)
+                        .stroke(theme.glassBorder, lineWidth: 1)
+                )
+        )
+    }
+
+    private var displayModeHeader: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(theme.accentGradient)
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: "percent")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(theme.id == "cli" ? theme.textPrimary : .white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Quota Display")
+                    .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+
+                Text("Show remaining or used percentage")
+                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+            }
+
+            Spacer()
+        }
+    }
+
+    private var displayModeToggle: some View {
+        HStack(spacing: 8) {
+            ForEach(UsageDisplayMode.allCases, id: \.rawValue) { mode in
+                DisplayModeButton(
+                    mode: mode,
+                    isSelected: settings.usageDisplayMode == mode
+                ) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        settings.usageDisplayMode = mode
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Providers Card
@@ -2037,6 +2097,48 @@ struct ThemeOptionButton: View {
         case .christmas:
             return ChristmasTheme().accentGradient
         }
+    }
+}
+
+// MARK: - Display Mode Button
+
+struct DisplayModeButton: View {
+    let mode: UsageDisplayMode
+    let isSelected: Bool
+    let action: () -> Void
+
+    @Environment(\.appTheme) private var theme
+    @State private var isHovering = false
+
+    private var iconName: String {
+        mode == .remaining ? "arrow.down.right" : "arrow.up.right"
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: iconName)
+                    .font(.system(size: 10, weight: .bold))
+
+                Text(mode.displayLabel)
+                    .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(buttonBackground)
+            .foregroundStyle(isSelected ? theme.accentPrimary : theme.textSecondary)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+    }
+
+    private var buttonBackground: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(isSelected ? theme.accentPrimary.opacity(0.2) : (isHovering ? theme.hoverOverlay : Color.clear))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? theme.accentPrimary.opacity(0.5) : theme.glassBorder, lineWidth: 1)
+            )
     }
 }
 

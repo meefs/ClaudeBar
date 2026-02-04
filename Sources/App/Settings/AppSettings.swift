@@ -1,4 +1,5 @@
 import Foundation
+import Domain
 
 /// Observable settings manager for ClaudeBar preferences.
 /// Note: Provider-specific settings (e.g., Copilot credentials) are managed by the providers themselves.
@@ -56,6 +57,15 @@ public final class AppSettings {
         }
     }
 
+    // MARK: - Display Settings
+
+    /// Whether to show quota as "remaining" or "used"
+    public var usageDisplayMode: UsageDisplayMode {
+        didSet {
+            UserDefaults.standard.set(usageDisplayMode.rawValue, forKey: Keys.usageDisplayMode)
+        }
+    }
+
     // MARK: - Background Sync Settings
 
     /// Whether background sync is enabled (default: true)
@@ -82,6 +92,14 @@ public final class AppSettings {
         self.claudeApiBudgetEnabled = UserDefaults.standard.bool(forKey: Keys.claudeApiBudgetEnabled)
         self.claudeApiBudget = Decimal(UserDefaults.standard.double(forKey: Keys.claudeApiBudget))
         self.receiveBetaUpdates = UserDefaults.standard.bool(forKey: Keys.receiveBetaUpdates)
+
+        // Display mode defaults to .remaining
+        if let rawMode = UserDefaults.standard.string(forKey: Keys.usageDisplayMode),
+           let mode = UsageDisplayMode(rawValue: rawMode) {
+            self.usageDisplayMode = mode
+        } else {
+            self.usageDisplayMode = .remaining
+        }
 
         // Background sync defaults to DISABLED
         self.backgroundSyncEnabled = UserDefaults.standard.object(forKey: Keys.backgroundSyncEnabled) as? Bool ?? false
@@ -130,6 +148,7 @@ private extension AppSettings {
         static let claudeApiBudgetEnabled = "claudeApiBudgetEnabled"
         static let claudeApiBudget = "claudeApiBudget"
         static let receiveBetaUpdates = "receiveBetaUpdates"
+        static let usageDisplayMode = "usageDisplayMode"
         static let backgroundSyncEnabled = "backgroundSyncEnabled"
         static let backgroundSyncInterval = "backgroundSyncInterval"
     }

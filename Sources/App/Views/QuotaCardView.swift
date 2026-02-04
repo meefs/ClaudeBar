@@ -6,6 +6,12 @@ import Domain
 struct QuotaCardView: View {
     let quota: UsageQuota
 
+    @State private var settings = AppSettings.shared
+
+    private var displayMode: UsageDisplayMode {
+        settings.usageDisplayMode
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             // Label
@@ -14,23 +20,24 @@ struct QuotaCardView: View {
                 .foregroundStyle(.secondary)
 
             // Percentage
-            Text("\(Int(quota.percentRemaining))%")
+            Text("\(Int(quota.displayPercent(mode: displayMode)))%")
                 .font(.title2)
                 .fontWeight(.semibold)
                 .foregroundStyle(quota.status.displayColor)
 
             // Progress bar
             GeometryReader { geometry in
+                let progressPercent = quota.displayProgressPercent(mode: displayMode)
                 ZStack(alignment: .leading) {
                     // Track
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.primary.opacity(0.1))
                         .frame(height: 4)
 
-                    // Fill (clamp width to 0-100% even if percentRemaining is negative)
+                    // Fill (clamp width to 0-100%)
                     RoundedRectangle(cornerRadius: 2)
                         .fill(quota.status.displayColor)
-                        .frame(width: geometry.size.width * max(0, min(100, quota.percentRemaining)) / 100, height: 4)
+                        .frame(width: geometry.size.width * max(0, min(100, progressPercent)) / 100, height: 4)
                 }
             }
             .frame(height: 4)

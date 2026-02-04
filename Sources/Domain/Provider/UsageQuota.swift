@@ -57,6 +57,26 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         status.needsAttention
     }
 
+    /// Returns the display percentage based on the display mode.
+    /// - In `.remaining` mode: returns `percentRemaining`
+    /// - In `.used` mode: returns `percentUsed` (100 - percentRemaining)
+    public func displayPercent(mode: UsageDisplayMode) -> Double {
+        switch mode {
+        case .remaining: percentRemaining
+        case .used: percentUsed
+        }
+    }
+
+    /// Returns the percentage to use for progress bar width based on the display mode.
+    /// - In `.remaining` mode: bar fills from right to left as quota depletes
+    /// - In `.used` mode: bar fills from left to right as quota is consumed
+    public func displayProgressPercent(mode: UsageDisplayMode) -> Double {
+        switch mode {
+        case .remaining: percentRemaining
+        case .used: percentUsed
+        }
+    }
+
     /// Time until this quota resets (if known)
     public var timeUntilReset: TimeInterval? {
         guard let resetsAt else { return nil }

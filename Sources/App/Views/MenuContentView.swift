@@ -689,6 +689,11 @@ struct WrappedStatCard: View {
     @Environment(\.appTheme) private var theme
     @State private var isHovering = false
     @State private var animateProgress = false
+    @State private var settings = AppSettings.shared
+
+    private var displayMode: UsageDisplayMode {
+        settings.usageDisplayMode
+    }
 
     private var statusColor: Color {
         theme.statusColor(for: quota.status)
@@ -717,10 +722,10 @@ struct WrappedStatCard: View {
                     .badge(statusColor)
             }
 
-            // Large percentage number with "Remaining" label (end-aligned)
+            // Large percentage number with "Remaining"/"Used" label (end-aligned)
             HStack(alignment: .firstTextBaseline) {
                 HStack(alignment: .firstTextBaseline, spacing: 1) {
-                    Text("\(Int(quota.percentRemaining))")
+                    Text("\(Int(quota.displayPercent(mode: displayMode)))")
                         .font(.system(size: 32, weight: .bold, design: theme.fontDesign))
                         .foregroundStyle(theme.textPrimary)
                         .contentTransition(.numericText())
@@ -732,22 +737,23 @@ struct WrappedStatCard: View {
 
                 Spacer()
 
-                Text("Remaining")
+                Text(displayMode.displayLabel)
                     .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }
 
             // Progress bar with gradient
             GeometryReader { geo in
+                let progressPercent = quota.displayProgressPercent(mode: displayMode)
                 ZStack(alignment: .leading) {
                     // Track
                     RoundedRectangle(cornerRadius: 3)
                         .fill(theme.progressTrack)
 
-                    // Fill (clamp width to 0-100% even if percentRemaining is negative)
+                    // Fill (clamp width to 0-100%)
                     RoundedRectangle(cornerRadius: 3)
                         .fill(theme.progressGradient(for: quota.percentRemaining))
-                        .frame(width: animateProgress ? geo.size.width * max(0, min(100, quota.percentRemaining)) / 100 : 0)
+                        .frame(width: animateProgress ? geo.size.width * max(0, min(100, progressPercent)) / 100 : 0)
                         .animation(.spring(response: 0.8, dampingFraction: 0.7).delay(delay + 0.2), value: animateProgress)
                 }
             }
