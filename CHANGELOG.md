@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-02-04
+
+### Added
+- **Remaining / Used Display Toggle**: Switch between "25% Remaining" and "75% Used" views for all quota cards. Choose whichever framing makes more sense for your workflow — see how much you have left, or how much you've consumed. Toggle in Settings → Quota Display.
+
+### Technical
+- Added `UsageDisplayMode` enum in Domain layer with `.remaining` and `.used` cases
+- Added `displayPercent(mode:)` and `displayProgressPercent(mode:)` methods to `UsageQuota`
+- Added `usageDisplayMode` to `AppSettings` with UserDefaults persistence (default: `.remaining`)
+- Updated `WrappedStatCard` and `QuotaCardView` to use display mode for percentage and label
+- Added "Quota Display" settings card with two-button toggle
+- 12 new tests covering display mode enum, percent calculation, and progress bar behavior
+
 ## [0.4.0] - 2026-02-03
 
 ### Added
@@ -354,7 +367,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/tddworks/ClaudeBar/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/tddworks/ClaudeBar/compare/v0.3.15...v0.4.0
 [0.3.15]: https://github.com/tddworks/ClaudeBar/compare/v0.3.12...v0.3.15
 [0.3.12]: https://github.com/tddworks/ClaudeBar/compare/v0.3.6...v0.3.12
