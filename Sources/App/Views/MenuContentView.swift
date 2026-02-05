@@ -335,6 +335,7 @@ struct MenuContentView: View {
                     }
                 }
             }
+            .background(HorizontalScrollBooster())
         }
         .opacity(animateIn ? 1 : 0)
         .offset(y: animateIn ? 0 : 10)
@@ -906,6 +907,86 @@ struct VisualEffectBlur: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
         nsView.material = material
         nsView.blendingMode = blendingMode
+    }
+}
+
+// MARK: - Horizontal Scroll Booster
+
+/// Converts vertical mouse wheel scroll events to horizontal scrolling.
+/// Trackpads natively produce horizontal gestures, but mouse scroll wheels only
+/// generate vertical deltas — this bridges the gap for horizontal ScrollViews.
+///
+/// Uses `NSEvent.addLocalMonitorForEvents` to intercept scroll events at the
+/// app level before they reach the NSScrollView, which would otherwise ignore
+/// vertical deltas in a horizontal-only scroll view.
+struct HorizontalScrollBooster: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.view = view
+        context.coordinator.startMonitoring()
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.stopMonitoring()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator {
+        var monitor: Any?
+        weak var view: NSView?
+
+        func startMonitoring() {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                guard let self,
+                      let view = self.view,
+                      let scrollView = view.enclosingScrollView else {
+                    return event
+                }
+
+                // Only act on events over this scroll view
+                let point = scrollView.convert(event.locationInWindow, from: nil)
+                guard scrollView.bounds.contains(point) else {
+                    return event
+                }
+
+                // Only convert predominantly vertical scrolls
+                guard abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX) else {
+                    return event
+                }
+
+                guard let cgEvent = event.cgEvent?.copy() else {
+                    return event
+                }
+
+                // Swap vertical → horizontal
+                cgEvent.setDoubleValueField(
+                    .scrollWheelEventDeltaAxis2,
+                    value: cgEvent.getDoubleValueField(.scrollWheelEventDeltaAxis1)
+                )
+                cgEvent.setDoubleValueField(.scrollWheelEventDeltaAxis1, value: 0)
+
+                cgEvent.setIntegerValueField(
+                    .scrollWheelEventPointDeltaAxis2,
+                    value: cgEvent.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)
+                )
+                cgEvent.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
+
+                return NSEvent(cgEvent: cgEvent) ?? event
+            }
+        }
+
+        func stopMonitoring() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+            monitor = nil
+        }
     }
 }
 
