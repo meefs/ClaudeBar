@@ -773,22 +773,41 @@ struct WrappedStatCard: View {
                 .lineLimit(1)
             }
 
-            // Progress bar with gradient
-            GeometryReader { geo in
-                let progressPercent = quota.displayProgressPercent(mode: effectiveDisplayMode)
-                ZStack(alignment: .leading) {
-                    // Track
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(theme.progressTrack)
+            // Progress bar with gradient and pace tick
+            VStack(spacing: 1) {
+                GeometryReader { geo in
+                    let progressPercent = quota.displayProgressPercent(mode: effectiveDisplayMode)
+                    ZStack(alignment: .leading) {
+                        // Track
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(theme.progressTrack)
 
-                    // Fill (clamp width to 0-100%)
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(theme.progressGradient(for: quota.percentRemaining))
-                        .frame(width: animateProgress ? geo.size.width * max(0, min(100, progressPercent)) / 100 : 0)
-                        .animation(.spring(response: 0.8, dampingFraction: 0.7).delay(delay + 0.2), value: animateProgress)
+                        // Fill (clamp width to 0-100%)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(theme.progressGradient(for: quota.percentRemaining))
+                            .frame(width: animateProgress ? geo.size.width * max(0, min(100, progressPercent)) / 100 : 0)
+                            .animation(.spring(response: 0.8, dampingFraction: 0.7).delay(delay + 0.2), value: animateProgress)
+                    }
+                }
+                .frame(height: 5)
+
+                // Expected pace tick mark
+                if let expectedPercent = quota.expectedProgressPercent(mode: effectiveDisplayMode) {
+                    GeometryReader { geo in
+                        let tickX = geo.size.width * max(0, min(100, expectedPercent)) / 100
+                        Path { path in
+                            path.move(to: CGPoint(x: tickX - 3, y: 4))
+                            path.addLine(to: CGPoint(x: tickX + 3, y: 4))
+                            path.addLine(to: CGPoint(x: tickX, y: 0))
+                            path.closeSubpath()
+                        }
+                        .fill(theme.textTertiary)
+                        .opacity(animateProgress ? 1 : 0)
+                        .animation(.easeIn(duration: 0.3).delay(delay + 0.5), value: animateProgress)
+                    }
+                    .frame(height: 5)
                 }
             }
-            .frame(height: 5)
 
             // Reset info
             if let resetText = quota.resetText ?? quota.resetDescription {

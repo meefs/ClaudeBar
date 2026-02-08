@@ -81,6 +81,17 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         }
     }
 
+    /// Returns the expected progress bar position based on time elapsed and display mode.
+    /// This represents where the bar "should be" if usage were perfectly on pace.
+    /// Returns nil when reset time is unknown.
+    public func expectedProgressPercent(mode: UsageDisplayMode) -> Double? {
+        guard let percentTimeElapsed else { return nil }
+        switch mode {
+        case .remaining, .pace: return 100 - percentTimeElapsed
+        case .used: return percentTimeElapsed
+        }
+    }
+
     // MARK: - Pace
 
     /// The percentage of the reset period that has elapsed (0-100), or nil if no reset time is known.
