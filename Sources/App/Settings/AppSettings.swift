@@ -1,5 +1,6 @@
 import Foundation
 import Domain
+import ServiceManagement
 
 /// Observable settings manager for ClaudeBar preferences.
 /// Note: Provider-specific settings (e.g., Copilot credentials) are managed by the providers themselves.
@@ -66,6 +67,25 @@ public final class AppSettings {
         }
     }
 
+    // MARK: - Launch at Login Settings
+
+    /// Whether the app should launch at login (backed by SMAppService)
+    public var launchAtLogin: Bool {
+        didSet {
+            guard !isInitializing else { return }
+            do {
+                if launchAtLogin {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                // Revert on failure
+                launchAtLogin = SMAppService.mainApp.status == .enabled
+            }
+        }
+    }
+
     // MARK: - Background Sync Settings
 
     /// Whether background sync is enabled (default: true)
@@ -100,6 +120,9 @@ public final class AppSettings {
         } else {
             self.usageDisplayMode = .remaining
         }
+
+        // Launch at login - read from SMAppService (no UserDefaults needed)
+        self.launchAtLogin = SMAppService.mainApp.status == .enabled
 
         // Background sync defaults to DISABLED
         self.backgroundSyncEnabled = UserDefaults.standard.object(forKey: Keys.backgroundSyncEnabled) as? Bool ?? false

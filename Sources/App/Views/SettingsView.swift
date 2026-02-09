@@ -151,6 +151,7 @@ struct SettingsContentView: View {
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     backgroundSyncCard
+                    launchAtLoginCard
                     #if ENABLE_SPARKLE
                     updatesCard
                     #endif
@@ -2015,6 +2016,58 @@ struct SettingsContentView: View {
                             ),
                             lineWidth: 1
                         )
+                )
+        )
+    }
+
+    // MARK: - Launch at Login Card
+
+    private var launchAtLoginCard: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.4, green: 0.7, blue: 0.4),
+                                Color(red: 0.3, green: 0.55, blue: 0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: "power")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Launch at Login")
+                    .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+
+                Text("Start ClaudeBar when you log in")
+                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+            }
+
+            Spacer()
+
+            Toggle("", isOn: $settings.launchAtLogin)
+                .toggleStyle(.switch)
+                .tint(theme.accentPrimary)
+                .scaleEffect(0.8)
+                .labelsHidden()
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: theme.cardCornerRadius)
+                .fill(theme.cardGradient)
+                .overlay(
+                    RoundedRectangle(cornerRadius: theme.cardCornerRadius)
+                        .stroke(theme.glassBorder, lineWidth: 1)
                 )
         )
     }

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.26] - 2026-02-09
+
+### Added
+- **Launch at Login**: New toggle in Settings to automatically start ClaudeBar when you log in to your Mac. Uses macOS native `SMAppService` — no helper app required.
+- **Pace Tick Mark**: Visual tick mark below the consumption bar showing your expected usage pace. ([#96](https://github.com/tddworks/ClaudeBar/pull/96) - thanks [@frankhommers](https://github.com/frankhommers)!)
+
+### Fixed
+- **Claude API Cost Display**: API cost is now correctly converted from cents to dollars in Claude API mode. ([#95](https://github.com/tddworks/ClaudeBar/issues/95))
+
+### Improved
+- **README Screenshots**: Compressed screenshots from ~38 MB to ~2.8 MB for faster page loading on GitHub.
+
 ## [0.4.2] - 2026-02-04
 
 ### Added
