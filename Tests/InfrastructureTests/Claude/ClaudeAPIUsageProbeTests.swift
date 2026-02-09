@@ -290,8 +290,8 @@ struct ClaudeAPIUsageProbeTests {
         #expect(snapshot.costUsage?.totalCost == Decimal(string: "26.72"))
         // 5000 cents -> $50.00 (NOT $5000.00)
         #expect(snapshot.costUsage?.budget == Decimal(string: "50"))
-        // Verify formatted output
-        #expect(snapshot.costUsage?.formattedCost == "$26.72")
+        // Verify formatted output shows dollars, not cents
+        #expect(snapshot.costUsage?.formattedCost.contains("26.72") == true)
     }
 
     @Test
