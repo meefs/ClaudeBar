@@ -61,6 +61,7 @@ struct ClaudeBarApp: App {
                 probe: BedrockUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
             ),
+            AmpCodeProvider(probe: AmpCodeUsageProbe(), settingsRepository: settingsRepository),
         ])
         AppLog.providers.info("Created \(repository.all.count) providers")
 
