@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.28] - 2026-02-10
+
+### Added
+- **Amp Code Support**: Monitor your [Amp](https://ampcode.com) (by Sourcegraph) AI coding assistant usage quota directly from the menu bar. Automatically detects the `amp` CLI and displays your usage and plan tier.
+- **Amp Tier Detection**: Automatically identifies your Amp subscription tier (Free, Pro, etc.) for accurate quota display.
+- **Provider Icon**: New Amp icon with branded styling in the provider list.
+
+### Improved
+- **Privacy Protection**: Amp probe sanitizes personal information from log output to prevent PII leaks.
+- **Probe Performance**: Optimized regex compilation in Amp probe for faster quota parsing.
+
+### Technical
+- Implemented `AmpCodeUsageProbe` with CLI output parsing and tier detection via regex
+- Added `AmpCodeProvider` domain model with observable state and settings persistence
+- Added visual identity (icon, theme color, gradient) for Amp provider
+- Registered Amp provider in `ClaudeBarApp` startup
+- Comprehensive test coverage for probe parsing (130+ lines), probe behavior (127+ lines), and tier detection
+
 ## [0.4.26] - 2026-02-09
 
 ### Added
@@ -396,7 +414,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.28...HEAD
+[0.4.28]: https://github.com/tddworks/ClaudeBar/compare/v0.4.27...v0.4.28
+[0.4.26]: https://github.com/tddworks/ClaudeBar/compare/v0.4.2...v0.4.26
 [0.4.2]: https://github.com/tddworks/ClaudeBar/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/tddworks/ClaudeBar/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/tddworks/ClaudeBar/compare/v0.3.15...v0.4.0
