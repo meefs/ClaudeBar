@@ -60,12 +60,22 @@ public struct AmpCodeUsageProbe: UsageProbe {
             throw ProbeError.executionFailed("amp usage exited with code \(result.exitCode)")
         }
 
-        AppLog.probes.info("AmpCode usage output:\n\(result.output)")
+        AppLog.probes.debug("AmpCode usage output:\n\(result.output)")
+
 
         // Step 3: Parse output
         let snapshot = try Self.parse(result.output)
 
-        AppLog.probes.info("AmpCode probe success: \(snapshot.quotas.count) quotas found, email=\(snapshot.accountEmail ?? "none")")
+        // Redact email for logs (e.g. "u***@example.com")
+        let redactedEmail = snapshot.accountEmail.map { email -> String in
+            let parts = email.split(separator: "@")
+            guard parts.count == 2 else { return "***" }
+            let name = parts[0]
+            let domain = parts[1]
+            return "\(name.prefix(1))***@\(domain)"
+        } ?? "none"
+
+        AppLog.probes.info("AmpCode probe success: \(snapshot.quotas.count) quotas found, email=\(redactedEmail)")
         for quota in snapshot.quotas {
             AppLog.probes.info("  - \(quota.quotaType.displayName): \(Int(quota.percentRemaining))% remaining")
         }
