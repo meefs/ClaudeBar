@@ -40,7 +40,9 @@ public struct BinaryLocator: Sendable {
             "/usr/local/lib/node_modules/.bin",
             // pnpm
             "\(home)/Library/pnpm",
-            // Herd/nvm (for node-based CLIs like codex)
+            // nvm (for node-based CLIs like codex)
+            "\(home)/.nvm/versions",
+            // Herd/nvm
             "\(home)/Library/Application Support/Herd/config/nvm/versions",
         ]
     }
