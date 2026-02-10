@@ -212,6 +212,34 @@ extension BedrockProvider: ProviderVisualIdentity {
     }
 }
 
+// MARK: - AmpCodeProvider Visual Identity
+
+extension AmpCodeProvider: ProviderVisualIdentity {
+    public var symbolIcon: String { "bolt.fill" }
+
+    public var iconAssetName: String { "AmpCodeIcon" }
+
+    public func themeColor(for scheme: ColorScheme) -> Color {
+        // AmpCode orange color #F34E3F
+        scheme == .dark
+            ? Color(red: 0.95, green: 0.30, blue: 0.25)
+            : Color(red: 0.90, green: 0.25, blue: 0.20)
+    }
+
+    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
+        let primaryColor = themeColor(for: scheme)
+        let secondaryColor = scheme == .dark
+            ? Color(red: 0.85, green: 0.20, blue: 0.15)
+            : Color(red: 0.80, green: 0.15, blue: 0.10)
+
+        return LinearGradient(
+            colors: [primaryColor, secondaryColor],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 // MARK: - AIProvider Visual Identity Helper
 
 /// Extension to access visual identity from any AIProvider.
@@ -283,6 +311,11 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.6, blue: 0.2)
                 : Color(red: 0.92, green: 0.5, blue: 0.15)
+        case "ampcode":
+            // AmpCode orange
+            return scheme == .dark
+                ? Color(red: 0.95, green: 0.30, blue: 0.25)
+                : Color(red: 0.90, green: 0.25, blue: 0.20)
         default:
             return BaseTheme.purpleVibrant
         }
@@ -322,6 +355,10 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.45, blue: 0.15)
                 : Color(red: 0.75, green: 0.35, blue: 0.1)
+        case "ampcode":
+            secondaryColor = scheme == .dark
+                ? Color(red: 0.85, green: 0.20, blue: 0.15)
+                : Color(red: 0.80, green: 0.15, blue: 0.10)
         default:
             return LinearGradient(
                 colors: [BaseTheme.coralAccent, BaseTheme.pinkHot],
@@ -347,6 +384,7 @@ enum ProviderVisualIdentityLookup {
         case "antigravity": return "AntigravityIcon"
         case "zai": return "ZaiIcon"
         case "bedrock": return "BedrockIcon"
+        case "ampcode": return "AmpCodeIcon"
         default: return "QuestionIcon"
         }
     }
@@ -361,6 +399,7 @@ enum ProviderVisualIdentityLookup {
         case "antigravity": return "Antigravity"
         case "zai": return "Z.ai"
         case "bedrock": return "AWS Bedrock"
+        case "ampcode": return "Amp"
         default: return providerId.capitalized
         }
     }
@@ -375,6 +414,7 @@ enum ProviderVisualIdentityLookup {
         case "antigravity": return "wand.and.stars"
         case "zai": return "z.square.fill"
         case "bedrock": return "cloud.fill"
+        case "ampcode": return "bolt.fill"
         default: return "questionmark.circle.fill"
         }
     }
