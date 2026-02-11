@@ -549,18 +549,17 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     ///
     /// This method detects such duplication and returns only the last occurrence.
     internal func deduplicateResetText(_ text: String) -> String {
-        // Find all positions where "Resets" (case-insensitive) starts
-        let lower = text.lowercased()
-        var positions: [String.Index] = []
-        var searchStart = lower.startIndex
-        while let range = lower.range(of: "resets", range: searchStart..<lower.endIndex) {
-            positions.append(range.lowerBound)
-            searchStart = lower.index(after: range.lowerBound)
+        // Find all positions where "Resets" (case-insensitive) starts in the original text
+        var positions: [Range<String.Index>] = []
+        var searchStart = text.startIndex
+        while let range = text.range(of: "resets", options: .caseInsensitive, range: searchStart..<text.endIndex) {
+            positions.append(range)
+            searchStart = text.index(after: range.lowerBound)
         }
 
         // If there's more than one "Resets", take the last occurrence
-        if positions.count > 1, let lastPos = positions.last {
-            return String(text[lastPos...]).trimmingCharacters(in: .whitespaces)
+        if positions.count > 1, let lastRange = positions.last {
+            return String(text[lastRange.lowerBound...]).trimmingCharacters(in: .whitespaces)
         }
 
         return text
