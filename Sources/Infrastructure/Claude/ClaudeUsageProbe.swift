@@ -602,6 +602,17 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     internal func parseResetDate(_ text: String?) -> Date? {
         guard let text else { return nil }
 
+        // Try relative duration first: "2h 15m", "30m", "2d"
+        if let relativeDate = parseRelativeDuration(text) {
+            return relativeDate
+        }
+
+        // Try absolute date/time: "4:59pm (America/New_York)", "Jan 15, 3:30pm (TZ)", etc.
+        return parseAbsoluteDate(text)
+    }
+
+    /// Parses relative duration strings like "2h 15m", "30m", "2d"
+    private func parseRelativeDuration(_ text: String) -> Date? {
         var totalSeconds: TimeInterval = 0
 
         // Extract days: "2d" or "2 d" or "2 days"
@@ -633,6 +644,133 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         }
 
         return nil
+    }
+
+    /// Parses absolute date/time strings from Claude CLI output.
+    ///
+    /// Handles these formats (all optionally followed by a timezone in parentheses):
+    /// - Time-only: "4:59pm", "3pm", "9pm"
+    /// - Month + day: "Dec 28"
+    /// - Month + day + time: "Jan 15, 3:30pm" or "Dec 25 at 4:59am"
+    /// - Month + day + year + time: "Jan 1, 2026 (America/New_York)"
+    private func parseAbsoluteDate(_ text: String) -> Date? {
+        // Extract timezone identifier from parentheses, e.g., "(America/New_York)"
+        let timeZone = extractTimeZone(from: text)
+
+        // Strip "Resets" prefix, timezone suffix, and whitespace for cleaner parsing
+        var cleaned = text
+            .replacingOccurrences(of: #"^\s*[Rr]esets\s+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\s*\([^)]+\)\s*$"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+
+        // Normalize "at" separator: "Dec 25 at 4:59am" -> "Dec 25, 4:59am"
+        cleaned = cleaned.replacingOccurrences(of: #"\s+at\s+"#, with: ", ", options: .regularExpression)
+
+        // Try date formats from most specific to least specific
+        let formats: [String] = [
+            "MMM d, yyyy, h:mma",   // "Jan 1, 2026, 3:30pm" (with year and minutes)
+            "MMM d, yyyy, ha",      // "Jan 1, 2026, 3pm" (with year, no minutes)
+            "MMM d, yyyy",          // "Jan 1, 2026" (date with year only)
+            "MMM d, h:mma",         // "Jan 15, 3:30pm" (date with minutes)
+            "MMM d, ha",            // "Jan 15, 4pm" (date without minutes)
+            "h:mma",               // "4:59pm" (time-only with minutes)
+            "ha",                  // "3pm" (time-only, no minutes)
+            "MMM d",               // "Dec 28" (date only)
+        ]
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone ?? .current
+
+        for format in formats {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: cleaned) {
+                return resolveToFutureDate(date, format: format, timeZone: formatter.timeZone)
+            }
+        }
+
+        return nil
+    }
+
+    /// Extracts a timezone identifier from parenthesized text, e.g., "(America/New_York)"
+    private func extractTimeZone(from text: String) -> TimeZone? {
+        guard let match = text.range(of: #"\(([^)]+)\)"#, options: .regularExpression) else {
+            return nil
+        }
+        let content = String(text[match])
+            .dropFirst() // remove "("
+            .dropLast()  // remove ")"
+        let identifier = String(content).trimmingCharacters(in: .whitespaces)
+        return TimeZone(identifier: identifier)
+    }
+
+    /// Resolves a parsed date to the next future occurrence.
+    ///
+    /// DateFormatter gives us a date with components that may be in the past
+    /// (e.g., "3pm" today but it's already 5pm, or "Dec 25" but it's Dec 26).
+    /// This method adjusts to the next occurrence.
+    private func resolveToFutureDate(_ parsedDate: Date, format: String, timeZone: TimeZone) -> Date {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+        let now = Date()
+
+        let hasYear = format.contains("yyyy")
+        let hasMonth = format.contains("MMM")
+        let hasTime = format.contains("h") || format.contains("H")
+
+        if hasYear {
+            // Explicit year provided — use as-is (e.g., "Jan 1, 2026")
+            return parsedDate
+        }
+
+        if hasMonth && hasTime {
+            // Has month, day, and time (e.g., "Jan 15, 3:30pm")
+            // Set the year to current or next year
+            var components = calendar.dateComponents([.month, .day, .hour, .minute, .second], from: parsedDate)
+            components.year = calendar.component(.year, from: now)
+            if let candidate = calendar.date(from: components), candidate > now {
+                return candidate
+            }
+            // Already past this year — try next year
+            components.year = calendar.component(.year, from: now) + 1
+            return calendar.date(from: components) ?? parsedDate
+        }
+
+        if hasMonth {
+            // Date only, no time (e.g., "Dec 28") — assume start of day
+            var components = calendar.dateComponents([.month, .day], from: parsedDate)
+            components.hour = 0
+            components.minute = 0
+            components.second = 0
+            components.year = calendar.component(.year, from: now)
+            if let candidate = calendar.date(from: components), candidate > now {
+                return candidate
+            }
+            components.year = calendar.component(.year, from: now) + 1
+            return calendar.date(from: components) ?? parsedDate
+        }
+
+        if hasTime {
+            // Time-only (e.g., "3pm", "4:59pm") — resolve to today or tomorrow
+            let parsedComponents = calendar.dateComponents([.hour, .minute, .second], from: parsedDate)
+            var todayComponents = calendar.dateComponents([.year, .month, .day], from: now)
+            todayComponents.hour = parsedComponents.hour
+            todayComponents.minute = parsedComponents.minute
+            todayComponents.second = parsedComponents.second
+            if let candidate = calendar.date(from: todayComponents), candidate > now {
+                return candidate
+            }
+            // Already past today — use tomorrow
+            if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) {
+                todayComponents = calendar.dateComponents([.year, .month, .day], from: tomorrow)
+                todayComponents.hour = parsedComponents.hour
+                todayComponents.minute = parsedComponents.minute
+                todayComponents.second = parsedComponents.second
+                return calendar.date(from: todayComponents) ?? parsedDate
+            }
+        }
+
+        return parsedDate
     }
 
     // MARK: - Error Detection

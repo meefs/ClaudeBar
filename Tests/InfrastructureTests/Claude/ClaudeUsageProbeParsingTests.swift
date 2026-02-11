@@ -251,6 +251,60 @@ struct ClaudeUsageProbeParsingTests {
         }
     }
 
+    // MARK: - Absolute Reset Time Parsing (resetsAt populated)
+
+    @Test
+    func `populates resetsAt for time only reset format`() throws {
+        // Given — Pro header with "Resets 4:59pm (America/New_York)"
+        let output = Self.proHeaderOutput
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(output)
+
+        // Then — resetsAt must be a Date, not nil (enables pace tick)
+        let sessionQuota = snapshot.sessionQuota
+        #expect(sessionQuota?.resetsAt != nil, "resetsAt should be populated for 'Resets 4:59pm (TZ)' format")
+        #expect(sessionQuota?.percentTimeElapsed != nil, "percentTimeElapsed should be computable")
+    }
+
+    @Test
+    func `populates resetsAt for date at time reset format`() throws {
+        // Given — real CLI output with "Resets Dec 25 at 4:59am (Asia/Shanghai)"
+        let output = Self.realCliOutput
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(output)
+
+        // Then — both session and weekly should have resetsAt populated
+        #expect(snapshot.sessionQuota?.resetsAt != nil, "Session resetsAt should be populated for 'Resets 2:59pm (TZ)' format")
+        #expect(snapshot.weeklyQuota?.resetsAt != nil, "Weekly resetsAt should be populated for 'Resets Dec 25 at 4:59am (TZ)' format")
+    }
+
+    @Test
+    func `populates resetsAt for date comma time format`() throws {
+        // Given — sample output with "Resets Jan 15, 3:30pm (America/Los_Angeles)"
+        let output = Self.sampleClaudeOutput
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(output)
+
+        // Then — weekly and opus should have resetsAt populated (session uses relative "2h 15m" which already works)
+        #expect(snapshot.weeklyQuota?.resetsAt != nil, "Weekly resetsAt should be populated for 'Resets Jan 15, 3:30pm (TZ)' format")
+    }
+
+    @Test
+    func `populates resetsAt for Claude API quotas with absolute times`() throws {
+        // Given — Claude API output with "Resets 9pm (Asia/Shanghai)" and "Resets Feb 12 at 4pm (Asia/Shanghai)"
+        let output = Self.claudeApiWithQuotasOutput
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(output)
+
+        // Then — all quotas should have resetsAt populated
+        #expect(snapshot.sessionQuota?.resetsAt != nil, "Session resetsAt should be populated for 'Resets 9pm (TZ)' format")
+        #expect(snapshot.weeklyQuota?.resetsAt != nil, "Weekly resetsAt should be populated for 'Resets Feb 12 at 4pm (TZ)' format")
+    }
+
     // MARK: - ANSI Code Handling
 
     static let ansiColoredOutput = """

@@ -62,6 +62,92 @@ struct ClaudeUsageProbeTests {
         #expect(probe.parseResetDate("no time here") == nil)
     }
 
+    // MARK: - Absolute Time Parsing Tests
+
+    @Test
+    func `parses reset date with time only and timezone`() {
+        let probe = ClaudeUsageProbe()
+
+        // "Resets 4:59pm (America/New_York)" — should resolve to a Date today or tomorrow
+        let result = probe.parseResetDate("Resets 4:59pm (America/New_York)")
+        #expect(result != nil, "Should parse time-only format with timezone")
+        if let date = result {
+            // Should be within the next 24 hours
+            let diff = date.timeIntervalSinceNow
+            #expect(diff > -60) // Allow small margin for test execution
+            #expect(diff < 24 * 3600 + 60)
+        }
+    }
+
+    @Test
+    func `parses reset date with short time and timezone`() {
+        let probe = ClaudeUsageProbe()
+
+        // "Resets 3pm (Asia/Shanghai)" — short time without minutes
+        let result = probe.parseResetDate("Resets 3pm (Asia/Shanghai)")
+        #expect(result != nil, "Should parse short time format like 3pm")
+    }
+
+    @Test
+    func `parses reset date with month day and time with timezone`() {
+        let probe = ClaudeUsageProbe()
+
+        // "Resets Dec 25 at 4:59am (Asia/Shanghai)"
+        let result = probe.parseResetDate("Resets Dec 25 at 4:59am (Asia/Shanghai)")
+        #expect(result != nil, "Should parse 'Mon DD at H:MMam (TZ)' format")
+    }
+
+    @Test
+    func `parses reset date with month day comma time and timezone`() {
+        let probe = ClaudeUsageProbe()
+
+        // "Resets Jan 15, 3:30pm (America/Los_Angeles)"
+        let result = probe.parseResetDate("Resets Jan 15, 3:30pm (America/Los_Angeles)")
+        #expect(result != nil, "Should parse 'Mon DD, H:MMpm (TZ)' format")
+    }
+
+    @Test
+    func `parses reset date with month day comma time without timezone`() {
+        let probe = ClaudeUsageProbe()
+
+        // "Resets Jan 15, 3:30pm"
+        let result = probe.parseResetDate("Resets Jan 15, 3:30pm")
+        #expect(result != nil, "Should parse 'Mon DD, H:MMpm' without timezone")
+    }
+
+    @Test
+    func `parses reset date with month day year and timezone`() {
+        let probe = ClaudeUsageProbe()
+
+        // "Resets Jan 1, 2026 (America/New_York)"
+        let result = probe.parseResetDate("Resets Jan 1, 2026 (America/New_York)")
+        #expect(result != nil, "Should parse 'Mon DD, YYYY (TZ)' format")
+    }
+
+    @Test
+    func `parses reset date with month day only`() {
+        let probe = ClaudeUsageProbe()
+
+        // "Resets Dec 28"
+        let result = probe.parseResetDate("Resets Dec 28")
+        #expect(result != nil, "Should parse 'Mon DD' date-only format")
+    }
+
+    @Test
+    func `parsed absolute date has correct timezone`() {
+        let probe = ClaudeUsageProbe()
+
+        // Two calls with different timezones for the same time should yield different Dates
+        let eastern = probe.parseResetDate("Resets 4:59pm (America/New_York)")
+        let shanghai = probe.parseResetDate("Resets 4:59pm (Asia/Shanghai)")
+        #expect(eastern != nil)
+        #expect(shanghai != nil)
+        if let e = eastern, let s = shanghai {
+            // These should NOT be equal — different timezones for the same wall-clock time
+            #expect(e != s, "Same wall-clock time in different timezones should produce different Dates")
+        }
+    }
+
     // MARK: - Helper Tests
 
     @Test
