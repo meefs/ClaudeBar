@@ -868,7 +868,7 @@ struct ClaudeUsageProbeParsingTests {
     }
 
     @Test
-    func `extractReset returns clean text when line has duplicate from terminal redraw`() {
+    func `extractReset returns clean text when line has duplicate from terminal redraw`() throws {
         // Given
         let probe = ClaudeUsageProbe()
         let text = """
@@ -881,9 +881,9 @@ struct ClaudeUsageProbeParsingTests {
         let result = probe.extractReset(labelSubstring: "Current session", text: text)
 
         // Then — should return deduplicated text
-        #expect(result != nil)
-        let resetsCount = result!.components(separatedBy: "Resets").count - 1
-        #expect(resetsCount == 1, "Should contain 'Resets' exactly once, got \(resetsCount) in: \(result!)")
+        let unwrapped = try #require(result)
+        let resetsCount = unwrapped.components(separatedBy: "Resets").count - 1
+        #expect(resetsCount == 1, "Should contain 'Resets' exactly once, got \(resetsCount) in: \(unwrapped)")
     }
 
     // MARK: - Helper

@@ -119,8 +119,9 @@ struct ClaudeUsageProbeTests {
     func `parses reset date with month day year and timezone`() {
         let probe = ClaudeUsageProbe()
 
-        // "Resets Jan 1, 2026 (America/New_York)"
-        let result = probe.parseResetDate("Resets Jan 1, 2026 (America/New_York)")
+        // Always use a future year so the test never goes stale
+        let futureYear = Calendar.current.component(.year, from: Date()) + 1
+        let result = probe.parseResetDate("Resets Jan 1, \(futureYear) (America/New_York)")
         #expect(result != nil, "Should parse 'Mon DD, YYYY (TZ)' format")
     }
 

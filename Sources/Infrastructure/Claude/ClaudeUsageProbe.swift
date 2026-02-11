@@ -689,8 +689,7 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         // Using the *last* occurrence handles both start-of-line "Resets Jan 1, 2026"
         // and mid-line "$5.41 ... · Resets Jan 1, 2026 (America/New_York)".
         var cleaned = text
-        let lower = cleaned.lowercased()
-        if let lastResets = lower.range(of: "resets", options: .backwards) {
+        if let lastResets = cleaned.range(of: "resets", options: [.caseInsensitive, .backwards]) {
             cleaned = String(cleaned[lastResets.upperBound...])
         }
         cleaned = cleaned
@@ -728,7 +727,7 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
 
     /// Extracts a timezone identifier from parenthesized text, e.g., "(America/New_York)"
     private func extractTimeZone(from text: String) -> TimeZone? {
-        guard let match = text.range(of: #"\(([^)]+)\)"#, options: .regularExpression) else {
+        guard let match = text.range(of: #"\(([^)]+)\)"#, options: [.regularExpression, .backwards]) else {
             return nil
         }
         let content = String(text[match])
