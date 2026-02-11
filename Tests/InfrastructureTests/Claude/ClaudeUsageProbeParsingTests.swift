@@ -586,6 +586,19 @@ struct ClaudeUsageProbeParsingTests {
         #expect(snapshot.quotas.count >= 1)
     }
 
+    @Test
+    func `parses resetsAt from Extra usage cost line with mid-line Resets`() throws {
+        // Given — "$5.41 / $20.00 spent · Resets Jan 1, 2026 (America/New_York)"
+        // "Resets" appears mid-line, not at the start
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(Self.proWithExtraUsageOutput)
+
+        // Then — resetsAt should be populated even though "Resets" is mid-line
+        #expect(snapshot.costUsage?.resetsAt != nil,
+                "resetsAt should be populated when 'Resets' appears mid-line in cost line")
+    }
+
     // MARK: - API Usage Billing Account Detection
 
     // Real output from API Usage Billing account showing subscription-only message

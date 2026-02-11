@@ -684,9 +684,16 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         // Extract timezone identifier from parentheses, e.g., "(America/New_York)"
         let timeZone = extractTimeZone(from: text)
 
-        // Strip "Resets" prefix, timezone suffix, and whitespace for cleaner parsing
+        // Strip everything up to and including the last "Resets" token (case-insensitive),
+        // then remove any trailing timezone in parentheses.
+        // Using the *last* occurrence handles both start-of-line "Resets Jan 1, 2026"
+        // and mid-line "$5.41 ... · Resets Jan 1, 2026 (America/New_York)".
         var cleaned = text
-            .replacingOccurrences(of: #"^\s*[Rr]esets\s+"#, with: "", options: .regularExpression)
+        let lower = cleaned.lowercased()
+        if let lastResets = lower.range(of: "resets", options: .backwards) {
+            cleaned = String(cleaned[lastResets.upperBound...])
+        }
+        cleaned = cleaned
             .replacingOccurrences(of: #"\s*\([^)]+\)\s*$"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespaces)
 
