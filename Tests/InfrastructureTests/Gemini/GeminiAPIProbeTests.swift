@@ -121,6 +121,70 @@ struct GeminiAPIProbeTests {
     }
     
     @Test
+    func `probe parses reset time into Date and human readable text`() async throws {
+        let homeDir = try makeTemporaryHomeDirectory()
+        try createCredentialsFile(in: homeDir)
+        let mockService = MockNetworkClient()
+
+        let projectsResponse = """
+        {
+            "projects": [
+                { "projectId": "gen-lang-client-123456" }
+            ]
+        }
+        """.data(using: .utf8)!
+
+        // Use a reset time 2 hours in the future
+        let futureDate = Date().addingTimeInterval(2 * 3600 + 15 * 60) // 2h 15m from now
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let resetTimeString = formatter.string(from: futureDate)
+
+        let quotaResponse = """
+        {
+            "buckets": [
+                {
+                    "modelId": "gemini-pro",
+                    "remainingFraction": 0.8,
+                    "resetTime": "\(resetTimeString)"
+                }
+            ]
+        }
+        """.data(using: .utf8)!
+
+        given(mockService)
+            .request(.any)
+            .willProduce { request in
+                let url = request.url?.absoluteString ?? ""
+                if url.contains("projects") {
+                    return (projectsResponse, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+                } else {
+                    return (quotaResponse, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+                }
+            }
+
+        let probe = GeminiAPIProbe(
+            homeDirectory: homeDir.path,
+            timeout: 1.0,
+            networkClient: mockService,
+            maxRetries: 1
+        )
+
+        let snapshot = try await probe.probe()
+        let quota = try #require(snapshot.quotas.first)
+
+        // resetsAt should be a parsed Date, not nil
+        let resetsAt = try #require(quota.resetsAt)
+        let timeDiff = abs(resetsAt.timeIntervalSince(futureDate))
+        #expect(timeDiff < 2) // Within 2 seconds tolerance
+
+        // resetText should be human-readable, not raw ISO 8601
+        let resetText = try #require(quota.resetText)
+        #expect(resetText.contains("Resets in"))
+        #expect(!resetText.contains("T"))  // Should NOT contain ISO 8601 'T' separator
+    }
+
+    @Test
     func `probe handles api error gracefully`() async throws {
         let homeDir = try makeTemporaryHomeDirectory()
         try createCredentialsFile(in: homeDir)

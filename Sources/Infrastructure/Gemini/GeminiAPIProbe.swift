@@ -174,11 +174,13 @@ internal struct GeminiAPIProbe {
         let quotas: [UsageQuota] = modelQuotaMap
             .sorted { $0.key < $1.key }
             .map { modelId, data in
-                UsageQuota(
+                let resetsAt = data.resetTime.flatMap { parseResetTime($0) }
+                return UsageQuota(
                     percentRemaining: data.fraction * 100,
                     quotaType: .modelSpecific(modelId),
                     providerId: "gemini",
-                    resetText: data.resetTime.map { "Resets \($0)" }
+                    resetsAt: resetsAt,
+                    resetText: formatResetText(resetsAt)
                 )
             }
 
@@ -229,6 +231,36 @@ internal struct GeminiAPIProbe {
             refreshToken: refreshToken,
             expiryDate: expiryDate
         )
+    }
+
+    // MARK: - Reset Time Parsing
+
+    private func parseResetTime(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) { return date }
+
+        // Try without fractional seconds
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
+    }
+
+    private func formatResetText(_ date: Date?) -> String? {
+        guard let date else { return nil }
+
+        let seconds = date.timeIntervalSinceNow
+        guard seconds > 0 else { return nil }
+
+        let hours = Int(seconds / 3600)
+        let minutes = Int((seconds.truncatingRemainder(dividingBy: 3600)) / 60)
+
+        if hours > 0 {
+            return "Resets in \(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "Resets in \(minutes)m"
+        } else {
+            return "Resets soon"
+        }
     }
 
     private struct QuotaBucket: Decodable {
