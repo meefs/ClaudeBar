@@ -819,6 +819,60 @@ struct ClaudeUsageProbeParsingTests {
         #expect(snapshot.weeklyQuota?.percentRemaining == 77)  // 23% used = 77% remaining
     }
 
+    // MARK: - Terminal Rendering Deduplication
+
+    @Test
+    func `handles duplicated reset text from terminal redraw artifact`() throws {
+        // Given - terminal rendering artifact where cursor misalignment causes
+        // reset text to appear twice on a single line
+        let output = """
+        Opus 4.5 · Claude Pro · Organization
+
+        Current session
+        █████░░░░░░░░░░░░░░░ 6% used
+        Resets 4:59pm (America/New_York)Resets 4:59pm (America/New_York)
+
+        Current week (all models)
+        █████████████████░░░ 36% used
+        Resets Dec 25 at 2:59pm (America/New_York)Resets Dec 25 at 2:59pm (America/New_York)
+        """
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(output)
+
+        // Then — quotas should parse successfully with clean reset text
+        let session = snapshot.sessionQuota
+        #expect(session != nil)
+        #expect(session?.resetsAt != nil, "resetsAt should be populated despite duplicated text")
+        #expect(session?.resetText?.contains("Resets 4:59pm") == true)
+        // Should NOT contain the duplication
+        #expect(session?.resetText?.components(separatedBy: "Resets").count == 2,
+                "resetText should contain 'Resets' exactly once (prefix + content)")
+
+        let weekly = snapshot.weeklyQuota
+        #expect(weekly != nil)
+        #expect(weekly?.resetsAt != nil, "weekly resetsAt should be populated despite duplicated text")
+    }
+
+    @Test
+    func `extractReset returns clean text when line has duplicate from terminal redraw`() {
+        // Given
+        let probe = ClaudeUsageProbe()
+        let text = """
+        Current session
+        ████ 6% used
+        Resets 4:59pm (America/New_York)Resets 4:59pm (America/New_York)
+        """
+
+        // When
+        let result = probe.extractReset(labelSubstring: "Current session", text: text)
+
+        // Then — should return deduplicated text
+        #expect(result != nil)
+        let resetsCount = result!.components(separatedBy: "Resets").count - 1
+        #expect(resetsCount == 1, "Should contain 'Resets' exactly once, got \(resetsCount) in: \(result!)")
+    }
+
     // MARK: - Helper
 
     private func simulateParse(text: String) throws -> UsageSnapshot {

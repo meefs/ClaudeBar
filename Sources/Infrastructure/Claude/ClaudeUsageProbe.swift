@@ -532,11 +532,38 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
                 // Look for "resets" or time indicators like "2h" or "30m"
                 if lower.contains("reset") ||
                    (lower.contains("in") && (lower.contains("h") || lower.contains("m"))) {
-                    return candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return deduplicateResetText(trimmed)
                 }
             }
         }
         return nil
+    }
+
+    /// Removes duplicate "Resets..." text caused by terminal redraw artifacts.
+    ///
+    /// The Claude CLI redraws the screen using cursor positioning. Wide Unicode characters
+    /// (progress bar blocks) can cause column misalignment, resulting in the reset text
+    /// being appended to itself on a single line, e.g.:
+    /// `"Resets 4:59pm (America/New_York)Resets 4:59pm (America/New_York)"`
+    ///
+    /// This method detects such duplication and returns only the last occurrence.
+    internal func deduplicateResetText(_ text: String) -> String {
+        // Find all positions where "Resets" (case-insensitive) starts
+        let lower = text.lowercased()
+        var positions: [String.Index] = []
+        var searchStart = lower.startIndex
+        while let range = lower.range(of: "resets", range: searchStart..<lower.endIndex) {
+            positions.append(range.lowerBound)
+            searchStart = lower.index(after: range.lowerBound)
+        }
+
+        // If there's more than one "Resets", take the last occurrence
+        if positions.count > 1, let lastPos = positions.last {
+            return String(text[lastPos...]).trimmingCharacters(in: .whitespaces)
+        }
+
+        return text
     }
 
     internal func extractEmail(text: String) -> String? {
