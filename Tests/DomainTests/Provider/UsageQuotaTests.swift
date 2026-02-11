@@ -45,10 +45,9 @@ struct UsageQuotaTests {
     }
 
     @Test
-    func `quota reset timestamp description uses abbreviated date and short time`() {
-        // Given
-        let resetDate = Date(timeIntervalSince1970: 1_735_747_200) // 2025-01-15T10:00:00Z
-        let expected = "Resets \(resetDate.formatted(date: .abbreviated, time: .shortened))"
+    func `quota reset timestamp shows days hours and minutes`() {
+        // Given - 2 days, 5 hours, 30 minutes from now
+        let resetDate = Date().addingTimeInterval(2 * 86400 + 5 * 3600 + 30 * 60)
 
         // When
         let quota = UsageQuota(
@@ -59,7 +58,41 @@ struct UsageQuotaTests {
         )
 
         // Then
-        #expect(quota.resetTimestampDescription == expected)
+        #expect(quota.resetTimestampDescription == "Resets in 2d 5h 30m")
+    }
+
+    @Test
+    func `quota reset timestamp shows only hours and minutes when less than a day`() {
+        // Given - 3 hours, 15 minutes from now
+        let resetDate = Date().addingTimeInterval(3 * 3600 + 15 * 60)
+
+        // When
+        let quota = UsageQuota(
+            percentRemaining: 35,
+            quotaType: .weekly,
+            providerId: "claude",
+            resetsAt: resetDate
+        )
+
+        // Then
+        #expect(quota.resetTimestampDescription == "Resets in 3h 15m")
+    }
+
+    @Test
+    func `quota reset timestamp shows resets soon when under a minute`() {
+        // Given - 30 seconds from now
+        let resetDate = Date().addingTimeInterval(30)
+
+        // When
+        let quota = UsageQuota(
+            percentRemaining: 35,
+            quotaType: .weekly,
+            providerId: "claude",
+            resetsAt: resetDate
+        )
+
+        // Then
+        #expect(quota.resetTimestampDescription == "Resets soon")
     }
 
     @Test

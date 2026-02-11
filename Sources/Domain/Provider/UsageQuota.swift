@@ -138,10 +138,22 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         return max(0, resetsAt.timeIntervalSinceNow)
     }
 
-    /// Human-readable reset timestamp in local time (e.g., "Resets Jan 15, 3:30 PM")
+    /// Human-readable reset countdown with all components (e.g., "Resets in 2d 5h 30m")
     public var resetTimestampDescription: String? {
-        guard let resetsAt else { return nil }
-        return "Resets \(resetsAt.formatted(date: .abbreviated, time: .shortened))"
+        guard let timeUntilReset else { return nil }
+
+        let totalMinutes = Int(timeUntilReset / 60)
+        let days = totalMinutes / (24 * 60)
+        let hours = (totalMinutes % (24 * 60)) / 60
+        let minutes = totalMinutes % 60
+
+        var parts: [String] = []
+        if days > 0 { parts.append("\(days)d") }
+        if hours > 0 { parts.append("\(hours)h") }
+        if minutes > 0 { parts.append("\(minutes)m") }
+
+        if parts.isEmpty { return "Resets soon" }
+        return "Resets in \(parts.joined(separator: " "))"
     }
 
     /// Human-readable description of time until reset
