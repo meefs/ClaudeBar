@@ -47,8 +47,7 @@ struct UsageQuotaTests {
     @Test
     func `quota reset timestamp shows days hours and minutes`() {
         // Given - 2 days, 5 hours, 30 minutes from now
-        let interval: TimeInterval = 2 * 86400 + 5 * 3600 + 30 * 60
-        let resetDate = Date().addingTimeInterval(interval)
+        let resetDate = Date().addingTimeInterval(2.0 * 86400 + 5.0 * 3600 + 30.0 * 60)
 
         // When
         let quota = UsageQuota(
@@ -65,7 +64,7 @@ struct UsageQuotaTests {
     @Test
     func `quota reset timestamp shows only hours and minutes when less than a day`() {
         // Given - 3 hours, 15 minutes from now
-        let resetDate = Date().addingTimeInterval(3 * 3600 + 15 * 60)
+        let resetDate = Date().addingTimeInterval(3.0 * 3600 + 15.0 * 60)
 
         // When
         let quota = UsageQuota(
