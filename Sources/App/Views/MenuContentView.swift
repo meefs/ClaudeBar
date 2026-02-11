@@ -810,7 +810,7 @@ struct WrappedStatCard: View {
             }
 
             // Reset info
-            if let resetText = quota.resetText ?? quota.resetDescription {
+            if let resetText = quota.resetTimestampDescription ?? quota.resetText ?? quota.resetDescription {
                 HStack(spacing: 3) {
                     Image(systemName: "clock.fill")
                         .font(.system(size: 7))

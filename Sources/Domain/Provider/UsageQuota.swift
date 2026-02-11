@@ -138,6 +138,12 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         return max(0, resetsAt.timeIntervalSinceNow)
     }
 
+    /// Human-readable reset timestamp in local time (e.g., "Resets Jan 15, 3:30 PM")
+    public var resetTimestampDescription: String? {
+        guard let resetsAt else { return nil }
+        return "Resets \(resetsAt.formatted(date: .abbreviated, time: .shortened))"
+    }
+
     /// Human-readable description of time until reset
     public var resetDescription: String? {
         guard let timeUntilReset else { return nil }

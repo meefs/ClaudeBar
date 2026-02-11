@@ -44,6 +44,37 @@ struct UsageQuotaTests {
         #expect(quota.resetsAt == resetDate)
     }
 
+    @Test
+    func `quota reset timestamp description uses abbreviated date and short time`() {
+        // Given
+        let resetDate = Date(timeIntervalSince1970: 1_735_747_200) // 2025-01-15T10:00:00Z
+        let expected = "Resets \(resetDate.formatted(date: .abbreviated, time: .shortened))"
+
+        // When
+        let quota = UsageQuota(
+            percentRemaining: 35,
+            quotaType: .weekly,
+            providerId: "claude",
+            resetsAt: resetDate
+        )
+
+        // Then
+        #expect(quota.resetTimestampDescription == expected)
+    }
+
+    @Test
+    func `quota reset timestamp description is nil without reset date`() {
+        // Given
+        let quota = UsageQuota(
+            percentRemaining: 35,
+            quotaType: .weekly,
+            providerId: "claude"
+        )
+
+        // Then
+        #expect(quota.resetTimestampDescription == nil)
+    }
+
     // MARK: - Quota Types
 
     @Test
