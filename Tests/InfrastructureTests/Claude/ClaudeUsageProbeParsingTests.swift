@@ -251,6 +251,60 @@ struct ClaudeUsageProbeParsingTests {
         }
     }
 
+    // MARK: - Absolute Reset Time Parsing (resetsAt populated)
+
+    @Test
+    func `populates resetsAt for time only reset format`() throws {
+        // Given — Pro header with "Resets 4:59pm (America/New_York)"
+        let output = Self.proHeaderOutput
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(output)
+
+        // Then — resetsAt must be a Date, not nil (enables pace tick)
+        let sessionQuota = snapshot.sessionQuota
+        #expect(sessionQuota?.resetsAt != nil, "resetsAt should be populated for 'Resets 4:59pm (TZ)' format")
+        #expect(sessionQuota?.percentTimeElapsed != nil, "percentTimeElapsed should be computable")
+    }
+
+    @Test
+    func `populates resetsAt for date at time reset format`() throws {
+        // Given — real CLI output with "Resets Dec 25 at 4:59am (Asia/Shanghai)"
+        let output = Self.realCliOutput
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(output)
+
+        // Then — both session and weekly should have resetsAt populated
+        #expect(snapshot.sessionQuota?.resetsAt != nil, "Session resetsAt should be populated for 'Resets 2:59pm (TZ)' format")
+        #expect(snapshot.weeklyQuota?.resetsAt != nil, "Weekly resetsAt should be populated for 'Resets Dec 25 at 4:59am (TZ)' format")
+    }
+
+    @Test
+    func `populates resetsAt for date comma time format`() throws {
+        // Given — sample output with "Resets Jan 15, 3:30pm (America/Los_Angeles)"
+        let output = Self.sampleClaudeOutput
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(output)
+
+        // Then — weekly and opus should have resetsAt populated (session uses relative "2h 15m" which already works)
+        #expect(snapshot.weeklyQuota?.resetsAt != nil, "Weekly resetsAt should be populated for 'Resets Jan 15, 3:30pm (TZ)' format")
+    }
+
+    @Test
+    func `populates resetsAt for Claude API quotas with absolute times`() throws {
+        // Given — Claude API output with "Resets 9pm (Asia/Shanghai)" and "Resets Feb 12 at 4pm (Asia/Shanghai)"
+        let output = Self.claudeApiWithQuotasOutput
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(output)
+
+        // Then — all quotas should have resetsAt populated
+        #expect(snapshot.sessionQuota?.resetsAt != nil, "Session resetsAt should be populated for 'Resets 9pm (TZ)' format")
+        #expect(snapshot.weeklyQuota?.resetsAt != nil, "Weekly resetsAt should be populated for 'Resets Feb 12 at 4pm (TZ)' format")
+    }
+
     // MARK: - ANSI Code Handling
 
     static let ansiColoredOutput = """
@@ -532,6 +586,19 @@ struct ClaudeUsageProbeParsingTests {
         #expect(snapshot.quotas.count >= 1)
     }
 
+    @Test
+    func `parses resetsAt from Extra usage cost line with mid-line Resets`() throws {
+        // Given — "$5.41 / $20.00 spent · Resets Jan 1, 2026 (America/New_York)"
+        // "Resets" appears mid-line, not at the start
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(Self.proWithExtraUsageOutput)
+
+        // Then — resetsAt should be populated even though "Resets" is mid-line
+        #expect(snapshot.costUsage?.resetsAt != nil,
+                "resetsAt should be populated when 'Resets' appears mid-line in cost line")
+    }
+
     // MARK: - API Usage Billing Account Detection
 
     // Real output from API Usage Billing account showing subscription-only message
@@ -763,6 +830,60 @@ struct ClaudeUsageProbeParsingTests {
         #expect(snapshot.sessionQuota != nil)
         #expect(snapshot.sessionQuota?.percentRemaining == 80) // 20% used = 80% remaining
         #expect(snapshot.weeklyQuota?.percentRemaining == 77)  // 23% used = 77% remaining
+    }
+
+    // MARK: - Terminal Rendering Deduplication
+
+    @Test
+    func `handles duplicated reset text from terminal redraw artifact`() throws {
+        // Given - terminal rendering artifact where cursor misalignment causes
+        // reset text to appear twice on a single line
+        let output = """
+        Opus 4.5 · Claude Pro · Organization
+
+        Current session
+        █████░░░░░░░░░░░░░░░ 6% used
+        Resets 4:59pm (America/New_York)Resets 4:59pm (America/New_York)
+
+        Current week (all models)
+        █████████████████░░░ 36% used
+        Resets Dec 25 at 2:59pm (America/New_York)Resets Dec 25 at 2:59pm (America/New_York)
+        """
+
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(output)
+
+        // Then — quotas should parse successfully with clean reset text
+        let session = snapshot.sessionQuota
+        #expect(session != nil)
+        #expect(session?.resetsAt != nil, "resetsAt should be populated despite duplicated text")
+        #expect(session?.resetText?.contains("Resets 4:59pm") == true)
+        // Should NOT contain the duplication
+        #expect(session?.resetText?.components(separatedBy: "Resets").count == 2,
+                "resetText should contain 'Resets' exactly once (prefix + content)")
+
+        let weekly = snapshot.weeklyQuota
+        #expect(weekly != nil)
+        #expect(weekly?.resetsAt != nil, "weekly resetsAt should be populated despite duplicated text")
+    }
+
+    @Test
+    func `extractReset returns clean text when line has duplicate from terminal redraw`() throws {
+        // Given
+        let probe = ClaudeUsageProbe()
+        let text = """
+        Current session
+        ████ 6% used
+        Resets 4:59pm (America/New_York)Resets 4:59pm (America/New_York)
+        """
+
+        // When
+        let result = probe.extractReset(labelSubstring: "Current session", text: text)
+
+        // Then — should return deduplicated text
+        let unwrapped = try #require(result)
+        let resetsCount = unwrapped.components(separatedBy: "Resets").count - 1
+        #expect(resetsCount == 1, "Should contain 'Resets' exactly once, got \(resetsCount) in: \(unwrapped)")
     }
 
     // MARK: - Helper

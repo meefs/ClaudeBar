@@ -532,11 +532,37 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
                 // Look for "resets" or time indicators like "2h" or "30m"
                 if lower.contains("reset") ||
                    (lower.contains("in") && (lower.contains("h") || lower.contains("m"))) {
-                    return candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return deduplicateResetText(trimmed)
                 }
             }
         }
         return nil
+    }
+
+    /// Removes duplicate "Resets..." text caused by terminal redraw artifacts.
+    ///
+    /// The Claude CLI redraws the screen using cursor positioning. Wide Unicode characters
+    /// (progress bar blocks) can cause column misalignment, resulting in the reset text
+    /// being appended to itself on a single line, e.g.:
+    /// `"Resets 4:59pm (America/New_York)Resets 4:59pm (America/New_York)"`
+    ///
+    /// This method detects such duplication and returns only the last occurrence.
+    internal func deduplicateResetText(_ text: String) -> String {
+        // Find all positions where "Resets" (case-insensitive) starts in the original text
+        var positions: [Range<String.Index>] = []
+        var searchStart = text.startIndex
+        while let range = text.range(of: "resets", options: .caseInsensitive, range: searchStart..<text.endIndex) {
+            positions.append(range)
+            searchStart = text.index(after: range.lowerBound)
+        }
+
+        // If there's more than one "Resets", take the last occurrence
+        if positions.count > 1, let lastRange = positions.last {
+            return String(text[lastRange.lowerBound...]).trimmingCharacters(in: .whitespaces)
+        }
+
+        return text
     }
 
     internal func extractEmail(text: String) -> String? {
@@ -602,6 +628,17 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     internal func parseResetDate(_ text: String?) -> Date? {
         guard let text else { return nil }
 
+        // Try relative duration first: "2h 15m", "30m", "2d"
+        if let relativeDate = parseRelativeDuration(text) {
+            return relativeDate
+        }
+
+        // Try absolute date/time: "4:59pm (America/New_York)", "Jan 15, 3:30pm (TZ)", etc.
+        return parseAbsoluteDate(text)
+    }
+
+    /// Parses relative duration strings like "2h 15m", "30m", "2d"
+    private func parseRelativeDuration(_ text: String) -> Date? {
         var totalSeconds: TimeInterval = 0
 
         // Extract days: "2d" or "2 d" or "2 days"
@@ -633,6 +670,139 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         }
 
         return nil
+    }
+
+    /// Parses absolute date/time strings from Claude CLI output.
+    ///
+    /// Handles these formats (all optionally followed by a timezone in parentheses):
+    /// - Time-only: "4:59pm", "3pm", "9pm"
+    /// - Month + day: "Dec 28"
+    /// - Month + day + time: "Jan 15, 3:30pm" or "Dec 25 at 4:59am"
+    /// - Month + day + year + time: "Jan 1, 2026 (America/New_York)"
+    private func parseAbsoluteDate(_ text: String) -> Date? {
+        // Extract timezone identifier from parentheses, e.g., "(America/New_York)"
+        let timeZone = extractTimeZone(from: text)
+
+        // Strip everything up to and including the last "Resets" token (case-insensitive),
+        // then remove any trailing timezone in parentheses.
+        // Using the *last* occurrence handles both start-of-line "Resets Jan 1, 2026"
+        // and mid-line "$5.41 ... · Resets Jan 1, 2026 (America/New_York)".
+        var cleaned = text
+        if let lastResets = cleaned.range(of: "resets", options: [.caseInsensitive, .backwards]) {
+            cleaned = String(cleaned[lastResets.upperBound...])
+        }
+        cleaned = cleaned
+            .replacingOccurrences(of: #"\s*\([^)]+\)\s*$"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+
+        // Normalize "at" separator: "Dec 25 at 4:59am" -> "Dec 25, 4:59am"
+        cleaned = cleaned.replacingOccurrences(of: #"\s+at\s+"#, with: ", ", options: .regularExpression)
+
+        // Try date formats from most specific to least specific
+        let formats: [String] = [
+            "MMM d, yyyy, h:mma",   // "Jan 1, 2026, 3:30pm" (with year and minutes)
+            "MMM d, yyyy, ha",      // "Jan 1, 2026, 3pm" (with year, no minutes)
+            "MMM d, yyyy",          // "Jan 1, 2026" (date with year only)
+            "MMM d, h:mma",         // "Jan 15, 3:30pm" (date with minutes)
+            "MMM d, ha",            // "Jan 15, 4pm" (date without minutes)
+            "h:mma",               // "4:59pm" (time-only with minutes)
+            "ha",                  // "3pm" (time-only, no minutes)
+            "MMM d",               // "Dec 28" (date only)
+        ]
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone ?? .current
+
+        for format in formats {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: cleaned) {
+                return resolveToFutureDate(date, format: format, timeZone: formatter.timeZone)
+            }
+        }
+
+        return nil
+    }
+
+    /// Extracts a timezone identifier from parenthesized text, e.g., "(America/New_York)"
+    private func extractTimeZone(from text: String) -> TimeZone? {
+        guard let match = text.range(of: #"\(([^)]+)\)"#, options: [.regularExpression, .backwards]) else {
+            return nil
+        }
+        let content = String(text[match])
+            .dropFirst() // remove "("
+            .dropLast()  // remove ")"
+        let identifier = String(content).trimmingCharacters(in: .whitespaces)
+        return TimeZone(identifier: identifier)
+    }
+
+    /// Resolves a parsed date to the next future occurrence.
+    ///
+    /// DateFormatter gives us a date with components that may be in the past
+    /// (e.g., "3pm" today but it's already 5pm, or "Dec 25" but it's Dec 26).
+    /// This method adjusts to the next occurrence.
+    private func resolveToFutureDate(_ parsedDate: Date, format: String, timeZone: TimeZone) -> Date {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+        let now = Date()
+
+        let hasYear = format.contains("yyyy")
+        let hasMonth = format.contains("MMM")
+        let hasTime = format.contains("h") || format.contains("H")
+
+        if hasYear {
+            // Explicit year provided — use as-is (e.g., "Jan 1, 2026")
+            return parsedDate
+        }
+
+        if hasMonth && hasTime {
+            // Has month, day, and time (e.g., "Jan 15, 3:30pm")
+            // Set the year to current or next year
+            var components = calendar.dateComponents([.month, .day, .hour, .minute, .second], from: parsedDate)
+            components.year = calendar.component(.year, from: now)
+            if let candidate = calendar.date(from: components), candidate > now {
+                return candidate
+            }
+            // Already past this year — try next year
+            components.year = calendar.component(.year, from: now) + 1
+            return calendar.date(from: components) ?? parsedDate
+        }
+
+        if hasMonth {
+            // Date only, no time (e.g., "Dec 28") — assume start of day
+            var components = calendar.dateComponents([.month, .day], from: parsedDate)
+            components.hour = 0
+            components.minute = 0
+            components.second = 0
+            components.year = calendar.component(.year, from: now)
+            if let candidate = calendar.date(from: components), candidate > now {
+                return candidate
+            }
+            components.year = calendar.component(.year, from: now) + 1
+            return calendar.date(from: components) ?? parsedDate
+        }
+
+        if hasTime {
+            // Time-only (e.g., "3pm", "4:59pm") — resolve to today or tomorrow
+            let parsedComponents = calendar.dateComponents([.hour, .minute, .second], from: parsedDate)
+            var todayComponents = calendar.dateComponents([.year, .month, .day], from: now)
+            todayComponents.hour = parsedComponents.hour
+            todayComponents.minute = parsedComponents.minute
+            todayComponents.second = parsedComponents.second
+            if let candidate = calendar.date(from: todayComponents), candidate > now {
+                return candidate
+            }
+            // Already past today — use tomorrow
+            if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) {
+                todayComponents = calendar.dateComponents([.year, .month, .day], from: tomorrow)
+                todayComponents.hour = parsedComponents.hour
+                todayComponents.minute = parsedComponents.minute
+                todayComponents.second = parsedComponents.second
+                return calendar.date(from: todayComponents) ?? parsedDate
+            }
+        }
+
+        return parsedDate
     }
 
     // MARK: - Error Detection
