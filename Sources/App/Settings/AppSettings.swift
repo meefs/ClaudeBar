@@ -86,6 +86,22 @@ public final class AppSettings {
         }
     }
 
+    // MARK: - Aggregate View Settings
+
+    /// Whether to show the aggregate (multi-provider) view instead of single-provider
+    public var aggregateViewEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(aggregateViewEnabled, forKey: Keys.aggregateViewEnabled)
+        }
+    }
+
+    /// The set of provider IDs to include in the aggregate view
+    public var aggregateProviderIds: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(aggregateProviderIds), forKey: Keys.aggregateProviderIds)
+        }
+    }
+
     // MARK: - Background Sync Settings
 
     /// Whether background sync is enabled (default: true)
@@ -123,6 +139,14 @@ public final class AppSettings {
 
         // Launch at login - read from SMAppService (no UserDefaults needed)
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
+
+        // Aggregate view defaults to DISABLED
+        self.aggregateViewEnabled = UserDefaults.standard.bool(forKey: Keys.aggregateViewEnabled)
+        if let savedIds = UserDefaults.standard.array(forKey: Keys.aggregateProviderIds) as? [String] {
+            self.aggregateProviderIds = Set(savedIds)
+        } else {
+            self.aggregateProviderIds = []
+        }
 
         // Background sync defaults to DISABLED
         self.backgroundSyncEnabled = UserDefaults.standard.object(forKey: Keys.backgroundSyncEnabled) as? Bool ?? false
@@ -172,6 +196,8 @@ private extension AppSettings {
         static let claudeApiBudget = "claudeApiBudget"
         static let receiveBetaUpdates = "receiveBetaUpdates"
         static let usageDisplayMode = "usageDisplayMode"
+        static let aggregateViewEnabled = "aggregateViewEnabled"
+        static let aggregateProviderIds = "aggregateProviderIds"
         static let backgroundSyncEnabled = "backgroundSyncEnabled"
         static let backgroundSyncInterval = "backgroundSyncInterval"
     }

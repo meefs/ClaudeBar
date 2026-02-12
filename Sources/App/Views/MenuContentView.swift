@@ -64,10 +64,12 @@ struct MenuContentView: View {
                         .padding(.top, 16)
                         .padding(.bottom, 12)
 
-                    // Provider Pills
-                    providerPills
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
+                    // Provider Pills (hidden in aggregate mode)
+                    if !settings.aggregateViewEnabled {
+                        providerPills
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
+                    }
 
                     // Main Content Area - no scroll, dynamic height
                     VStack(spacing: 12) {
@@ -114,7 +116,11 @@ struct MenuContentView: View {
                 animateIn = true
             }
             // Then fetch data in background
-            await refresh(providerId: selectedProviderId)
+            if settings.aggregateViewEnabled {
+                await refreshAggregateProviders()
+            } else {
+                await refresh(providerId: selectedProviderId)
+            }
 
             // Check for updates when menu opens (no UI unless update found)
             #if ENABLE_SPARKLE
@@ -344,16 +350,25 @@ struct MenuContentView: View {
 
     // MARK: - Metrics Content
 
+    /// Providers selected for aggregate view (from settings)
+    private var aggregateProviders: [any AIProvider] {
+        monitor.enabledProviders.filter { settings.aggregateProviderIds.contains($0.id) }
+    }
+
     @ViewBuilder
     private var metricsContent: some View {
-        if let provider = selectedProvider, let snapshot = provider.snapshot {
+        if settings.aggregateViewEnabled {
+            let providers = aggregateProviders
+            if providers.isEmpty {
+                emptyAggregateState
+            } else {
+                aggregateContent(providers: providers)
+            }
+        } else if let provider = selectedProvider, let snapshot = provider.snapshot {
             VStack(spacing: 12) {
-                // Account info card - show if email OR organization is available
                 if let displayName = snapshot.accountEmail ?? snapshot.accountOrganization {
                     accountCard(displayName: displayName, snapshot: snapshot)
                 }
-
-                // Stats Grid - Wrapped style with large numbers
                 statsGrid(snapshot: snapshot)
             }
             .opacity(animateIn ? 1 : 0)
@@ -363,6 +378,85 @@ struct MenuContentView: View {
         } else {
             emptyState
         }
+    }
+
+    private func aggregateContent(providers: [any AIProvider]) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 16) {
+                ForEach(providers, id: \.id) { provider in
+                    providerSection(provider: provider)
+                }
+            }
+        }
+        .opacity(animateIn ? 1 : 0)
+        .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
+    }
+
+    private func providerSection(provider: any AIProvider) -> some View {
+        VStack(spacing: 8) {
+            providerSectionHeader(provider: provider)
+
+            if let snapshot = provider.snapshot {
+                statsGrid(snapshot: snapshot)
+            } else if provider.isSyncing {
+                LoadingSpinnerView()
+            } else {
+                compactErrorState(provider: provider)
+            }
+        }
+        .glassCard()
+    }
+
+    private func providerSectionHeader(provider: any AIProvider) -> some View {
+        HStack(spacing: 8) {
+            ProviderIconView(providerId: provider.id, size: 20, showGlow: false)
+
+            Text(provider.name)
+                .font(.system(size: 13, weight: .semibold, design: theme.fontDesign))
+                .foregroundStyle(theme.textPrimary)
+
+            Spacer()
+
+            let status = provider.snapshot?.overallStatus ?? .healthy
+            Text(provider.isSyncing ? "Syncing..." : status.badgeText)
+                .badge(theme.statusColor(for: status))
+        }
+    }
+
+    private func compactErrorState(provider: any AIProvider) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(theme.statusWarning)
+
+            Text(provider.lastError?.localizedDescription ?? "Unavailable")
+                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                .foregroundStyle(theme.textTertiary)
+                .lineLimit(1)
+
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var emptyAggregateState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 28))
+                .foregroundStyle(theme.textTertiary)
+
+            Text("No Providers Selected")
+                .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                .foregroundStyle(theme.textPrimary)
+
+            Text("Enable providers in Settings → Aggregate View")
+                .font(.system(size: 11, weight: .semibold, design: theme.fontDesign))
+                .foregroundStyle(theme.textTertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(height: 140)
+        .frame(maxWidth: .infinity)
+        .glassCard()
     }
 
     private func accountCard(displayName: String, snapshot: UsageSnapshot) -> some View {
@@ -497,14 +591,20 @@ struct MenuContentView: View {
             .keyboardShortcut("d")
 
             // Refresh Button
-            let isCurrentlyRefreshing = selectedProvider?.isSyncing == true
+            let isCurrentlyRefreshing = settings.aggregateViewEnabled
+                ? aggregateProviders.contains { $0.isSyncing }
+                : selectedProvider?.isSyncing == true
             WrappedActionButton(
                 icon: isCurrentlyRefreshing ? "arrow.trianglehead.2.counterclockwise.rotate.90" : "arrow.clockwise",
                 label: isCurrentlyRefreshing ? "Syncing" : "Refresh",
                 gradient: theme.accentGradient,
                 isLoading: isCurrentlyRefreshing
             ) {
-                Task { await refresh() }
+                if settings.aggregateViewEnabled {
+                    Task { await refreshAggregateProviders() }
+                } else {
+                    Task { await refresh(providerId: selectedProviderId) }
+                }
             }
             .keyboardShortcut("r")
 
@@ -589,9 +689,20 @@ struct MenuContentView: View {
 
     // MARK: - Actions
 
-    /// Refresh the currently selected provider (for button action)
-    private func refresh() async {
-        await refresh(providerId: selectedProviderId)
+    /// Refresh all aggregate providers concurrently
+    private func refreshAggregateProviders() async {
+        await withTaskGroup(of: Void.self) { group in
+            for provider in aggregateProviders {
+                group.addTask {
+                    guard !provider.isSyncing else { return }
+                    do {
+                        try await provider.refresh()
+                    } catch {
+                        // Provider stores error in lastError
+                    }
+                }
+            }
+        }
     }
 
     /// Refresh a specific provider by ID
