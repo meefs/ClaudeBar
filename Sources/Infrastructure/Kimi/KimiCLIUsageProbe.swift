@@ -84,10 +84,9 @@ public struct KimiCLIUsageProbe: UsageProbe {
     /// 5h limit                            75% left   (resets in 4h 22m)
     /// ```
     public static func parse(_ text: String) throws -> UsageSnapshot {
-        let clean = stripANSICodes(text)
         var quotas: [UsageQuota] = []
 
-        for line in clean.components(separatedBy: .newlines) {
+        for line in text.components(separatedBy: .newlines) {
             let lower = line.lowercased()
 
             // Only process lines that contain "% left"
@@ -142,12 +141,6 @@ public struct KimiCLIUsageProbe: UsageProbe {
     }
 
     // MARK: - Private Helpers
-
-    /// Strips ANSI escape sequences (colors, cursor control) from terminal output.
-    internal static func stripANSICodes(_ text: String) -> String {
-        let pattern = #"\x1B(?:[@-Z\\-_]|\[[0-9;?]*[ -/]*[@-~])"#
-        return text.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
-    }
 
     /// Parses a relative duration string like "6d 23h 22m" or "4h 22m" into a future Date.
     static func parseResetDuration(_ text: String) -> Date? {
