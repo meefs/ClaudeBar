@@ -68,13 +68,17 @@ The key principle is **QuotaMonitor as Single Source of Truth** - all provider s
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     INFRASTRUCTURE LAYER                             │
 │                                                                      │
-│  CLI Probes (Sources/Infrastructure/CLI/)                           │
-│  ├── ClaudeUsageProbe - probes `claude /usage`                      │
-│  ├── CodexUsageProbe - probes Codex via RPC/TTY                     │
+│  CLI Probes (Sources/Infrastructure/)                               │
+│  ├── ClaudeUsageProbe - probes `claude /usage` (CLI + API)          │
+│  ├── CodexUsageProbe - probes Codex via RPC/TTY (RPC + API)         │
 │  ├── GeminiUsageProbe - probes Gemini CLI + API                     │
 │  ├── CopilotUsageProbe - probes GitHub API with token               │
 │  ├── AntigravityUsageProbe - probes local Antigravity server        │
-│  └── ZaiUsageProbe - probes Z.ai API via Claude config              │
+│  ├── ZaiUsageProbe - probes Z.ai API via Claude config              │
+│  ├── BedrockUsageProbe - probes AWS Bedrock API                     │
+│  ├── AmpCodeUsageProbe - probes Amp Code CLI                        │
+│  ├── KimiCLIUsageProbe - probes `kimi` CLI with /usage (CLI mode)   │
+│  └── KimiUsageProbe - probes Kimi HTTP API (API mode)               │
 │                                                                      │
 │  Storage (Sources/Infrastructure/Storage/)                          │
 │  ├── AIProviders - implements AIProviderRepository                  │

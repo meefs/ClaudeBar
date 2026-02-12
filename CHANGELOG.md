@@ -11,18 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Kimi Support**: Monitor your [Kimi](https://www.kimi.com/code/console) AI coding assistant usage quota directly from the menu bar. Displays weekly quota and 5-hour session rate limit with automatic tier detection (Andante/Moderato/Allegretto).
-- **Browser Cookie Authentication**: Kimi authenticates by reading the `kimi-auth` cookie from your browser via [SweetCookieKit](https://github.com/steipete/SweetCookieKit). Supports Safari, Chrome, and other Chromium-based browsers.
-- **Full Disk Access Requirement**: Kimi requires Full Disk Access to read browser cookies. Navigate to System Settings → Privacy & Security → Full Disk Access → enable ClaudeBar. Alternatively, set the `KIMI_AUTH_TOKEN` environment variable.
+- **Kimi Dual Probe Mode**: Kimi now supports both CLI and API modes, switchable in Settings:
+  - **CLI Mode (Recommended)**: Launches the interactive `kimi` CLI and sends `/usage`. No Full Disk Access needed — just install `kimi` CLI (`uv tool install kimi-cli`).
+  - **API Mode**: Calls the Kimi API directly using browser cookie authentication via [SweetCookieKit](https://github.com/steipete/SweetCookieKit). Requires Full Disk Access to read browser cookies.
 - **Provider Icon**: New Kimi icon with blue/cyan branded styling in the provider list.
 
 ### Technical
 - Added `SweetCookieKit` dependency for cross-browser cookie extraction
-- Implemented `KimiUsageProbe` with Connect-RPC API integration and JWT session header extraction
+- Implemented `KimiCLIUsageProbe` with interactive CLI execution and `/usage` output parsing
+- Implemented `KimiUsageProbe` (API mode) with Connect-RPC API integration and JWT session header extraction
 - Implemented `KimiTokenProvider` with env var → browser cookie fallback chain
-- Added `KimiProvider` domain model with observable state and settings persistence
+- Added `KimiProvider` domain model with dual-probe support (CLI + API) and probe mode switching
+- Added `KimiProbeMode` enum and `KimiSettingsRepository` sub-protocol (ISP pattern)
+- Added Kimi configuration card in Settings with CLI/API probe mode picker
 - Added visual identity (icon, theme color, gradient) for Kimi provider
-- Registered Kimi provider in `ClaudeBarApp` startup
-- Comprehensive test coverage: parsing tests (15), probe behavior tests (8), provider domain tests (18)
+- Registered Kimi provider in `ClaudeBarApp` startup with both probes
+- Comprehensive test coverage: CLI parsing tests (18), CLI probe behavior tests (6), API probe tests (8), provider domain tests (18)
 
 ## [0.4.28] - 2026-02-10
 

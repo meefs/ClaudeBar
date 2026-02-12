@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ClaudeBar is a macOS menu bar application that monitors AI coding assistant usage quotas (Claude, Codex, Gemini, GitHub Copilot, Antigravity). It probes CLI tools to fetch quota information and displays it in a menu bar interface with system notifications for status changes.
+ClaudeBar is a macOS menu bar application that monitors AI coding assistant usage quotas (Claude, Codex, Gemini, GitHub Copilot, Antigravity, Z.ai, AWS Bedrock, Amp Code, Kimi). It probes CLI tools and APIs to fetch quota information and displays it in a menu bar interface with system notifications for status changes.
 
 ## Build & Test Commands
 
@@ -84,17 +84,23 @@ ProviderSettingsRepository (base)
 │   ├── zaiConfigPath(), setZaiConfigPath()
 │   └── glmAuthEnvVar(), setGlmAuthEnvVar()
 │
-└── CopilotSettingsRepository: ProviderSettingsRepository
-    ├── copilotAuthEnvVar(), setCopilotAuthEnvVar()
-    └── GitHub credentials: save/get/delete token & username
+├── CopilotSettingsRepository: ProviderSettingsRepository
+│   ├── copilotAuthEnvVar(), setCopilotAuthEnvVar()
+│   └── GitHub credentials: save/get/delete token & username
+│
+└── KimiSettingsRepository: ProviderSettingsRepository
+    ├── kimiProbeMode(), setKimiProbeMode()
+    └── Probe mode: CLI (interactive kimi CLI) or API (HTTP with cookie auth)
 ```
 
 **Provider Dependencies:**
 | Provider | Repository Type |
 |----------|----------------|
-| Claude, Codex, Gemini, Antigravity | `ProviderSettingsRepository` |
+| Claude, Codex, Gemini, Antigravity, Amp Code | `ProviderSettingsRepository` |
 | Z.ai | `ZaiSettingsRepository` |
 | Copilot | `CopilotSettingsRepository` |
+| Bedrock | `BedrockSettingsRepository` |
+| Kimi | `KimiSettingsRepository` |
 
 ### Theme System
 

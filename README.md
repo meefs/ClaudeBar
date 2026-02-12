@@ -69,19 +69,21 @@ A macOS menu bar application that monitors AI coding assistant usage quotas. Kee
   - [GitHub Copilot](https://github.com/features/copilot) - Configure credentials in Settings
   - [Antigravity](https://antigravity.google) - Auto-detected when running locally
   - [Z.ai](https://z.ai/subscribe) - Configure Claude Code with GLM Coding Plan endpoint
-  - [Kimi](https://www.kimi.com/code/console) - Requires **Full Disk Access** (see below)
+  - [Kimi](https://www.kimi.com/code/console) (`kimi`) - CLI mode (recommended) or API mode (see below)
   - [Amp](https://ampcode.com) (`amp`) - Auto-detected when CLI is installed
 
-### Kimi Setup (Full Disk Access)
+### Kimi Setup
 
-Kimi authenticates by reading the `kimi-auth` browser cookie. macOS requires **Full Disk Access** for apps to read browser cookie databases.
+Kimi supports two probe modes, configurable in **Settings > Kimi Configuration**:
 
-To enable:
-1. Open **System Settings** → **Privacy & Security** → **Full Disk Access**
+**CLI Mode (Recommended)** - Launches the interactive `kimi` CLI and sends `/usage` to fetch quota data. Requires `kimi` CLI installed (`uv tool install kimi-cli`). No Full Disk Access needed.
+
+**API Mode** - Calls the Kimi API directly using browser cookie authentication. Requires **Full Disk Access** for ClaudeBar to read the `kimi-auth` browser cookie:
+1. Open **System Settings** > **Privacy & Security** > **Full Disk Access**
 2. Toggle **ClaudeBar** on (or click `+` and add it)
 3. Restart ClaudeBar
 
-Without Full Disk Access, Kimi will show as unavailable. You can also set the `KIMI_AUTH_TOKEN` environment variable to bypass cookie reading.
+You can also set the `KIMI_AUTH_TOKEN` environment variable to bypass cookie reading in API mode.
 
 ## Installation
 
