@@ -10,32 +10,16 @@
 
 A macOS menu bar application that monitors AI coding assistant usage quotas. Keep track of your Claude, Codex, Gemini, GitHub Copilot, Antigravity, Z.ai, Kimi, and Amp usage at a glance.
 
-<p align="center">
-  <img src="docs/screenshots/Screenshot-dark.png" alt="ClaudeBar Dark Mode" width="380"/>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="docs/screenshots/Screenshot-light.png" alt="ClaudeBar Light Mode" width="380"/>
-</p>
-<p align="center">
-  <em>Dark Mode &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Light Mode</em>
-</p>
-
-### CLI Theme
-
-<p align="center">
-  <img src="docs/screenshots/Screenshot-cli-dark.png" alt="ClaudeBar CLI Theme" width="380"/>
-</p>
-<p align="center">
-  <em>Minimalistic monochrome terminal aesthetic with classic green accents</em>
-</p>
-
-### Christmas Theme
-
-<p align="center">
-  <img src="docs/screenshots/Christmas-theme.png" alt="ClaudeBar Christmas Theme" width="380"/>
-</p>
-<p align="center">
-  <em>Festive holiday theme with snowfall animation - automatically enabled during the Christmas season!</em>
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/screenshots/Screenshot-dark.png" alt="Dark Mode" width="360"/><br/><em>Dark Mode</em></td>
+    <td align="center"><img src="docs/screenshots/Screenshot-light.png" alt="Light Mode" width="360"/><br/><em>Light Mode</em></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/Screenshot-cli-dark.png" alt="CLI Theme" width="360"/><br/><em>CLI Theme</em></td>
+    <td align="center"><img src="docs/screenshots/Christmas-theme.png" alt="Christmas Theme" width="360"/><br/><em>Christmas Theme</em></td>
+  </tr>
+</table>
 
 ## Features
 
