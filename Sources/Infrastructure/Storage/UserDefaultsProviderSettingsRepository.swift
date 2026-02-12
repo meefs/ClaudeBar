@@ -3,7 +3,7 @@ import Domain
 
 /// UserDefaults-based implementation of ProviderSettingsRepository and its sub-protocols.
 /// Persists provider settings like isEnabled state and provider-specific configuration.
-public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -190,6 +190,19 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(mode.rawValue, forKey: Keys.codexProbeMode)
     }
 
+    // MARK: - KimiSettingsRepository
+
+    public func kimiProbeMode() -> KimiProbeMode {
+        guard let rawValue = userDefaults.string(forKey: Keys.kimiProbeMode) else {
+            return .cli // Default to CLI mode
+        }
+        return KimiProbeMode(rawValue: rawValue) ?? .cli
+    }
+
+    public func setKimiProbeMode(_ mode: KimiProbeMode) {
+        userDefaults.set(mode.rawValue, forKey: Keys.kimiProbeMode)
+    }
+
     // MARK: - BedrockSettingsRepository
 
     public func awsProfileName() -> String {
@@ -230,6 +243,8 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let claudeProbeMode = "providerConfig.claudeProbeMode"
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
+        // Kimi settings
+        static let kimiProbeMode = "providerConfig.kimiProbeMode"
         static let zaiConfigPath = "providerConfig.zaiConfigPath"
         static let glmAuthEnvVar = "providerConfig.glmAuthEnvVar"
         static let copilotAuthEnvVar = "providerConfig.copilotAuthEnvVar"

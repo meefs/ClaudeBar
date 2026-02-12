@@ -56,12 +56,17 @@ struct SettingsContentView: View {
     @State private var codexConfigExpanded: Bool = false
     @State private var codexProbeMode: CodexProbeMode = .rpc
 
+    // Kimi settings state
+    @State private var kimiConfigExpanded: Bool = false
+    @State private var kimiProbeMode: KimiProbeMode = .cli
+
     private enum ProviderID {
         static let claude = "claude"
         static let codex = "codex"
         static let copilot = "copilot"
         static let zai = "zai"
         static let bedrock = "bedrock"
+        static let kimi = "kimi"
     }
 
     /// The Claude provider from the monitor (cast to ClaudeProvider for probe mode access)
@@ -103,6 +108,15 @@ struct SettingsContentView: View {
         monitor.provider(for: ProviderID.codex) as? CodexProvider
     }
 
+    private var isKimiEnabled: Bool {
+        monitor.provider(for: ProviderID.kimi)?.isEnabled ?? false
+    }
+
+    /// The Kimi provider from the monitor (cast to KimiProvider for probe mode access)
+    private var kimiProvider: KimiProvider? {
+        monitor.provider(for: ProviderID.kimi) as? KimiProvider
+    }
+
     private var isBedrockEnabled: Bool {
         monitor.provider(for: ProviderID.bedrock)?.isEnabled ?? false
     }
@@ -136,6 +150,10 @@ struct SettingsContentView: View {
                     }
                     if isCodexEnabled {
                         codexConfigCard
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                    if isKimiEnabled {
+                        kimiConfigCard
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     if isCopilotEnabled {
@@ -193,6 +211,9 @@ struct SettingsContentView: View {
 
             // Initialize Codex settings
             codexProbeMode = UserDefaultsProviderSettingsRepository.shared.codexProbeMode()
+
+            // Initialize Kimi settings
+            kimiProbeMode = UserDefaultsProviderSettingsRepository.shared.kimiProbeMode()
 
             // Initialize Bedrock settings
             awsProfileNameInput = UserDefaultsProviderSettingsRepository.shared.awsProfileName()
@@ -907,6 +928,138 @@ struct SettingsContentView: View {
                     Text("Run `codex` in terminal to authenticate, then credentials will be available.")
                         .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
                         .foregroundStyle(theme.textTertiary)
+                }
+            }
+        }
+    }
+
+    // MARK: - Kimi Config Card
+
+    private var kimiConfigCard: some View {
+        DisclosureGroup(isExpanded: $kimiConfigExpanded) {
+            Divider()
+                .background(theme.glassBorder)
+                .padding(.vertical, 12)
+
+            kimiConfigForm
+        } label: {
+            kimiConfigHeader
+                .contentShape(.rect)
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        kimiConfigExpanded.toggle()
+                    }
+                }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(theme.cardGradient)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    theme.glassBorder, theme.glassBorder.opacity(0.5)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+    }
+
+    private var kimiConfigHeader: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [theme.accentPrimary.opacity(0.2), theme.accentSecondary.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 28, height: 28)
+
+                Image(systemName: "terminal")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.accentPrimary)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Kimi Configuration")
+                    .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+
+                Text("Data fetching method")
+                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+            }
+
+            Spacer()
+        }
+    }
+
+    private var kimiConfigForm: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Probe Mode
+            VStack(alignment: .leading, spacing: 6) {
+                Text("PROBE MODE")
+                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textSecondary)
+                    .tracking(0.5)
+
+                Picker("", selection: $kimiProbeMode) {
+                    ForEach(KimiProbeMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: kimiProbeMode) { _, newValue in
+                    UserDefaultsProviderSettingsRepository.shared.setKimiProbeMode(newValue)
+                    Task {
+                        await monitor.refresh(providerId: ProviderID.kimi)
+                    }
+                }
+            }
+
+            // Mode descriptions
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 10))
+                        .foregroundStyle(kimiProbeMode == .cli ? theme.accentPrimary : theme.textTertiary)
+                        .frame(width: 16)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("CLI Mode")
+                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .foregroundStyle(kimiProbeMode == .cli ? theme.textPrimary : theme.textSecondary)
+
+                        Text("Uses kimi CLI with /usage command. Requires kimi installed.")
+                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textTertiary)
+                    }
+                }
+
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "network")
+                        .font(.system(size: 10))
+                        .foregroundStyle(kimiProbeMode == .api ? theme.accentPrimary : theme.textTertiary)
+                        .frame(width: 16)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("API Mode")
+                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .foregroundStyle(kimiProbeMode == .api ? theme.textPrimary : theme.textSecondary)
+
+                        Text("Calls Kimi API directly. Uses browser cookie authentication.")
+                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textTertiary)
+                    }
                 }
             }
         }

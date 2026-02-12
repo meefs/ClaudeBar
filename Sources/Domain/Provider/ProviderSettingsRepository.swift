@@ -170,6 +170,18 @@ public protocol CodexSettingsRepository: ProviderSettingsRepository {
     func setCodexProbeMode(_ mode: CodexProbeMode)
 }
 
+/// Kimi-specific settings repository, extending base ProviderSettingsRepository.
+/// Includes configuration for probe mode (CLI vs API).
+/// Tests can use UserDefaultsProviderSettingsRepository with test UserDefaults.
+/// App uses UserDefaultsProviderSettingsRepository.
+public protocol KimiSettingsRepository: ProviderSettingsRepository {
+    /// Gets the probe mode for Kimi (CLI or API)
+    func kimiProbeMode() -> KimiProbeMode
+
+    /// Sets the probe mode for Kimi
+    func setKimiProbeMode(_ mode: KimiProbeMode)
+}
+
 // MARK: - Default Implementation
 
 public extension ProviderSettingsRepository {
