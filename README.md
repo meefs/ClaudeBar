@@ -8,7 +8,7 @@
 [![Platform](https://img.shields.io/badge/Platform-macOS%2015-blue.svg)](https://developer.apple.com)
 [![Homebrew](https://img.shields.io/badge/Homebrew-Install-brightgreen.svg)](https://formulae.brew.sh/cask/claudebar)
 
-A macOS menu bar application that monitors AI coding assistant usage quotas. Keep track of your Claude, Codex, Gemini, GitHub Copilot, Antigravity, and Z.ai usage at a glance.
+A macOS menu bar application that monitors AI coding assistant usage quotas. Keep track of your Claude, Codex, Gemini, GitHub Copilot, Antigravity, Z.ai, Kimi, and Amp usage at a glance.
 
 <p align="center">
   <img src="docs/screenshots/Screenshot-dark.png" alt="ClaudeBar Dark Mode" width="380"/>
@@ -39,7 +39,7 @@ A macOS menu bar application that monitors AI coding assistant usage quotas. Kee
 
 ## Features
 
-- **Multi-Provider Support** - Monitor Claude, Codex, Gemini, GitHub Copilot, Antigravity, and Z.ai quotas in one place
+- **Multi-Provider Support** - Monitor Claude, Codex, Gemini, GitHub Copilot, Antigravity, Z.ai, Kimi, and Amp quotas in one place
 - **Provider Enable/Disable** - Toggle individual providers on/off from Settings to customize your monitoring
 - **Real-Time Quota Tracking** - View Session, Weekly, and Model-specific usage percentages
 - **Multiple Themes** - Light, Dark, CLI (terminal-style), and festive Christmas themes
@@ -69,6 +69,19 @@ A macOS menu bar application that monitors AI coding assistant usage quotas. Kee
   - [GitHub Copilot](https://github.com/features/copilot) - Configure credentials in Settings
   - [Antigravity](https://antigravity.google) - Auto-detected when running locally
   - [Z.ai](https://z.ai/subscribe) - Configure Claude Code with GLM Coding Plan endpoint
+  - [Kimi](https://www.kimi.com/code/console) - Requires **Full Disk Access** (see below)
+  - [Amp](https://ampcode.com) (`amp`) - Auto-detected when CLI is installed
+
+### Kimi Setup (Full Disk Access)
+
+Kimi authenticates by reading the `kimi-auth` browser cookie. macOS requires **Full Disk Access** for apps to read browser cookie databases.
+
+To enable:
+1. Open **System Settings** → **Privacy & Security** → **Full Disk Access**
+2. Toggle **ClaudeBar** on (or click `+` and add it)
+3. Restart ClaudeBar
+
+Without Full Disk Access, Kimi will show as unavailable. You can also set the `KIMI_AUTH_TOKEN` environment variable to bypass cookie reading.
 
 ## Installation
 
