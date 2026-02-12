@@ -27,7 +27,6 @@ struct SettingsContentView: View {
     @State private var providersExpanded: Bool = false
     @State private var zaiConfigExpanded: Bool = false
     @State private var updatesExpanded: Bool = false
-    @State private var aggregateViewExpanded: Bool = false
     @State private var backgroundSyncExpanded: Bool = false
 
     // Budget input state
@@ -142,7 +141,7 @@ struct SettingsContentView: View {
                 VStack(spacing: 12) {
                     themeCard
                     displayModeCard
-                    aggregateViewCard
+                    overviewModeCard
                     providersCard
                     if isClaudeEnabled {
                         claudeConfigCard
@@ -347,73 +346,9 @@ struct SettingsContentView: View {
         }
     }
 
-    // MARK: - Aggregate View Card
+    // MARK: - Overview Mode Card
 
-    private var aggregateViewCard: some View {
-        DisclosureGroup(isExpanded: $aggregateViewExpanded) {
-            Divider()
-                .background(theme.glassBorder)
-                .padding(.vertical, 12)
-
-            VStack(alignment: .leading, spacing: 12) {
-                // Enable/disable toggle
-                HStack {
-                    Text("Enable Aggregate View")
-                        .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textPrimary)
-
-                    Spacer()
-
-                    Toggle("", isOn: Binding(
-                        get: { settings.aggregateViewEnabled },
-                        set: { newValue in
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                settings.aggregateViewEnabled = newValue
-                            }
-                        }
-                    ))
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(theme.accentPrimary)
-                }
-
-                // Provider checkboxes (only when enabled)
-                if settings.aggregateViewEnabled {
-                    Divider()
-                        .background(theme.glassBorder)
-
-                    Text("Select providers to display:")
-                        .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textTertiary)
-
-                    VStack(spacing: 8) {
-                        ForEach(monitor.enabledProviders, id: \.id) { provider in
-                            aggregateProviderCheckbox(provider: provider)
-                        }
-                    }
-                }
-            }
-        } label: {
-            aggregateViewHeader
-                .contentShape(.rect)
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        aggregateViewExpanded.toggle()
-                    }
-                }
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                .fill(theme.cardGradient)
-                .overlay(
-                    RoundedRectangle(cornerRadius: theme.cardCornerRadius)
-                        .stroke(theme.glassBorder, lineWidth: 1)
-                )
-        )
-    }
-
-    private var aggregateViewHeader: some View {
+    private var overviewModeCard: some View {
         HStack(spacing: 10) {
             ZStack {
                 Circle()
@@ -426,46 +361,22 @@ struct SettingsContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Aggregate View")
+                Text("Overview")
                     .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
                     .foregroundStyle(theme.textPrimary)
 
-                Text("Show multiple providers at once")
+                Text("Show all providers at once")
                     .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
             }
 
             Spacer()
 
-            if settings.aggregateViewEnabled {
-                Text("\(settings.aggregateProviderIds.count)")
-                    .font(.system(size: 10, weight: .bold, design: theme.fontDesign))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(theme.accentPrimary))
-            }
-        }
-    }
-
-    private func aggregateProviderCheckbox(provider: any AIProvider) -> some View {
-        let isChecked = settings.aggregateProviderIds.contains(provider.id)
-        return HStack(spacing: 10) {
-            ProviderIconView(providerId: provider.id, size: 20)
-
-            Text(provider.name)
-                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                .foregroundStyle(theme.textPrimary)
-
-            Spacer()
-
             Toggle("", isOn: Binding(
-                get: { isChecked },
+                get: { settings.overviewModeEnabled },
                 set: { newValue in
-                    if newValue {
-                        settings.aggregateProviderIds.insert(provider.id)
-                    } else {
-                        settings.aggregateProviderIds.remove(provider.id)
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        settings.overviewModeEnabled = newValue
                     }
                 }
             ))
@@ -473,6 +384,15 @@ struct SettingsContentView: View {
             .controlSize(.small)
             .tint(theme.accentPrimary)
         }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: theme.cardCornerRadius)
+                .fill(theme.cardGradient)
+                .overlay(
+                    RoundedRectangle(cornerRadius: theme.cardCornerRadius)
+                        .stroke(theme.glassBorder, lineWidth: 1)
+                )
+        )
     }
 
     // MARK: - Providers Card
