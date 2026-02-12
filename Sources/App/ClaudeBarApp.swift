@@ -62,6 +62,7 @@ struct ClaudeBarApp: App {
                 settingsRepository: settingsRepository
             ),
             AmpCodeProvider(probe: AmpCodeUsageProbe(), settingsRepository: settingsRepository),
+            KimiProvider(probe: KimiUsageProbe(), settingsRepository: settingsRepository),
         ])
         AppLog.providers.info("Created \(repository.all.count) providers")
 

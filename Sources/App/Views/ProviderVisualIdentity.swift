@@ -240,6 +240,34 @@ extension AmpCodeProvider: ProviderVisualIdentity {
     }
 }
 
+// MARK: - KimiProvider Visual Identity
+
+extension KimiProvider: ProviderVisualIdentity {
+    public var symbolIcon: String { "k.square.fill" }
+
+    public var iconAssetName: String { "KimiIcon" }
+
+    public func themeColor(for scheme: ColorScheme) -> Color {
+        // Blue/cyan color matching Kimi branding
+        scheme == .dark
+            ? Color(red: 0.30, green: 0.65, blue: 0.95)
+            : Color(red: 0.20, green: 0.55, blue: 0.85)
+    }
+
+    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
+        LinearGradient(
+            colors: [
+                themeColor(for: scheme),
+                scheme == .dark
+                    ? Color(red: 0.20, green: 0.50, blue: 0.80)
+                    : Color(red: 0.10, green: 0.40, blue: 0.70)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 // MARK: - AIProvider Visual Identity Helper
 
 /// Extension to access visual identity from any AIProvider.
@@ -316,6 +344,10 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 0.95, green: 0.30, blue: 0.25)
                 : Color(red: 0.90, green: 0.25, blue: 0.20)
+        case "kimi":
+            return scheme == .dark
+                ? Color(red: 0.30, green: 0.65, blue: 0.95)
+                : Color(red: 0.20, green: 0.55, blue: 0.85)
         default:
             return BaseTheme.purpleVibrant
         }
@@ -359,6 +391,10 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.20, blue: 0.15)
                 : Color(red: 0.80, green: 0.15, blue: 0.10)
+        case "kimi":
+            secondaryColor = scheme == .dark
+                ? Color(red: 0.20, green: 0.50, blue: 0.80)
+                : Color(red: 0.10, green: 0.40, blue: 0.70)
         default:
             return LinearGradient(
                 colors: [BaseTheme.coralAccent, BaseTheme.pinkHot],
@@ -385,6 +421,7 @@ enum ProviderVisualIdentityLookup {
         case "zai": return "ZaiIcon"
         case "bedrock": return "BedrockIcon"
         case "ampcode": return "AmpCodeIcon"
+        case "kimi": return "KimiIcon"
         default: return "QuestionIcon"
         }
     }
@@ -400,6 +437,7 @@ enum ProviderVisualIdentityLookup {
         case "zai": return "Z.ai"
         case "bedrock": return "AWS Bedrock"
         case "ampcode": return "Amp"
+        case "kimi": return "Kimi"
         default: return providerId.capitalized
         }
     }
@@ -415,6 +453,7 @@ enum ProviderVisualIdentityLookup {
         case "zai": return "z.square.fill"
         case "bedrock": return "cloud.fill"
         case "ampcode": return "bolt.fill"
+        case "kimi": return "k.square.fill"
         default: return "questionmark.circle.fill"
         }
     }
