@@ -93,7 +93,12 @@ public struct KimiUsageProbe: UsageProbe {
             throw ProbeError.executionFailed("Kimi API returned HTTP \(httpResponse.statusCode): \(body)")
         }
 
-        // Step 4: Parse response
+        // Step 4: Log raw response for debugging
+        if let rawString = String(data: data, encoding: .utf8) {
+            AppLog.probes.debug("Kimi raw response: \(rawString.prefix(2000))")
+        }
+
+        // Step 5: Parse response
         let snapshot = try Self.parseResponse(data, providerId: "kimi")
 
         AppLog.probes.info("Kimi probe success: \(snapshot.quotas.count) quotas found")
