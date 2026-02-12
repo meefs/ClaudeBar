@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.32] - 2026-02-12
+
+### Added
+- **Overview Mode**: New "Overview" toggle in Settings to display all enabled providers at once in a single scrollable view. Ideal for juggling multiple AI assistants (Claude + Codex + Kimi + ...) throughout the day — see all your quotas at a glance without switching between pills.
+
+### Technical
+- Added `overviewModeEnabled` setting to `AppSettings` with UserDefaults persistence
+- Added scrollable overview layout with per-provider sections reusing existing stat cards, capped at 80% screen height
+
 ## [0.4.31] - 2026-02-12
 
 ### Added

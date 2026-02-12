@@ -32,14 +32,8 @@ public final class QuotaMonitor: @unchecked Sendable {
     /// Whether monitoring is active
     public private(set) var isMonitoring: Bool = false
 
-    /// The currently selected provider IDs (for UI display, supports multi-select)
-    public var selectedProviderIds: Set<String> = ["claude"]
-
-    /// Backward-compatible single-select accessor
-    public var selectedProviderId: String {
-        get { selectedProviderIds.first ?? "claude" }
-        set { selectedProviderIds = [newValue] }
-    }
+    /// The currently selected provider ID (for UI display)
+    public var selectedProviderId: String = "claude"
 
     // MARK: - Initialization
 
@@ -166,21 +160,14 @@ public final class QuotaMonitor: @unchecked Sendable {
 
     // MARK: - Selection
 
-    /// All selected providers (from enabled providers, preserving providers order)
-    public var selectedProviders: [any AIProvider] {
-        providers.enabled.filter { selectedProviderIds.contains($0.id) }
-    }
-
-    /// The currently selected provider (first selected, for backward compat)
+    /// The currently selected provider (from enabled providers)
     public var selectedProvider: (any AIProvider)? {
-        selectedProviders.first
+        providers.enabled.first { $0.id == selectedProviderId }
     }
 
-    /// Status across all selected providers (worst status wins, for menu bar icon)
+    /// Status of the currently selected provider (for menu bar icon)
     public var selectedProviderStatus: QuotaStatus {
-        selectedProviders
-            .compactMap(\.snapshot?.overallStatus)
-            .max() ?? .healthy
+        selectedProvider?.snapshot?.overallStatus ?? .healthy
     }
 
     /// Whether any provider is currently refreshing
@@ -188,48 +175,30 @@ public final class QuotaMonitor: @unchecked Sendable {
         providers.all.contains { $0.isSyncing }
     }
 
-    /// Toggles a provider in/out of the multi-select set.
-    /// Cannot deselect the last provider.
-    public func toggleProviderSelection(id: String) {
-        guard providers.enabled.contains(where: { $0.id == id }) else { return }
-        if selectedProviderIds.contains(id) {
-            guard selectedProviderIds.count > 1 else { return }
-            selectedProviderIds.remove(id)
-        } else {
-            selectedProviderIds.insert(id)
-        }
-    }
-
-    /// Selects a provider by ID, replacing the entire selection (must be enabled)
+    /// Selects a provider by ID (must be enabled)
     public func selectProvider(id: String) {
         if providers.enabled.contains(where: { $0.id == id }) {
-            selectedProviderIds = [id]
+            selectedProviderId = id
         }
     }
 
     /// Sets a provider's enabled state.
-    /// When disabling a selected provider, removes it from the selection.
-    /// If no providers remain selected, auto-selects the first enabled.
+    /// When disabling the currently selected provider, automatically switches
+    /// to the first available enabled provider.
     public func setProviderEnabled(_ id: String, enabled: Bool) {
         guard let provider = providers.provider(id: id) else { return }
         provider.isEnabled = enabled
         if !enabled {
-            selectedProviderIds.remove(id)
-            if selectedProviderIds.isEmpty {
-                selectFirstEnabledIfNeeded()
-            }
+            selectFirstEnabledIfNeeded()
         }
     }
 
     /// Selects the first enabled provider if current selection is invalid.
     /// Called automatically during initialization and when providers are disabled.
     private func selectFirstEnabledIfNeeded() {
-        let enabledIds = Set(providers.enabled.map(\.id))
-        let validSelection = selectedProviderIds.intersection(enabledIds)
-        if validSelection.isEmpty, let firstEnabled = providers.enabled.first {
-            selectedProviderIds = [firstEnabled.id]
-        } else {
-            selectedProviderIds = validSelection
+        if !providers.enabled.contains(where: { $0.id == selectedProviderId }),
+           let firstEnabled = providers.enabled.first {
+            selectedProviderId = firstEnabled.id
         }
     }
 
