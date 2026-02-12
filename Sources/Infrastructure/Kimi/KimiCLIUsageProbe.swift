@@ -74,58 +74,64 @@ public struct KimiCLIUsageProbe: UsageProbe {
 
     /// Parses the Kimi CLI `/usage` output into a UsageSnapshot.
     ///
-    /// Expected format per quota line:
+    /// Looks for lines containing known quota labels ("Weekly limit", "5h limit")
+    /// with `N% left` and `(resets in ...)`. Strips ANSI escape codes first
+    /// so colored progress bars in release builds don't interfere.
+    ///
+    /// Expected format per quota line (with or without progress bars):
     /// ```
     /// Weekly limit  ━━━━━━━━━━━━━━━━━━━━  100% left  (resets in 6d 23h 22m)
-    /// 5h limit      ━━━━━━━━━━━━━━━━━━━━  75% left   (resets in 4h 22m)
+    /// 5h limit                            75% left   (resets in 4h 22m)
     /// ```
     public static func parse(_ text: String) throws -> UsageSnapshot {
-        // Pattern: label + optional progress bar + percent + "left" + reset info
-        // Real CLI output may omit progress bar chars (just whitespace between label and %)
-        let pattern = #"([\w\s]+?)\s{2,}[━░─]*\s*(\d+)%\s+left\s+\(resets\s+in\s+(.+?)\)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-            throw ProbeError.parseFailed("Invalid regex pattern")
-        }
-
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        let matches = regex.matches(in: text, options: [], range: range)
-
-        guard !matches.isEmpty else {
-            throw ProbeError.parseFailed("No quota data found in Kimi CLI output")
-        }
-
+        let clean = stripANSICodes(text)
         var quotas: [UsageQuota] = []
 
-        for match in matches {
-            guard match.numberOfRanges >= 4,
-                  let labelRange = Range(match.range(at: 1), in: text),
-                  let percentRange = Range(match.range(at: 2), in: text),
-                  let resetRange = Range(match.range(at: 3), in: text) else {
+        for line in clean.components(separatedBy: .newlines) {
+            let lower = line.lowercased()
+
+            // Only process lines that contain "% left"
+            guard lower.contains("% left") else { continue }
+
+            // Determine quota type from known labels
+            let quotaType: QuotaType
+            if lower.contains("weekly") {
+                quotaType = .weekly
+            } else if lower.contains("5h") || lower.contains("hour") {
+                quotaType = .session
+            } else {
                 continue
             }
 
-            let label = String(text[labelRange]).trimmingCharacters(in: .whitespaces).lowercased()
-            let percent = Double(text[percentRange]) ?? 0.0
-            let resetText = String(text[resetRange]).trimmingCharacters(in: .whitespaces)
-
-            let quotaType: QuotaType
-            if label.contains("weekly") {
-                quotaType = .weekly
-            } else if label.contains("5h") || label.contains("hour") {
-                quotaType = .session
-            } else {
-                quotaType = .timeLimit(label)
+            // Extract percent: look for "N% left"
+            guard let percentMatch = line.range(of: #"(\d+)%\s+left"#, options: .regularExpression),
+                  let percent = Double(line[percentMatch].prefix(while: { $0.isNumber })) else {
+                continue
             }
 
-            let resetsAt = parseResetDuration(resetText)
+            // Extract reset text: look for "(resets in ...)"
+            var resetText: String?
+            var resetsAt: Date?
+            if let resetMatch = line.range(of: #"\(resets\s+in\s+(.+?)\)"#, options: .regularExpression) {
+                let raw = String(line[resetMatch])
+                    .replacingOccurrences(of: "(resets in ", with: "")
+                    .replacingOccurrences(of: ")", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                resetText = "Resets in \(raw)"
+                resetsAt = parseResetDuration(raw)
+            }
 
             quotas.append(UsageQuota(
                 percentRemaining: percent,
                 quotaType: quotaType,
                 providerId: "kimi",
                 resetsAt: resetsAt,
-                resetText: "Resets in \(resetText)"
+                resetText: resetText
             ))
+        }
+
+        guard !quotas.isEmpty else {
+            throw ProbeError.parseFailed("No quota data found in Kimi CLI output")
         }
 
         return UsageSnapshot(
@@ -136,6 +142,12 @@ public struct KimiCLIUsageProbe: UsageProbe {
     }
 
     // MARK: - Private Helpers
+
+    /// Strips ANSI escape sequences (colors, cursor control) from terminal output.
+    internal static func stripANSICodes(_ text: String) -> String {
+        let pattern = #"\x1B(?:[@-Z\\-_]|\[[0-9;?]*[ -/]*[@-~])"#
+        return text.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+    }
 
     /// Parses a relative duration string like "6d 23h 22m" or "4h 22m" into a future Date.
     static func parseResetDuration(_ text: String) -> Date? {
