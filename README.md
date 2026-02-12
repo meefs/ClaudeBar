@@ -76,7 +76,7 @@ You can also set the `KIMI_AUTH_TOKEN` environment variable to bypass cookie rea
 Install via [Homebrew](https://brew.sh).
 
 ```bash
-brew install claudebar
+brew install --cask claudebar
 ```
 
 ### Download (Recommended)
