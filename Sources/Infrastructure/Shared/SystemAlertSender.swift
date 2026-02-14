@@ -3,7 +3,9 @@ import UserNotifications
 
 /// System alert sender using macOS UNUserNotificationCenter.
 /// This is excluded from code coverage as it's a pure adapter for system APIs.
-final class SystemAlertSender: AlertSender, @unchecked Sendable {
+public final class SystemAlertSender: AlertSender, @unchecked Sendable {
+
+    public init() {}
 
     private var notificationCenter: UNUserNotificationCenter? {
         guard Bundle.main.bundleIdentifier != nil else {
@@ -44,7 +46,7 @@ final class SystemAlertSender: AlertSender, @unchecked Sendable {
         }
     }
 
-    func send(title: String, body: String, categoryIdentifier: String) async throws {
+    public func send(title: String, body: String, categoryIdentifier: String) async throws {
         guard let center = notificationCenter else { return }
 
         let content = UNMutableNotificationContent()

@@ -20,6 +20,9 @@ struct ClaudeBarApp: App {
     /// Alerts users when quota status degrades
     private let quotaAlerter = NotificationAlerter()
 
+    /// Sends session start/end notifications
+    private let sessionAlertSender = SystemAlertSender()
+
     #if ENABLE_SPARKLE
     /// Sparkle updater for auto-updates
     @State private var sparkleUpdater = SparkleUpdater()
@@ -110,10 +113,41 @@ struct ClaudeBarApp: App {
                 AppLog.hooks.info("Hook server started, listening for events")
                 for await event in events {
                     sessionMonitor.processEvent(event)
+                    sendSessionNotification(for: event)
                 }
             } catch {
                 AppLog.hooks.error("Failed to start hook server: \(error.localizedDescription)")
             }
+        }
+    }
+
+    private func sendSessionNotification(for event: SessionEvent) {
+        let projectName = (event.cwd as NSString).lastPathComponent
+
+        switch event.eventName {
+        case .sessionStart:
+            Task {
+                try? await sessionAlertSender.send(
+                    title: "Claude Code Started",
+                    body: "Session started in \(projectName)",
+                    categoryIdentifier: "SESSION_START"
+                )
+            }
+        case .sessionEnd:
+            let taskCount = sessionMonitor.recentSessions.first?.completedTaskCount ?? 0
+            let duration = sessionMonitor.recentSessions.first?.durationDescription ?? ""
+            let summary = taskCount > 0
+                ? "Completed \(taskCount) task\(taskCount == 1 ? "" : "s") in \(duration)"
+                : "Session ended after \(duration)"
+            Task {
+                try? await sessionAlertSender.send(
+                    title: "Claude Code Finished",
+                    body: "\(projectName) — \(summary)",
+                    categoryIdentifier: "SESSION_END"
+                )
+            }
+        default:
+            break
         }
     }
 
