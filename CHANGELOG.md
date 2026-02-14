@@ -14,18 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Menu bar indicator**: A terminal icon appears next to the quota icon with phase-colored status (green = active, blue = subagents working, orange = stopped)
   - **Session card**: Detailed session info in the popover showing phase, task count, active subagents, duration, and working directory
   - **System notifications**: Get notified when a session starts ("Claude Code Started") and finishes ("Claude Code Finished — Completed 3 tasks in 2m 5s")
-- **Hook Settings**: New "Claude Code Hooks" section in Settings with a single toggle to enable/disable. Automatically installs/uninstalls hooks in `~/.claude/settings.json`.
+- **Hook Settings**: New "Claude Code Hooks" section in Settings with a single toggle to enable/disable. Automatically installs/uninstalls hooks in `~/.claude/settings.json`. Server starts/stops reactively when the toggle changes.
+- **Copilot Internal API Probe**: New dual probe mode for GitHub Copilot, supporting Business and Enterprise plans where the Billing API returns 404. Switchable in Settings between "Billing API" (default) and "Copilot API" (`copilot_internal/user`) modes.
+
+### Fixed
+- **HookHTTPServer deadlock**: Removed `queue.sync` calls inside NWListener callbacks that already run on the same serial queue, preventing a crash on startup.
+- **Hook format**: Updated hook installer to use Claude Code's new matcher-based format (`{"matcher": ".*", "hooks": [...]}`) instead of the deprecated flat format.
 
 ### Technical
-- Added `SessionEvent`, `ClaudeSession`, and `SessionMonitor` domain models for session lifecycle tracking
+- Added `SessionEvent`, `ClaudeSession`, and `SessionMonitor` (`@MainActor`) domain models for session lifecycle tracking
 - Added `HookHTTPServer` using Network.framework (`NWListener`) for localhost-only event reception on port 19847
 - Added `SessionEventParser` for parsing Claude Code hook JSON payloads
-- Added `HookInstaller` for auto-managing hooks in `~/.claude/settings.json` using the new matcher-based format
+- Added `HookInstaller` with atomic writes and corruption-safe JSON handling
 - Added `PortDiscovery` for writing/reading `~/.claude/claudebar-hook-port`
 - Added `HookSettingsRepository` protocol and `UserDefaults` implementation
+- Added `CopilotProbeMode` enum, `CopilotInternalAPIProbe`, and dual probe support in `CopilotProvider`
 - Added `com.apple.security.network.server` entitlement for `NWListener`
 - Added `AppLog.hooks` logging category
-- Added `LiveActivityManager` placeholder for future ActivityKit support (currently unavailable on macOS)
+- Extracted `ClaudeSession.Phase.label` and `.color` extensions to deduplicate phase display logic
+- Added `HookConstants.defaultPort` as single source of truth for port 19847
 
 ## [0.4.32] - 2026-02-12
 
