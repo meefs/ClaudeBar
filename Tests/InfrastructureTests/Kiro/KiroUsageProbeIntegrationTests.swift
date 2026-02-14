@@ -1,18 +1,18 @@
-import XCTest
+import Testing
 @testable import Infrastructure
 
-final class KiroUsageProbeIntegrationTests: XCTestCase {
-    func testKiroCLIExecution() async throws {
+@Suite("KiroUsageProbe Integration Tests")
+struct KiroUsageProbeIntegrationTests {
+    @Test
+    func `execute kiro-cli and parse usage`() async throws {
         let probe = KiroUsageProbe()
         
-        guard await probe.isAvailable() else {
-            throw XCTSkip("kiro-cli not available")
-        }
+        try #require(await probe.isAvailable(), "kiro-cli not available")
         
         let snapshot = try await probe.probe()
         
-        XCTAssertEqual(snapshot.providerId, "kiro")
-        XCTAssertFalse(snapshot.quotas.isEmpty, "Should have at least one quota")
+        #expect(snapshot.providerId == "kiro")
+        #expect(!snapshot.quotas.isEmpty, "Should have at least one quota")
         
         print("✅ Quotas found: \(snapshot.quotas.count)")
         for quota in snapshot.quotas {

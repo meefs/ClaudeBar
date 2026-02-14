@@ -1,10 +1,12 @@
-import XCTest
+import Testing
 @testable import Infrastructure
 @testable import Domain
 
-final class KiroUsageProbeParsingTests: XCTestCase {
+@Suite("KiroUsageProbe Parsing Tests")
+struct KiroUsageProbeParsingTests {
     
-    func testParseNormalOutput() throws {
+    @Test
+    func `parse normal output with both bonus and regular credits`() throws {
         let output = """
         Estimated Usage | resets on 03/01 | KIRO FREE
         
@@ -16,41 +18,43 @@ final class KiroUsageProbeParsingTests: XCTestCase {
         
         let snapshot = try KiroUsageProbe.parse(output)
         
-        XCTAssertEqual(snapshot.providerId, "kiro")
-        XCTAssertEqual(snapshot.quotas.count, 2)
+        #expect(snapshot.providerId == "kiro")
+        #expect(snapshot.quotas.count == 2)
         
         // Bonus credits (weekly)
         let bonus = snapshot.quotas.first { $0.quotaType == .weekly }
-        XCTAssertNotNil(bonus)
+        #expect(bonus != nil)
         if let bonus = bonus {
-            XCTAssertEqual(bonus.percentRemaining, 75.492, accuracy: 0.01)
-            XCTAssertNotNil(bonus.resetsAt)
-            XCTAssertEqual(bonus.resetText, "Expires in 29 days")
+            #expect(abs(bonus.percentRemaining - 75.492) < 0.01)
+            #expect(bonus.resetsAt != nil)
+            #expect(bonus.resetText == "Expires in 29 days")
         }
         
         // Regular credits (monthly)
         let regular = snapshot.quotas.first { $0.quotaType == .timeLimit("Monthly") }
-        XCTAssertNotNil(regular)
+        #expect(regular != nil)
         if let regular = regular {
-            XCTAssertEqual(regular.percentRemaining, 100.0, accuracy: 0.01)
-            XCTAssertNotNil(regular.resetsAt)
-            XCTAssertEqual(regular.resetText, "Resets on 03/01")
+            #expect(abs(regular.percentRemaining - 100.0) < 0.01)
+            #expect(regular.resetsAt != nil)
+            #expect(regular.resetText == "Resets on 03/01")
         }
     }
     
-    func testParseBonusCreditsOnly() throws {
+    @Test
+    func `parse bonus credits only`() throws {
         let output = """
         🎁 Bonus credits: 250.0/500 credits used, expires in 15 days
         """
         
         let snapshot = try KiroUsageProbe.parse(output)
         
-        XCTAssertEqual(snapshot.quotas.count, 1)
-        XCTAssertEqual(snapshot.quotas[0].quotaType, .weekly)
-        XCTAssertEqual(snapshot.quotas[0].percentRemaining, 50.0, accuracy: 0.01)
+        #expect(snapshot.quotas.count == 1)
+        #expect(snapshot.quotas[0].quotaType == .weekly)
+        #expect(abs(snapshot.quotas[0].percentRemaining - 50.0) < 0.01)
     }
     
-    func testParseRegularCreditsOnly() throws {
+    @Test
+    func `parse regular credits only`() throws {
         let output = """
         Credits (25.0 of 50 covered in plan)
         resets on 03/15
@@ -58,34 +62,31 @@ final class KiroUsageProbeParsingTests: XCTestCase {
         
         let snapshot = try KiroUsageProbe.parse(output)
         
-        XCTAssertEqual(snapshot.quotas.count, 1)
-        XCTAssertEqual(snapshot.quotas[0].quotaType, .timeLimit("Monthly"))
-        XCTAssertEqual(snapshot.quotas[0].percentRemaining, 50.0, accuracy: 0.01)
+        #expect(snapshot.quotas.count == 1)
+        #expect(snapshot.quotas[0].quotaType == .timeLimit("Monthly"))
+        #expect(abs(snapshot.quotas[0].percentRemaining - 50.0) < 0.01)
     }
     
-    func testParseEmptyOutput() {
+    @Test
+    func `parse empty output throws error`() {
         let output = ""
         
-        XCTAssertThrowsError(try KiroUsageProbe.parse(output)) { error in
-            guard case ProbeError.parseFailed = error else {
-                XCTFail("Expected parseFailed error")
-                return
-            }
+        #expect(throws: ProbeError.self) {
+            try KiroUsageProbe.parse(output)
         }
     }
     
-    func testParseMalformedOutput() {
+    @Test
+    func `parse malformed output throws error`() {
         let output = "Some random text without quota data"
         
-        XCTAssertThrowsError(try KiroUsageProbe.parse(output)) { error in
-            guard case ProbeError.parseFailed = error else {
-                XCTFail("Expected parseFailed error")
-                return
-            }
+        #expect(throws: ProbeError.self) {
+            try KiroUsageProbe.parse(output)
         }
     }
     
-    func testParseZeroTotalCredits() throws {
+    @Test
+    func `parse zero total credits throws error`() {
         let output = """
         🎁 Bonus credits: 0.0/0 credits used, expires in 10 days
         Credits (0.00 of 0 covered in plan)
@@ -93,15 +94,13 @@ final class KiroUsageProbeParsingTests: XCTestCase {
         
         // Should not crash with division by zero
         // Should skip quotas with zero total
-        XCTAssertThrowsError(try KiroUsageProbe.parse(output)) { error in
-            guard case ProbeError.parseFailed = error else {
-                XCTFail("Expected parseFailed error when no valid quotas")
-                return
-            }
+        #expect(throws: ProbeError.self) {
+            try KiroUsageProbe.parse(output)
         }
     }
     
-    func testParseWithoutResetInfo() throws {
+    @Test
+    func `parse without reset info`() throws {
         let output = """
         🎁 Bonus credits: 100.0/500 credits used
         Credits (10.0 of 50 covered in plan)
@@ -109,16 +108,17 @@ final class KiroUsageProbeParsingTests: XCTestCase {
         
         let snapshot = try KiroUsageProbe.parse(output)
         
-        XCTAssertEqual(snapshot.quotas.count, 2)
+        #expect(snapshot.quotas.count == 2)
         
         // Both should have nil resetsAt and resetText
         for quota in snapshot.quotas {
-            XCTAssertNil(quota.resetsAt)
-            XCTAssertNil(quota.resetText)
+            #expect(quota.resetsAt == nil)
+            #expect(quota.resetText == nil)
         }
     }
     
-    func testParseWithANSIEscapeCodes() throws {
+    @Test
+    func `parse with ANSI escape codes`() throws {
         let output = """
         \u{001B}[38;5;141mEstimated Usage\u{001B}[0m | resets on 03/01 | \u{001B}[38;5;141mKIRO FREE\u{001B}[0m
         
@@ -129,8 +129,8 @@ final class KiroUsageProbeParsingTests: XCTestCase {
         
         let snapshot = try KiroUsageProbe.parse(output)
         
-        XCTAssertEqual(snapshot.quotas.count, 2)
-        XCTAssertEqual(snapshot.quotas[0].percentRemaining, 75.492, accuracy: 0.01)
-        XCTAssertEqual(snapshot.quotas[1].percentRemaining, 100.0, accuracy: 0.01)
+        #expect(snapshot.quotas.count == 2)
+        #expect(abs(snapshot.quotas[0].percentRemaining - 75.492) < 0.01)
+        #expect(abs(snapshot.quotas[1].percentRemaining - 100.0) < 0.01)
     }
 }
