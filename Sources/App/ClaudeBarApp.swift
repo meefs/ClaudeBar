@@ -11,6 +11,12 @@ struct ClaudeBarApp: App {
     /// This is the single source of truth for providers and their state
     @State private var monitor: QuotaMonitor
 
+    /// Monitors Claude Code sessions via hook events
+    @State private var sessionMonitor = SessionMonitor()
+
+    /// The hook HTTP server that receives events from Claude Code
+    private let hookServer = HookHTTPServer()
+
     /// Alerts users when quota status degrades
     private let quotaAlerter = NotificationAlerter()
 
@@ -78,6 +84,11 @@ struct ClaudeBarApp: App {
         )
         AppLog.monitor.info("QuotaMonitor initialized")
 
+        // Start hook server if hooks are enabled
+        if settingsRepository.isHookEnabled() {
+            startHookServer()
+        }
+
         // Note: Notification permission is requested in onAppear, not here
         // Menu bar apps need the run loop to be active before requesting permissions
 
@@ -92,19 +103,33 @@ struct ClaudeBarApp: App {
         ThemeMode(rawValue: settings.themeMode) ?? .system
     }
 
+    private func startHookServer() {
+        Task {
+            do {
+                let events = try await hookServer.start()
+                AppLog.hooks.info("Hook server started, listening for events")
+                for await event in events {
+                    sessionMonitor.processEvent(event)
+                }
+            } catch {
+                AppLog.hooks.error("Failed to start hook server: \(error.localizedDescription)")
+            }
+        }
+    }
+
     var body: some Scene {
         MenuBarExtra {
             #if ENABLE_SPARKLE
-            MenuContentView(monitor: monitor, quotaAlerter: quotaAlerter)
+            MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter)
                 .appThemeProvider(themeModeId: settings.themeMode)
                 .environment(\.sparkleUpdater, sparkleUpdater)
             #else
-            MenuContentView(monitor: monitor, quotaAlerter: quotaAlerter)
+            MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter)
                 .appThemeProvider(themeModeId: settings.themeMode)
             #endif
         } label: {
-            // Show overall status (worst across all enabled providers) in menu bar
-            StatusBarIcon(status: monitor.selectedProviderStatus)
+            // Show overall status + active session indicator in menu bar
+            StatusBarIcon(status: monitor.selectedProviderStatus, activeSession: sessionMonitor.activeSession)
                 .appThemeProvider(themeModeId: settings.themeMode)
         }
         .menuBarExtraStyle(.window)
@@ -112,16 +137,30 @@ struct ClaudeBarApp: App {
 }
 
 /// The menu bar icon that reflects the overall quota status.
+/// When a Claude Code session is active, shows a terminal icon with phase color.
 /// Uses theme's `statusBarIconName` if set, otherwise shows status-based icons.
 struct StatusBarIcon: View {
     let status: QuotaStatus
+    var activeSession: ClaudeSession? = nil
 
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        Image(systemName: iconName)
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(iconColor)
+        if let session = activeSession {
+            // Active session: show terminal icon with phase color
+            HStack(spacing: 3) {
+                Image(systemName: "terminal.fill")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(sessionPhaseColor(session.phase))
+                Image(systemName: iconName)
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(iconColor)
+            }
+        } else {
+            Image(systemName: iconName)
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(iconColor)
+        }
     }
 
     private var iconName: String {
@@ -142,6 +181,15 @@ struct StatusBarIcon: View {
 
     private var iconColor: Color {
         theme.statusColor(for: status)
+    }
+
+    private func sessionPhaseColor(_ phase: ClaudeSession.Phase) -> Color {
+        switch phase {
+        case .active: return .green
+        case .subagentsWorking: return .blue
+        case .stopped: return .orange
+        case .ended: return .gray
+        }
     }
 }
 

@@ -9,6 +9,7 @@ import Sparkle
 /// Uses the pluggable theme system for consistent styling across all themes.
 struct MenuContentView: View {
     let monitor: QuotaMonitor
+    let sessionMonitor: SessionMonitor
     let quotaAlerter: QuotaAlerter
 
     @Environment(\.appTheme) private var theme
@@ -69,6 +70,13 @@ struct MenuContentView: View {
                         providerPills
                             .padding(.horizontal, 16)
                             .padding(.bottom, 16)
+                    }
+
+                    // Session Indicator (shown when Claude Code is active)
+                    if let session = sessionMonitor.activeSession {
+                        SessionIndicatorView(session: session)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
                     }
 
                     // Main Content Area - no scroll, dynamic height

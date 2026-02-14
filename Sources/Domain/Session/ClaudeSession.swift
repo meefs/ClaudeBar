@@ -1,0 +1,103 @@
+import Foundation
+
+/// Represents an active or recent Claude Code session.
+/// Tracks session lifecycle, subagent activity, and task completion.
+public struct ClaudeSession: Sendable, Equatable, Identifiable {
+    public let id: String
+    public let cwd: String
+    public let startedAt: Date
+    public private(set) var phase: Phase
+    public private(set) var activeSubagentCount: Int
+    public private(set) var completedTaskCount: Int
+    public private(set) var endedAt: Date?
+
+    public init(
+        id: String,
+        cwd: String,
+        startedAt: Date = Date()
+    ) {
+        self.id = id
+        self.cwd = cwd
+        self.startedAt = startedAt
+        self.phase = .active
+        self.activeSubagentCount = 0
+        self.completedTaskCount = 0
+    }
+
+    /// The current phase of the session
+    public enum Phase: String, Sendable, Equatable {
+        case active
+        case subagentsWorking
+        case stopped
+        case ended
+    }
+
+    // MARK: - Mutations
+
+    /// Records a subagent starting work
+    public mutating func subagentStarted() {
+        activeSubagentCount += 1
+        updatePhase()
+    }
+
+    /// Records a subagent stopping work
+    public mutating func subagentStopped() {
+        activeSubagentCount = max(0, activeSubagentCount - 1)
+        updatePhase()
+    }
+
+    /// Records a task completion
+    public mutating func taskCompleted() {
+        completedTaskCount += 1
+    }
+
+    /// Marks the session as stopped (Claude Code stopped responding)
+    public mutating func stop() {
+        phase = .stopped
+        activeSubagentCount = 0
+    }
+
+    /// Marks the session as ended
+    public mutating func end(at date: Date = Date()) {
+        phase = .ended
+        activeSubagentCount = 0
+        endedAt = date
+    }
+
+    /// Whether this session is still active (not ended)
+    public var isActive: Bool {
+        phase != .ended
+    }
+
+    /// Duration of the session so far
+    public var duration: TimeInterval {
+        let end = endedAt ?? Date()
+        return end.timeIntervalSince(startedAt)
+    }
+
+    /// Human-readable duration string
+    public var durationDescription: String {
+        let totalSeconds = Int(duration)
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes)m \(seconds)s"
+        } else {
+            return "\(seconds)s"
+        }
+    }
+
+    // MARK: - Private
+
+    private mutating func updatePhase() {
+        if activeSubagentCount > 0 {
+            phase = .subagentsWorking
+        } else {
+            phase = .active
+        }
+    }
+}
