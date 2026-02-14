@@ -1208,6 +1208,7 @@ struct SettingsContentView: View {
                 .pickerStyle(.segmented)
                 .onChange(of: copilotProbeMode) { _, newValue in
                     UserDefaultsProviderSettingsRepository.shared.setCopilotProbeMode(newValue)
+                    AppLog.probes.info("Copilot probe mode changed to \(newValue.rawValue)")
                     // Trigger a refresh when mode changes
                     Task {
                         await monitor.refresh(providerId: ProviderID.copilot)
@@ -2529,6 +2530,8 @@ struct SettingsContentView: View {
             copilotTestResult = "Success: Connection verified"
         }
 
+        // Refresh state that may have been updated by the probe
+        copilotApiReturnedEmpty = UserDefaultsProviderSettingsRepository.shared.copilotApiReturnedEmpty()
         isTestingCopilot = false
     }
 }

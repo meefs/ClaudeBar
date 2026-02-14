@@ -107,10 +107,8 @@ public struct CopilotInternalAPIProbe: UsageProbe {
             throw ProbeError.executionFailed("HTTP error: \(httpResponse.statusCode)")
         }
 
-        // Log raw response for debugging
-        if let rawString = String(data: data, encoding: .utf8) {
-            AppLog.probes.debug("Copilot Internal API raw response: \(rawString.prefix(1000))")
-        }
+        // Log response metadata for debugging (avoid logging full response body)
+        AppLog.probes.debug("Copilot Internal API: received \(data.count) bytes")
 
         do {
             let decoder = JSONDecoder()
@@ -167,8 +165,8 @@ public struct CopilotInternalAPIProbe: UsageProbe {
         let remaining = premiumInteractions.remaining ?? 0
         let percentRemaining = premiumInteractions.percentRemaining ?? 100
 
-        // Calculate used from entitlement - remaining
-        let used = entitlement - remaining
+        // Calculate used from entitlement - remaining (clamp to non-negative)
+        let used = max(0, entitlement - remaining)
 
         AppLog.probes.debug("Copilot Internal API: Used \(used)/\(entitlement) premium requests, \(Int(percentRemaining))% remaining")
 

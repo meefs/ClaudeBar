@@ -58,15 +58,10 @@ public final class CopilotProvider: AIProvider, @unchecked Sendable {
     /// The current probe mode (billing or copilotAPI)
     public var probeMode: CopilotProbeMode {
         get {
-            if let copilotSettings = settingsRepository as? CopilotSettingsRepository {
-                return copilotSettings.copilotProbeMode()
-            }
-            return .billing
+            settingsRepository.copilotProbeMode()
         }
         set {
-            if let copilotSettings = settingsRepository as? CopilotSettingsRepository {
-                copilotSettings.setCopilotProbeMode(newValue)
-            }
+            settingsRepository.setCopilotProbeMode(newValue)
         }
     }
 
