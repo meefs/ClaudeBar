@@ -99,7 +99,7 @@ brew install tuist
 
 # Install dependencies and build
 tuist install
-tuist build -- -configuration Release
+tuist build ClaudeBar -C Release
 ```
 
 ## Usage
@@ -144,7 +144,7 @@ tuist test
 tuist test --result-bundle-path TestResults.xcresult -- -enableCodeCoverage YES
 
 # Build release configuration
-tuist build -- -configuration Release
+tuist build ClaudeBar -C Release
 ```
 
 ### SwiftUI Previews

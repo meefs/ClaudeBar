@@ -40,7 +40,7 @@ tuist test DomainTests
 tuist test --result-bundle-path TestResults.xcresult -- -enableCodeCoverage YES
 
 # Build release configuration
-tuist build -- -configuration Release
+tuist build ClaudeBar -C Release
 ```
 
 **Key files:**
