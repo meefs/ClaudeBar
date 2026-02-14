@@ -78,31 +78,11 @@ struct SessionIndicatorView: View {
 
     // MARK: - Phase Display
 
-    private var phaseLabel: String {
-        switch session.phase {
-        case .active: return "Active"
-        case .subagentsWorking: return "Agents Working"
-        case .stopped: return "Stopped"
-        case .ended: return "Ended"
-        }
-    }
-
-    private var phaseColor: Color {
-        switch session.phase {
-        case .active: return .green
-        case .subagentsWorking: return .blue
-        case .stopped: return .orange
-        case .ended: return .gray
-        }
-    }
+    private var phaseLabel: String { session.phase.label }
+    private var phaseColor: Color { session.phase.color }
 
     private var phaseLabelColor: Color {
-        switch session.phase {
-        case .active: return .green
-        case .subagentsWorking: return .blue
-        case .stopped: return .orange
-        case .ended: return theme.textTertiary
-        }
+        session.phase == .ended ? theme.textTertiary : session.phase.color
     }
 
     private var cwdShort: String {

@@ -1,4 +1,5 @@
 import Foundation
+import Domain
 
 /// Installs and uninstalls ClaudeBar hooks in ~/.claude/settings.json.
 /// Hook commands use the __claudebar_hook function wrapper for identification.
@@ -14,7 +15,7 @@ public enum HookInstaller {
 
     /// The hook command template. Port is read from the discovery file at runtime.
     static let hookCommand = """
-    __claudebar_hook() { PORT=$(cat "$HOME/.claude/claudebar-hook-port" 2>/dev/null || echo 19847); cat | curl -s -X POST "http://localhost:${PORT}/hook" -H 'Content-Type: application/json' -d @- > /dev/null 2>&1 & }; __claudebar_hook
+    __claudebar_hook() { PORT=$(cat "$HOME/.claude/claudebar-hook-port" 2>/dev/null || echo \(HookConstants.defaultPort)); cat | curl -s -X POST "http://localhost:${PORT}/hook" -H 'Content-Type: application/json' -d @- > /dev/null 2>&1 & }; __claudebar_hook
     """
 
     /// The event names to register hooks for
@@ -36,7 +37,7 @@ public enum HookInstaller {
     /// {"SessionStart": [{"matcher": ".*", "hooks": [{"type": "command", "command": "..."}]}]}
     /// ```
     public static func install() throws {
-        var settings = readSettings() ?? [String: Any]()
+        var settings = try readOrCreateSettings()
         var hooks = settings["hooks"] as? [String: Any] ?? [String: Any]()
 
         for event in hookEvents {
@@ -68,7 +69,7 @@ public enum HookInstaller {
     /// Uninstalls ClaudeBar hooks from the Claude settings file.
     /// Preserves hooks from other tools.
     public static func uninstall() throws {
-        guard var settings = readSettings() else { return }
+        guard var settings = try? readOrCreateSettings() else { return }
         guard var hooks = settings["hooks"] as? [String: Any] else { return }
 
         for event in hookEvents {
@@ -121,12 +122,37 @@ public enum HookInstaller {
 
     // MARK: - Private
 
-    static func readSettings() -> [String: Any]? {
-        guard let data = FileManager.default.contents(atPath: settingsPath),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
+    enum InstallerError: Error {
+        case corruptedSettingsFile(String)
+    }
+
+    /// Reads settings, returning empty dict for missing file but throwing on corrupt JSON.
+    static func readOrCreateSettings() throws -> [String: Any] {
+        guard FileManager.default.fileExists(atPath: settingsPath) else {
+            return [String: Any]()
         }
+
+        guard let data = FileManager.default.contents(atPath: settingsPath) else {
+            return [String: Any]()
+        }
+
+        // Empty file is treated as empty settings
+        if data.isEmpty {
+            return [String: Any]()
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw InstallerError.corruptedSettingsFile(
+                "Failed to parse \(settingsPath) — file may be corrupted. Fix it manually before retrying."
+            )
+        }
+
         return json
+    }
+
+    /// For read-only checks (isInstalled) — returns nil on any error.
+    static func readSettings() -> [String: Any]? {
+        try? readOrCreateSettings()
     }
 
     private static func writeSettings(_ settings: [String: Any]) throws {
@@ -140,6 +166,6 @@ public enum HookInstaller {
             withJSONObject: settings,
             options: [.prettyPrinted, .sortedKeys]
         )
-        try data.write(to: URL(fileURLWithPath: settingsPath))
+        try data.write(to: URL(fileURLWithPath: settingsPath), options: .atomic)
     }
 }

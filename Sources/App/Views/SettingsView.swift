@@ -63,6 +63,8 @@ struct SettingsContentView: View {
     // Hook settings state
     @State private var hooksExpanded: Bool = false
     @State private var hooksEnabled: Bool = false
+    @State private var hooksInstalled: Bool = false
+    @State private var hookError: String?
 
     private enum ProviderID {
         static let claude = "claude"
@@ -223,6 +225,7 @@ struct SettingsContentView: View {
 
             // Initialize Hook settings
             hooksEnabled = UserDefaultsProviderSettingsRepository.shared.isHookEnabled()
+            hooksInstalled = HookInstaller.isInstalled()
 
             // Initialize Bedrock settings
             awsProfileNameInput = UserDefaultsProviderSettingsRepository.shared.awsProfileName()
@@ -2388,11 +2391,18 @@ struct SettingsContentView: View {
                 // Status
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(HookInstaller.isInstalled() ? Color.green : Color.gray)
+                        .fill(hooksInstalled ? Color.green : Color.gray)
                         .frame(width: 6, height: 6)
-                    Text(HookInstaller.isInstalled() ? "Hooks installed in ~/.claude/settings.json" : "Hooks not installed")
+                    Text(hooksInstalled ? "Hooks installed in ~/.claude/settings.json" : "Hooks not installed")
                         .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
                         .foregroundStyle(theme.textSecondary)
+                }
+
+                // Error message
+                if let hookError {
+                    Text(hookError)
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(.red)
                 }
 
                 // Help text
@@ -2459,11 +2469,26 @@ struct SettingsContentView: View {
                 .scaleEffect(0.8)
                 .labelsHidden()
                 .onChange(of: hooksEnabled) { _, newValue in
-                    UserDefaultsProviderSettingsRepository.shared.setHookEnabled(newValue)
-                    if newValue {
-                        try? HookInstaller.install()
-                    } else {
-                        try? HookInstaller.uninstall()
+                    hookError = nil
+                    do {
+                        if newValue {
+                            try HookInstaller.install()
+                        } else {
+                            try HookInstaller.uninstall()
+                        }
+                        UserDefaultsProviderSettingsRepository.shared.setHookEnabled(newValue)
+                        hooksInstalled = HookInstaller.isInstalled()
+                        // Notify app to start/stop hook server
+                        NotificationCenter.default.post(
+                            name: .hookSettingsChanged,
+                            object: nil,
+                            userInfo: ["enabled": newValue]
+                        )
+                    } catch {
+                        // Revert toggle on failure
+                        hookError = error.localizedDescription
+                        hooksEnabled = !newValue
+                        AppLog.hooks.error("Hook \(newValue ? "install" : "uninstall") failed: \(error.localizedDescription)")
                     }
                 }
         }

@@ -1,5 +1,11 @@
 import Foundation
 
+/// Constants for hook configuration
+public enum HookConstants {
+    /// Default port for the hook HTTP server
+    public static let defaultPort: UInt16 = 19847
+}
+
 /// Settings repository for hook configuration.
 /// Standalone protocol (not extending ProviderSettingsRepository) since hooks aren't a provider.
 public protocol HookSettingsRepository: Sendable {

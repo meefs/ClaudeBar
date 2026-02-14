@@ -30,29 +30,43 @@ public struct ClaudeSession: Sendable, Equatable, Identifiable {
         case subagentsWorking
         case stopped
         case ended
+
+        /// Human-readable label for this phase
+        public var label: String {
+            switch self {
+            case .active: return "Active"
+            case .subagentsWorking: return "Agents Working"
+            case .stopped: return "Stopped"
+            case .ended: return "Ended"
+            }
+        }
     }
 
     // MARK: - Mutations
 
     /// Records a subagent starting work
     public mutating func subagentStarted() {
+        guard phase != .stopped, phase != .ended else { return }
         activeSubagentCount += 1
         updatePhase()
     }
 
     /// Records a subagent stopping work
     public mutating func subagentStopped() {
+        guard phase != .stopped, phase != .ended else { return }
         activeSubagentCount = max(0, activeSubagentCount - 1)
         updatePhase()
     }
 
     /// Records a task completion
     public mutating func taskCompleted() {
+        guard phase != .ended else { return }
         completedTaskCount += 1
     }
 
     /// Marks the session as stopped (Claude Code stopped responding)
     public mutating func stop() {
+        guard phase != .ended else { return }
         phase = .stopped
         activeSubagentCount = 0
     }

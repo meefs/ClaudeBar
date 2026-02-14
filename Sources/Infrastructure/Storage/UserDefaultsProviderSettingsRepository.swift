@@ -251,7 +251,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
 
     public func hookPort() -> Int {
         let port = userDefaults.integer(forKey: Keys.hookPort)
-        return port > 0 ? port : 19847
+        return port > 0 ? port : Int(HookConstants.defaultPort)
     }
 
     public func setHookPort(_ port: Int) {

@@ -11,6 +11,7 @@ struct MenuContentView: View {
     let monitor: QuotaMonitor
     let sessionMonitor: SessionMonitor
     let quotaAlerter: QuotaAlerter
+    var onHookSettingsChanged: ((Bool) -> Void)?
 
     @Environment(\.appTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
@@ -106,6 +107,10 @@ struct MenuContentView: View {
         .frame(width: 400)
         .fixedSize(horizontal: false, vertical: true)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .onReceive(NotificationCenter.default.publisher(for: .hookSettingsChanged)) { notification in
+            let enabled = notification.userInfo?["enabled"] as? Bool ?? false
+            onHookSettingsChanged?(enabled)
+        }
         .task {
             // Request alert permission once (after app run loop is active)
             if !hasRequestedNotificationPermission {

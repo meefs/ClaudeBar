@@ -3,8 +3,10 @@ import Observation
 
 /// Monitors Claude Code sessions by processing hook events.
 /// Single source of truth for session state, similar to QuotaMonitor for providers.
+/// Isolated to @MainActor since it's consumed by SwiftUI views.
+@MainActor
 @Observable
-public final class SessionMonitor: @unchecked Sendable {
+public final class SessionMonitor {
     /// The currently active session (nil if no session is running)
     public private(set) var activeSession: ClaudeSession?
 

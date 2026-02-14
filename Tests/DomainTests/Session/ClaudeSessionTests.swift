@@ -142,4 +142,67 @@ struct ClaudeSessionTests {
 
         #expect(session1.id == session2.id)
     }
+
+    // MARK: - Phase Guards
+
+    @Test
+    func `subagentStarted is ignored after stopped`() {
+        var session = ClaudeSession(id: "test", cwd: "/tmp")
+        session.stop()
+
+        session.subagentStarted()
+
+        #expect(session.phase == .stopped)
+        #expect(session.activeSubagentCount == 0)
+    }
+
+    @Test
+    func `subagentStopped is ignored after ended`() {
+        var session = ClaudeSession(id: "test", cwd: "/tmp")
+        session.subagentStarted()
+        session.end()
+
+        session.subagentStopped()
+
+        #expect(session.phase == .ended)
+        #expect(session.activeSubagentCount == 0)
+    }
+
+    @Test
+    func `taskCompleted still works after stopped`() {
+        var session = ClaudeSession(id: "test", cwd: "/tmp")
+        session.stop()
+
+        session.taskCompleted()
+
+        #expect(session.completedTaskCount == 1)
+    }
+
+    @Test
+    func `taskCompleted is ignored after ended`() {
+        var session = ClaudeSession(id: "test", cwd: "/tmp")
+        session.end()
+
+        session.taskCompleted()
+
+        #expect(session.completedTaskCount == 0)
+    }
+
+    @Test
+    func `stop is ignored after ended`() {
+        var session = ClaudeSession(id: "test", cwd: "/tmp")
+        session.end()
+
+        session.stop()
+
+        #expect(session.phase == .ended)
+    }
+
+    @Test
+    func `phase label returns correct strings`() {
+        #expect(ClaudeSession.Phase.active.label == "Active")
+        #expect(ClaudeSession.Phase.subagentsWorking.label == "Agents Working")
+        #expect(ClaudeSession.Phase.stopped.label == "Stopped")
+        #expect(ClaudeSession.Phase.ended.label == "Ended")
+    }
 }

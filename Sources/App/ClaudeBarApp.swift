@@ -5,6 +5,10 @@ import Infrastructure
 import Sparkle
 #endif
 
+extension Notification.Name {
+    static let hookSettingsChanged = Notification.Name("com.tddworks.claudebar.hookSettingsChanged")
+}
+
 @main
 struct ClaudeBarApp: App {
     /// The main domain service - monitors all AI providers
@@ -16,6 +20,9 @@ struct ClaudeBarApp: App {
 
     /// The hook HTTP server that receives events from Claude Code
     private let hookServer = HookHTTPServer()
+
+    /// Task for the hook server event loop (allows cancellation on toggle off)
+    @State private var hookServerTask: Task<Void, Never>?
 
     /// Alerts users when quota status degrades
     private let quotaAlerter = NotificationAlerter()
@@ -107,13 +114,17 @@ struct ClaudeBarApp: App {
     }
 
     private func startHookServer() {
-        Task {
+        // Cancel any existing server task
+        hookServerTask?.cancel()
+        hookServer.stop()
+
+        hookServerTask = Task {
             do {
                 let events = try await hookServer.start()
                 AppLog.hooks.info("Hook server started, listening for events")
                 for await event in events {
-                    sessionMonitor.processEvent(event)
-                    sendSessionNotification(for: event)
+                    await sessionMonitor.processEvent(event)
+                    await sendSessionNotification(for: event)
                 }
             } catch {
                 AppLog.hooks.error("Failed to start hook server: \(error.localizedDescription)")
@@ -121,7 +132,13 @@ struct ClaudeBarApp: App {
         }
     }
 
-    private func sendSessionNotification(for event: SessionEvent) {
+    func stopHookServer() {
+        hookServerTask?.cancel()
+        hookServerTask = nil
+        hookServer.stop()
+    }
+
+    @MainActor private func sendSessionNotification(for event: SessionEvent) {
         let projectName = (event.cwd as NSString).lastPathComponent
 
         switch event.eventName {
@@ -154,11 +171,15 @@ struct ClaudeBarApp: App {
     var body: some Scene {
         MenuBarExtra {
             #if ENABLE_SPARKLE
-            MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter)
+            MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter) { enabled in
+                    if enabled { startHookServer() } else { stopHookServer() }
+                }
                 .appThemeProvider(themeModeId: settings.themeMode)
                 .environment(\.sparkleUpdater, sparkleUpdater)
             #else
-            MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter)
+            MenuContentView(monitor: monitor, sessionMonitor: sessionMonitor, quotaAlerter: quotaAlerter) { enabled in
+                    if enabled { startHookServer() } else { stopHookServer() }
+                }
                 .appThemeProvider(themeModeId: settings.themeMode)
             #endif
         } label: {
@@ -168,6 +189,7 @@ struct ClaudeBarApp: App {
         }
         .menuBarExtraStyle(.window)
     }
+
 }
 
 /// The menu bar icon that reflects the overall quota status.
@@ -218,12 +240,7 @@ struct StatusBarIcon: View {
     }
 
     private func sessionPhaseColor(_ phase: ClaudeSession.Phase) -> Color {
-        switch phase {
-        case .active: return .green
-        case .subagentsWorking: return .blue
-        case .stopped: return .orange
-        case .ended: return .gray
-        }
+        phase.color
     }
 }
 

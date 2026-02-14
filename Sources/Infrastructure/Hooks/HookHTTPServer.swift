@@ -4,22 +4,28 @@ import Domain
 
 /// Lightweight HTTP server using Network.framework (NWListener).
 /// Listens on localhost only, receives hook events via POST /hook.
+/// All mutable state is synchronized on a dedicated serial queue.
 public final class HookHTTPServer: @unchecked Sendable {
     private var listener: NWListener?
     private var continuation: AsyncStream<SessionEvent>.Continuation?
     private let defaultPort: UInt16
 
+    /// Serial queue for synchronizing all mutable state
+    private let queue = DispatchQueue(label: "com.tddworks.claudebar.hookserver")
+
     /// The actual port the server is listening on
     public private(set) var actualPort: UInt16 = 0
 
-    public init(defaultPort: UInt16 = 19847) {
+    public init(defaultPort: UInt16 = HookConstants.defaultPort) {
         self.defaultPort = defaultPort
     }
 
     /// Starts the HTTP server and returns a stream of parsed session events.
     public func start() async throws -> AsyncStream<SessionEvent> {
         let stream = AsyncStream<SessionEvent> { continuation in
-            self.continuation = continuation
+            self.queue.sync {
+                self.continuation = continuation
+            }
             continuation.onTermination = { _ in
                 self.stop()
             }
@@ -39,16 +45,17 @@ public final class HookHTTPServer: @unchecked Sendable {
         let listener = try NWListener(using: parameters)
 
         listener.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
             switch state {
             case .ready:
                 if let actualPort = listener.port?.rawValue {
-                    self?.actualPort = actualPort
+                    self.queue.sync { self.actualPort = actualPort }
                     try? PortDiscovery.writePort(Int(actualPort))
                     AppLog.hooks.info("Hook HTTP server listening on port \(actualPort)")
                 }
             case .failed(let error):
                 AppLog.hooks.error("Hook HTTP server failed: \(error.localizedDescription)")
-                self?.continuation?.finish()
+                self.queue.sync { self.continuation?.finish() }
             default:
                 break
             }
@@ -58,18 +65,20 @@ public final class HookHTTPServer: @unchecked Sendable {
             self?.handleConnection(connection)
         }
 
-        listener.start(queue: .global(qos: .utility))
-        self.listener = listener
+        listener.start(queue: queue)
+        self.queue.sync { self.listener = listener }
 
         return stream
     }
 
     /// Stops the HTTP server and cleans up.
     public func stop() {
-        listener?.cancel()
-        listener = nil
-        continuation?.finish()
-        continuation = nil
+        queue.sync {
+            listener?.cancel()
+            listener = nil
+            continuation?.finish()
+            continuation = nil
+        }
         PortDiscovery.removePortFile()
         AppLog.hooks.info("Hook HTTP server stopped")
     }
@@ -77,7 +86,7 @@ public final class HookHTTPServer: @unchecked Sendable {
     // MARK: - Connection Handling
 
     private func handleConnection(_ connection: NWConnection) {
-        connection.start(queue: .global(qos: .utility))
+        connection.start(queue: queue)
 
         // Read up to 64KB (more than enough for hook payloads)
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
@@ -127,7 +136,7 @@ public final class HookHTTPServer: @unchecked Sendable {
 
         if let event = SessionEventParser.parse(bodyData) {
             AppLog.hooks.info("Received hook event: \(event.eventName.rawValue) for session \(event.sessionId)")
-            continuation?.yield(event)
+            queue.sync { continuation?.yield(event) }
         } else {
             AppLog.hooks.warning("Failed to parse hook event payload")
         }

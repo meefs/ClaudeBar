@@ -3,6 +3,7 @@ import Foundation
 @testable import Domain
 
 @Suite
+@MainActor
 struct SessionMonitorTests {
     private func makeEvent(
         sessionId: String = "test-session",
