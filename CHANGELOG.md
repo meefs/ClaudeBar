@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.33] - 2026-02-14
+
+### Added
+- **Claude Code Session Tracking**: Real-time monitoring of Claude Code sessions via hooks. When Claude Code is running, ClaudeBar shows session status directly in the menu bar and popover:
+  - **Menu bar indicator**: A terminal icon appears next to the quota icon with phase-colored status (green = active, blue = subagents working, orange = stopped)
+  - **Session card**: Detailed session info in the popover showing phase, task count, active subagents, duration, and working directory
+  - **System notifications**: Get notified when a session starts ("Claude Code Started") and finishes ("Claude Code Finished — Completed 3 tasks in 2m 5s")
+- **Hook Settings**: New "Claude Code Hooks" section in Settings with a single toggle to enable/disable. Automatically installs/uninstalls hooks in `~/.claude/settings.json`.
+
+### Technical
+- Added `SessionEvent`, `ClaudeSession`, and `SessionMonitor` domain models for session lifecycle tracking
+- Added `HookHTTPServer` using Network.framework (`NWListener`) for localhost-only event reception on port 19847
+- Added `SessionEventParser` for parsing Claude Code hook JSON payloads
+- Added `HookInstaller` for auto-managing hooks in `~/.claude/settings.json` using the new matcher-based format
+- Added `PortDiscovery` for writing/reading `~/.claude/claudebar-hook-port`
+- Added `HookSettingsRepository` protocol and `UserDefaults` implementation
+- Added `com.apple.security.network.server` entitlement for `NWListener`
+- Added `AppLog.hooks` logging category
+- Added `LiveActivityManager` placeholder for future ActivityKit support (currently unavailable on macOS)
+
 ## [0.4.32] - 2026-02-12
 
 ### Added
