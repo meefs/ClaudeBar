@@ -306,4 +306,113 @@ struct CopilotProviderTests {
         #expect(copilot.username == "")
         #expect(copilot.hasToken == false)
     }
+
+    // MARK: - Probe Mode Tests
+
+    @Test
+    func `copilot provider defaults to billing mode`() {
+        let settings = MockRepositoryFactory.makeCopilotSettingsRepository()
+        let mockProbe = MockUsageProbe()
+        let copilot = CopilotProvider(probe: mockProbe, settingsRepository: settings)
+
+        #expect(copilot.probeMode == .billing)
+    }
+
+    @Test
+    func `copilot provider uses billing probe in billing mode`() async throws {
+        let billingProbe = MockUsageProbe()
+        let internalProbe = MockUsageProbe()
+        let settings = MockRepositoryFactory.makeCopilotSettingsRepository()
+
+        let billingSnapshot = UsageSnapshot(
+            providerId: "copilot",
+            quotas: [UsageQuota(percentRemaining: 80, quotaType: .session, providerId: "copilot", resetText: "10/50 requests")],
+            capturedAt: Date()
+        )
+        given(billingProbe).probe().willReturn(billingSnapshot)
+        given(billingProbe).isAvailable().willReturn(true)
+
+        let copilot = CopilotProvider(
+            billingProbe: billingProbe,
+            internalProbe: internalProbe,
+            settingsRepository: settings
+        )
+
+        // Default is billing mode
+        #expect(copilot.probeMode == .billing)
+
+        let snapshot = try await copilot.refresh()
+        #expect(snapshot.quotas.first?.resetText == "10/50 requests")
+    }
+
+    @Test
+    func `copilot provider uses internal probe in copilotAPI mode`() async throws {
+        let billingProbe = MockUsageProbe()
+        let internalProbe = MockUsageProbe()
+        let settings = MockRepositoryFactory.makeCopilotSettingsRepository()
+        settings.setCopilotProbeMode(.copilotAPI)
+
+        let internalSnapshot = UsageSnapshot(
+            providerId: "copilot",
+            quotas: [UsageQuota(percentRemaining: 99.3, quotaType: .session, providerId: "copilot", resetText: "2/300 requests")],
+            capturedAt: Date()
+        )
+        given(internalProbe).probe().willReturn(internalSnapshot)
+        given(internalProbe).isAvailable().willReturn(true)
+
+        let copilot = CopilotProvider(
+            billingProbe: billingProbe,
+            internalProbe: internalProbe,
+            settingsRepository: settings
+        )
+
+        #expect(copilot.probeMode == .copilotAPI)
+
+        let snapshot = try await copilot.refresh()
+        #expect(snapshot.quotas.first?.resetText == "2/300 requests")
+    }
+
+    @Test
+    func `copilot provider falls back to billing when internal probe is nil`() async throws {
+        let billingProbe = MockUsageProbe()
+        let settings = MockRepositoryFactory.makeCopilotSettingsRepository()
+        settings.setCopilotProbeMode(.copilotAPI)
+
+        let billingSnapshot = UsageSnapshot(
+            providerId: "copilot",
+            quotas: [UsageQuota(percentRemaining: 80, quotaType: .session, providerId: "copilot", resetText: "10/50 requests")],
+            capturedAt: Date()
+        )
+        given(billingProbe).probe().willReturn(billingSnapshot)
+        given(billingProbe).isAvailable().willReturn(true)
+
+        // Use single probe init (no internal probe)
+        let copilot = CopilotProvider(probe: billingProbe, settingsRepository: settings)
+
+        // Mode is copilotAPI but internal probe is nil, should fall back to billing
+        #expect(copilot.probeMode == .copilotAPI)
+
+        let snapshot = try await copilot.refresh()
+        #expect(snapshot.quotas.first?.resetText == "10/50 requests")
+    }
+
+    @Test
+    func `copilot provider supportsInternalApiMode when internal probe provided`() {
+        let billingProbe = MockUsageProbe()
+        let internalProbe = MockUsageProbe()
+        let settings = MockRepositoryFactory.makeCopilotSettingsRepository()
+
+        let copilotWithInternal = CopilotProvider(
+            billingProbe: billingProbe,
+            internalProbe: internalProbe,
+            settingsRepository: settings
+        )
+        #expect(copilotWithInternal.supportsInternalApiMode == true)
+
+        let copilotWithoutInternal = CopilotProvider(
+            probe: billingProbe,
+            settingsRepository: settings
+        )
+        #expect(copilotWithoutInternal.supportsInternalApiMode == false)
+    }
 }

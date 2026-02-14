@@ -49,6 +49,19 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(envVar, forKey: Keys.glmAuthEnvVar)
     }
 
+    // MARK: - CopilotSettingsRepository (Probe Mode)
+
+    public func copilotProbeMode() -> CopilotProbeMode {
+        guard let rawValue = userDefaults.string(forKey: Keys.copilotProbeMode) else {
+            return .billing // Default to Billing API mode
+        }
+        return CopilotProbeMode(rawValue: rawValue) ?? .billing
+    }
+
+    public func setCopilotProbeMode(_ mode: CopilotProbeMode) {
+        userDefaults.set(mode.rawValue, forKey: Keys.copilotProbeMode)
+    }
+
     // MARK: - CopilotSettingsRepository (Configuration)
 
     public func copilotAuthEnvVar() -> String {
@@ -272,6 +285,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let kimiProbeMode = "providerConfig.kimiProbeMode"
         static let zaiConfigPath = "providerConfig.zaiConfigPath"
         static let glmAuthEnvVar = "providerConfig.glmAuthEnvVar"
+        static let copilotProbeMode = "providerConfig.copilotProbeMode"
         static let copilotAuthEnvVar = "providerConfig.copilotAuthEnvVar"
         static let copilotMonthlyLimit = "providerConfig.copilotMonthlyLimit"
         static let copilotManualUsageValue = "providerConfig.copilotManualUsageValue"
