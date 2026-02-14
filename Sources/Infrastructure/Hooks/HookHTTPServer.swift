@@ -4,13 +4,16 @@ import Domain
 
 /// Lightweight HTTP server using Network.framework (NWListener).
 /// Listens on localhost only, receives hook events via POST /hook.
-/// All mutable state is synchronized on a dedicated serial queue.
+/// All mutable state is accessed only from `queue` — NWListener callbacks
+/// and external callers both dispatch onto it, so no queue.sync is needed
+/// inside callbacks (which already run on queue).
 public final class HookHTTPServer: @unchecked Sendable {
     private var listener: NWListener?
     private var continuation: AsyncStream<SessionEvent>.Continuation?
     private let defaultPort: UInt16
 
-    /// Serial queue for synchronizing all mutable state
+    /// Serial queue for synchronizing all mutable state.
+    /// NWListener and NWConnection callbacks also run on this queue.
     private let queue = DispatchQueue(label: "com.tddworks.claudebar.hookserver")
 
     /// The actual port the server is listening on
@@ -23,7 +26,7 @@ public final class HookHTTPServer: @unchecked Sendable {
     /// Starts the HTTP server and returns a stream of parsed session events.
     public func start() async throws -> AsyncStream<SessionEvent> {
         let stream = AsyncStream<SessionEvent> { continuation in
-            self.queue.sync {
+            self.queue.async {
                 self.continuation = continuation
             }
             continuation.onTermination = { _ in
@@ -44,51 +47,56 @@ public final class HookHTTPServer: @unchecked Sendable {
 
         let listener = try NWListener(using: parameters)
 
+        // stateUpdateHandler runs on `queue` (set by listener.start below),
+        // so we access mutable state directly — no queue.sync needed.
         listener.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
             switch state {
             case .ready:
                 if let actualPort = listener.port?.rawValue {
-                    self.queue.sync { self.actualPort = actualPort }
+                    self.actualPort = actualPort
                     try? PortDiscovery.writePort(Int(actualPort))
                     AppLog.hooks.info("Hook HTTP server listening on port \(actualPort)")
                 }
             case .failed(let error):
                 AppLog.hooks.error("Hook HTTP server failed: \(error.localizedDescription)")
-                self.queue.sync { self.continuation?.finish() }
+                self.continuation?.finish()
             default:
                 break
             }
         }
 
+        // newConnectionHandler also runs on `queue`.
         listener.newConnectionHandler = { [weak self] connection in
             self?.handleConnection(connection)
         }
 
         listener.start(queue: queue)
-        self.queue.sync { self.listener = listener }
+        queue.async { self.listener = listener }
 
         return stream
     }
 
     /// Stops the HTTP server and cleans up.
     public func stop() {
-        queue.sync {
+        queue.async { [self] in
             listener?.cancel()
             listener = nil
             continuation?.finish()
             continuation = nil
+            PortDiscovery.removePortFile()
+            AppLog.hooks.info("Hook HTTP server stopped")
         }
-        PortDiscovery.removePortFile()
-        AppLog.hooks.info("Hook HTTP server stopped")
     }
 
     // MARK: - Connection Handling
 
+    /// Runs on `queue` (via newConnectionHandler).
     private func handleConnection(_ connection: NWConnection) {
         connection.start(queue: queue)
 
         // Read up to 64KB (more than enough for hook payloads)
+        // Callback runs on `queue` (connection started on queue).
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             defer {
                 // Send minimal HTTP 200 response and close
@@ -114,8 +122,8 @@ public final class HookHTTPServer: @unchecked Sendable {
         }
     }
 
+    /// Runs on `queue` (called from connection.receive callback).
     private func processHTTPRequest(_ rawData: Data) {
-        // Find the body by looking for \r\n\r\n separator
         guard let rawString = String(data: rawData, encoding: .utf8) else { return }
 
         guard let separatorRange = rawString.range(of: "\r\n\r\n") else {
@@ -136,7 +144,7 @@ public final class HookHTTPServer: @unchecked Sendable {
 
         if let event = SessionEventParser.parse(bodyData) {
             AppLog.hooks.info("Received hook event: \(event.eventName.rawValue) for session \(event.sessionId)")
-            queue.sync { continuation?.yield(event) }
+            continuation?.yield(event)
         } else {
             AppLog.hooks.warning("Failed to parse hook event payload")
         }
