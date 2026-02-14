@@ -60,6 +60,12 @@ struct SettingsContentView: View {
     @State private var kimiConfigExpanded: Bool = false
     @State private var kimiProbeMode: KimiProbeMode = .cli
 
+    // Hook settings state
+    @State private var hooksExpanded: Bool = false
+    @State private var hooksEnabled: Bool = false
+    @State private var hooksInstalled: Bool = false
+    @State private var hookError: String?
+
     private enum ProviderID {
         static let claude = "claude"
         static let codex = "codex"
@@ -170,6 +176,7 @@ struct SettingsContentView: View {
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     backgroundSyncCard
+                    hooksCard
                     launchAtLoginCard
                     #if ENABLE_SPARKLE
                     updatesCard
@@ -215,6 +222,10 @@ struct SettingsContentView: View {
 
             // Initialize Kimi settings
             kimiProbeMode = UserDefaultsProviderSettingsRepository.shared.kimiProbeMode()
+
+            // Initialize Hook settings
+            hooksEnabled = UserDefaultsProviderSettingsRepository.shared.isHookEnabled()
+            hooksInstalled = HookInstaller.isInstalled()
 
             // Initialize Bedrock settings
             awsProfileNameInput = UserDefaultsProviderSettingsRepository.shared.awsProfileName()
@@ -2365,6 +2376,121 @@ struct SettingsContentView: View {
                 .tint(theme.accentPrimary)
                 .scaleEffect(0.8)
                 .labelsHidden()
+        }
+    }
+
+    // MARK: - Hooks Card
+
+    private var hooksCard: some View {
+        DisclosureGroup(isExpanded: $hooksExpanded) {
+            Divider()
+                .background(theme.glassBorder)
+                .padding(.vertical, 12)
+
+            VStack(alignment: .leading, spacing: 14) {
+                // Status
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(hooksInstalled ? Color.green : Color.gray)
+                        .frame(width: 6, height: 6)
+                    Text(hooksInstalled ? "Hooks installed in ~/.claude/settings.json" : "Hooks not installed")
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                }
+
+                // Error message
+                if let hookError {
+                    Text(hookError)
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(.red)
+                }
+
+                // Help text
+                Text("Track Claude Code sessions in real-time. Shows active session status, subagent activity, and task completion.")
+                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+            }
+        } label: {
+            hooksHeader
+                .contentShape(.rect)
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        hooksExpanded.toggle()
+                    }
+                }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: theme.cardCornerRadius)
+                .fill(theme.cardGradient)
+                .overlay(
+                    RoundedRectangle(cornerRadius: theme.cardCornerRadius)
+                        .stroke(theme.glassBorder, lineWidth: 1)
+                )
+        )
+    }
+
+    private var hooksHeader: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.4, green: 0.7, blue: 0.5),
+                                Color(red: 0.25, green: 0.55, blue: 0.35)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Claude Code Hooks")
+                    .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+
+                Text("Live session tracking")
+                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+            }
+
+            Spacer()
+
+            Toggle("", isOn: $hooksEnabled)
+                .toggleStyle(.switch)
+                .tint(theme.accentPrimary)
+                .scaleEffect(0.8)
+                .labelsHidden()
+                .onChange(of: hooksEnabled) { _, newValue in
+                    hookError = nil
+                    do {
+                        if newValue {
+                            try HookInstaller.install()
+                        } else {
+                            try HookInstaller.uninstall()
+                        }
+                        UserDefaultsProviderSettingsRepository.shared.setHookEnabled(newValue)
+                        hooksInstalled = HookInstaller.isInstalled()
+                        // Notify app to start/stop hook server
+                        NotificationCenter.default.post(
+                            name: .hookSettingsChanged,
+                            object: nil,
+                            userInfo: ["enabled": newValue]
+                        )
+                    } catch {
+                        // Revert toggle on failure
+                        hookError = error.localizedDescription
+                        hooksEnabled = !newValue
+                        AppLog.hooks.error("Hook \(newValue ? "install" : "uninstall") failed: \(error.localizedDescription)")
+                    }
+                }
         }
     }
 
