@@ -84,6 +84,7 @@ struct ClaudeBarApp: App {
                 apiProbe: KimiUsageProbe(),
                 settingsRepository: settingsRepository
             ),
+            KiroProvider(probe: KiroUsageProbe(), settingsRepository: settingsRepository),
             MiniMaxiProvider(
                 probe: MiniMaxiUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
