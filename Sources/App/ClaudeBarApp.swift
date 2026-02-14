@@ -54,7 +54,8 @@ struct ClaudeBarApp: App {
                 settingsRepository: settingsRepository
             ),
             CopilotProvider(
-                probe: CopilotUsageProbe(settingsRepository: settingsRepository),
+                billingProbe: CopilotUsageProbe(settingsRepository: settingsRepository),
+                internalProbe: CopilotInternalAPIProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
             ),
             BedrockProvider(

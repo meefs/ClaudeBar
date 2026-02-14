@@ -40,6 +40,7 @@ struct SettingsContentView: View {
     @State private var copilotManualUsageInput: String = ""
     @State private var copilotManualUsageInputError: String?
     @State private var copilotApiReturnedEmpty: Bool = false
+    @State private var copilotProbeMode: CopilotProbeMode = .billing
     @State private var isTestingCopilot = false
     @State private var copilotTestResult: String?
 
@@ -194,6 +195,7 @@ struct SettingsContentView: View {
             }
             zaiConfigPathInput = UserDefaultsProviderSettingsRepository.shared.zaiConfigPath()
             glmAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.glmAuthEnvVar()
+            copilotProbeMode = UserDefaultsProviderSettingsRepository.shared.copilotProbeMode()
             copilotAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.copilotAuthEnvVar()
             copilotMonthlyLimit = UserDefaultsProviderSettingsRepository.shared.copilotMonthlyLimit() ?? 50
             copilotManualOverrideEnabled = UserDefaultsProviderSettingsRepository.shared.copilotManualOverrideEnabled()
@@ -1191,29 +1193,91 @@ struct SettingsContentView: View {
 
     private var copilotForm: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // GitHub Username
+            // Probe Mode Picker
             VStack(alignment: .leading, spacing: 6) {
-                Text("GITHUB USERNAME")
+                Text("PROBE MODE")
                     .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(theme.textSecondary)
                     .tracking(0.5)
 
-                TextField("", text: copilotUsernameBinding, prompt: Text("username").foregroundStyle(theme.textTertiary))
-                    .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                    .foregroundStyle(theme.textPrimary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(theme.glassBackground)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(theme.glassBorder, lineWidth: 1)
-                            )
-                    )
+                Picker("", selection: $copilotProbeMode) {
+                    ForEach(CopilotProbeMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: copilotProbeMode) { _, newValue in
+                    UserDefaultsProviderSettingsRepository.shared.setCopilotProbeMode(newValue)
+                    // Trigger a refresh when mode changes
+                    Task {
+                        await monitor.refresh(providerId: ProviderID.copilot)
+                    }
+                }
             }
 
-            // Personal Access Token
+            // Mode descriptions
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "creditcard")
+                        .font(.system(size: 10))
+                        .foregroundStyle(copilotProbeMode == .billing ? theme.accentPrimary : theme.textTertiary)
+                        .frame(width: 16)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Billing Mode")
+                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .foregroundStyle(copilotProbeMode == .billing ? theme.textPrimary : theme.textSecondary)
+
+                        Text("Uses GitHub Billing API. Requires fine-grained PAT with 'Plan: read'.")
+                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textTertiary)
+                    }
+                }
+
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "network")
+                        .font(.system(size: 10))
+                        .foregroundStyle(copilotProbeMode == .copilotAPI ? theme.accentPrimary : theme.textTertiary)
+                        .frame(width: 16)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Copilot API Mode")
+                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .foregroundStyle(copilotProbeMode == .copilotAPI ? theme.textPrimary : theme.textSecondary)
+
+                        Text("Uses Copilot Internal API. Works for all plans (incl. Business/Enterprise). Requires Classic PAT with 'copilot' scope.")
+                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textTertiary)
+                    }
+                }
+            }
+
+            // Billing mode specific fields
+            if copilotProbeMode == .billing {
+                // GitHub Username (only needed for Billing API)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("GITHUB USERNAME")
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                        .tracking(0.5)
+
+                    TextField("", text: copilotUsernameBinding, prompt: Text("username").foregroundStyle(theme.textTertiary))
+                        .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textPrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(theme.glassBackground)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(theme.glassBorder, lineWidth: 1)
+                                )
+                        )
+                }
+            }
+
+            // Personal Access Token (shared by both modes)
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("PERSONAL ACCESS TOKEN")
@@ -1292,7 +1356,7 @@ struct SettingsContentView: View {
                 }
             }
 
-            // Environment Variable (Alternative)
+            // Environment Variable (Alternative) - shared by both modes
             VStack(alignment: .leading, spacing: 6) {
                 Text("AUTH TOKEN ENV VAR (ALTERNATIVE)")
                     .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
@@ -1317,152 +1381,155 @@ struct SettingsContentView: View {
                     }
             }
 
-            // Monthly Limit (Premium Requests)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("MONTHLY PREMIUM REQUEST LIMIT")
-                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                    .foregroundStyle(theme.textSecondary)
-                    .tracking(0.5)
-
-                Picker("", selection: $copilotMonthlyLimit) {
-                    Text("Free/Pro (50)").tag(50)
-                    Text("Business (300)").tag(300)
-                    Text("Enterprise (1000)").tag(1000)
-                    Text("Pro+ (1500)").tag(1500)
-                }
-                .pickerStyle(.menu)
-                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                .foregroundStyle(theme.textPrimary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(theme.glassBackground)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(theme.glassBorder, lineWidth: 1)
-                        )
-                )
-                .onChange(of: copilotMonthlyLimit) { _, newValue in
-                    UserDefaultsProviderSettingsRepository.shared.setCopilotMonthlyLimit(newValue)
-                }
-
-                Text("Note: This is for premium requests (Copilot Chat with advanced models), not code completions")
-                    .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
-                    .foregroundStyle(theme.textTertiary)
-            }
-
-            // Warning banner for org-based subscriptions
-            if copilotApiReturnedEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(theme.statusWarning)
-                        Text("API returned no usage data")
-                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
-                            .foregroundStyle(theme.textPrimary)
-                    }
-                    
-                    Text("This is common for Copilot Business subscriptions through an organization.")
-                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textSecondary)
-                    
-                    Link(destination: URL(string: "https://github.com/settings/copilot/features")!) {
-                        HStack(spacing: 4) {
-                            Text("View usage on GitHub")
-                                .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 8))
-                        }
-                        .foregroundStyle(theme.accentPrimary)
-                    }
-                }
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(theme.statusWarning.opacity(0.1))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(theme.statusWarning.opacity(0.3), lineWidth: 1)
-                        )
-                )
-            }
-
-            // Manual override toggle
-            Toggle("Enable manual usage entry", isOn: $copilotManualOverrideEnabled)
-                .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
-                .foregroundStyle(theme.textPrimary)
-                .toggleStyle(.switch)
-                .onChange(of: copilotManualOverrideEnabled) { _, newValue in
-                    UserDefaultsProviderSettingsRepository.shared.setCopilotManualOverrideEnabled(newValue)
-                }
-
-            // Manual usage input (shown when toggle is on)
-            if copilotManualOverrideEnabled {
+            // Billing mode specific fields: Monthly Limit, API Warning, Manual Override
+            if copilotProbeMode == .billing {
+                // Monthly Limit (Premium Requests)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("CURRENT PREMIUM REQUEST USAGE")
+                    Text("MONTHLY PREMIUM REQUEST LIMIT")
                         .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
                         .foregroundStyle(theme.textSecondary)
                         .tracking(0.5)
 
-                    TextField("", text: $copilotManualUsageInput, prompt: Text("99 or 198%").foregroundStyle(theme.textTertiary))
-                        .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
-                        .foregroundStyle(theme.textPrimary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(theme.glassBackground)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(
-                                            copilotManualUsageInputError != nil ? Color.red.opacity(0.6) : theme.glassBorder,
-                                            lineWidth: copilotManualUsageInputError != nil ? 1.5 : 1
-                                        )
-                                )
-                        )
-                        .onChange(of: copilotManualUsageInput) { _, newValue in
-                            // Parse input: if ends with %, treat as percentage; otherwise as request count
-                            let trimmed = newValue.trimmingCharacters(in: .whitespaces)
-                            
-                            if trimmed.isEmpty {
-                                // Clear value and error if input is empty
-                                copilotManualUsageInputError = nil
-                                UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(nil)
-                            } else if trimmed.hasSuffix("%") {
-                                // Percentage input (e.g., "198%")
-                                let numberPart = trimmed.dropLast()
-                                if let intValue = Int(numberPart), intValue >= 0 {
-                                    // Valid percentage (integer >= 0)
+                    Picker("", selection: $copilotMonthlyLimit) {
+                        Text("Free/Pro (50)").tag(50)
+                        Text("Business (300)").tag(300)
+                        Text("Enterprise (1000)").tag(1000)
+                        Text("Pro+ (1500)").tag(1500)
+                    }
+                    .pickerStyle(.menu)
+                    .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(theme.glassBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(theme.glassBorder, lineWidth: 1)
+                            )
+                    )
+                    .onChange(of: copilotMonthlyLimit) { _, newValue in
+                        UserDefaultsProviderSettingsRepository.shared.setCopilotMonthlyLimit(newValue)
+                    }
+
+                    Text("Note: This is for premium requests (Copilot Chat with advanced models), not code completions")
+                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textTertiary)
+                }
+
+                // Warning banner for org-based subscriptions
+                if copilotApiReturnedEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(theme.statusWarning)
+                            Text("API returned no usage data")
+                                .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                                .foregroundStyle(theme.textPrimary)
+                        }
+
+                        Text("This is common for Copilot Business subscriptions. Try switching to Copilot API mode.")
+                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textSecondary)
+
+                        Link(destination: URL(string: "https://github.com/settings/copilot/features")!) {
+                            HStack(spacing: 4) {
+                                Text("View usage on GitHub")
+                                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 8))
+                            }
+                            .foregroundStyle(theme.accentPrimary)
+                        }
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(theme.statusWarning.opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(theme.statusWarning.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                }
+
+                // Manual override toggle
+                Toggle("Enable manual usage entry", isOn: $copilotManualOverrideEnabled)
+                    .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+                    .toggleStyle(.switch)
+                    .onChange(of: copilotManualOverrideEnabled) { _, newValue in
+                        UserDefaultsProviderSettingsRepository.shared.setCopilotManualOverrideEnabled(newValue)
+                    }
+
+                // Manual usage input (shown when toggle is on)
+                if copilotManualOverrideEnabled {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("CURRENT PREMIUM REQUEST USAGE")
+                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                            .foregroundStyle(theme.textSecondary)
+                            .tracking(0.5)
+
+                        TextField("", text: $copilotManualUsageInput, prompt: Text("99 or 198%").foregroundStyle(theme.textTertiary))
+                            .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textPrimary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(theme.glassBackground)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(
+                                                copilotManualUsageInputError != nil ? Color.red.opacity(0.6) : theme.glassBorder,
+                                                lineWidth: copilotManualUsageInputError != nil ? 1.5 : 1
+                                            )
+                                    )
+                            )
+                            .onChange(of: copilotManualUsageInput) { _, newValue in
+                                // Parse input: if ends with %, treat as percentage; otherwise as request count
+                                let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+
+                                if trimmed.isEmpty {
+                                    // Clear value and error if input is empty
+                                    copilotManualUsageInputError = nil
+                                    UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(nil)
+                                } else if trimmed.hasSuffix("%") {
+                                    // Percentage input (e.g., "198%")
+                                    let numberPart = trimmed.dropLast()
+                                    if let intValue = Int(numberPart), intValue >= 0 {
+                                        // Valid percentage (integer >= 0)
+                                        copilotManualUsageInputError = nil
+                                        UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(Double(intValue))
+                                        UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageIsPercent(true)
+                                    } else {
+                                        // Invalid percentage
+                                        copilotManualUsageInputError = "Enter a valid number (e.g., 198%)"
+                                        UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(nil)
+                                    }
+                                } else if let intValue = Int(trimmed), intValue >= 0 {
+                                    // Valid request count (integer >= 0)
                                     copilotManualUsageInputError = nil
                                     UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(Double(intValue))
-                                    UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageIsPercent(true)
+                                    UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageIsPercent(false)
                                 } else {
-                                    // Invalid percentage
-                                    copilotManualUsageInputError = "Enter a valid number (e.g., 198%)"
+                                    // Invalid request count
+                                    copilotManualUsageInputError = "Enter a whole number or percentage"
                                     UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(nil)
                                 }
-                            } else if let intValue = Int(trimmed), intValue >= 0 {
-                                // Valid request count (integer >= 0)
-                                copilotManualUsageInputError = nil
-                                UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(Double(intValue))
-                                UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageIsPercent(false)
-                            } else {
-                                // Invalid request count
-                                copilotManualUsageInputError = "Enter a whole number or percentage"
-                                UserDefaultsProviderSettingsRepository.shared.setCopilotManualUsageValue(nil)
                             }
+
+                        if let error = copilotManualUsageInputError {
+                            Text(error)
+                                .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                                .foregroundStyle(.red)
+                        } else {
+                            Text("Enter request count (e.g., 99) or percentage (e.g., 198%)")
+                                .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                                .foregroundStyle(theme.textTertiary)
                         }
-                    
-                    if let error = copilotManualUsageInputError {
-                        Text(error)
-                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(.red)
-                    } else {
-                        Text("Enter request count (e.g., 99) or percentage (e.g., 198%)")
-                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
-                            .foregroundStyle(theme.textTertiary)
                     }
                 }
             }
@@ -1516,20 +1583,36 @@ struct SettingsContentView: View {
                     .foregroundStyle(result.contains("Success") ? theme.statusHealthy : theme.statusCritical)
             }
 
-            // Help text and link
+            // Help text and link - different based on mode
             VStack(alignment: .leading, spacing: 4) {
-                Text("Create a fine-grained PAT with 'Plan: read' permission")
-                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                    .foregroundStyle(theme.textTertiary)
+                if copilotProbeMode == .billing {
+                    Text("Create a fine-grained PAT with 'Plan: read' permission")
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textTertiary)
 
-                Link(destination: URL(string: "https://github.com/settings/tokens?type=beta")!) {
-                    HStack(spacing: 3) {
-                        Text("Create token on GitHub")
-                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 7, weight: .bold))
+                    Link(destination: URL(string: "https://github.com/settings/tokens?type=beta")!) {
+                        HStack(spacing: 3) {
+                            Text("Create fine-grained token")
+                                .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 7, weight: .bold))
+                        }
+                        .foregroundStyle(theme.accentPrimary)
                     }
-                    .foregroundStyle(theme.accentPrimary)
+                } else {
+                    Text("Create a Classic PAT with 'copilot' scope")
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textTertiary)
+
+                    Link(destination: URL(string: "https://github.com/settings/tokens/new")!) {
+                        HStack(spacing: 3) {
+                            Text("Create classic token")
+                                .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 7, weight: .bold))
+                        }
+                        .foregroundStyle(theme.accentPrimary)
+                    }
                 }
             }
 

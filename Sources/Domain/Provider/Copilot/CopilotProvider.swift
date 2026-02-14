@@ -3,6 +3,7 @@ import Observation
 
 /// GitHub Copilot AI provider - a rich domain model.
 /// Observable class with its own state (isSyncing, snapshot, error).
+/// Supports dual probe modes: Billing API (default) and Copilot Internal API.
 /// Owns its probe, credentials, and manages its own data lifecycle.
 @Observable
 public final class CopilotProvider: AIProvider, @unchecked Sendable {
@@ -52,22 +53,74 @@ public final class CopilotProvider: AIProvider, @unchecked Sendable {
         settingsRepository.hasGithubToken()
     }
 
+    // MARK: - Probe Mode
+
+    /// The current probe mode (billing or copilotAPI)
+    public var probeMode: CopilotProbeMode {
+        get {
+            if let copilotSettings = settingsRepository as? CopilotSettingsRepository {
+                return copilotSettings.copilotProbeMode()
+            }
+            return .billing
+        }
+        set {
+            if let copilotSettings = settingsRepository as? CopilotSettingsRepository {
+                copilotSettings.setCopilotProbeMode(newValue)
+            }
+        }
+    }
+
     // MARK: - Internal
 
-    /// The probe used to fetch usage data
-    private let probe: any UsageProbe
+    /// The billing probe for fetching usage data via GitHub Billing API
+    private let billingProbe: any UsageProbe
+
+    /// The internal API probe for fetching usage data via Copilot Internal API (optional)
+    private let internalProbe: (any UsageProbe)?
+
     private let settingsRepository: any CopilotSettingsRepository
+
+    /// Returns the active probe based on current mode
+    private var activeProbe: any UsageProbe {
+        switch probeMode {
+        case .billing:
+            return billingProbe
+        case .copilotAPI:
+            // Fall back to billing if internal probe not available
+            return internalProbe ?? billingProbe
+        }
+    }
 
     // MARK: - Initialization
 
-    /// Creates a Copilot provider with the specified dependencies
+    /// Creates a Copilot provider with a single probe (legacy initializer for tests)
     /// - Parameter probe: The probe to use for fetching usage data
     /// - Parameter settingsRepository: The repository for persisting Copilot settings and credentials
     public init(
         probe: any UsageProbe,
         settingsRepository: any CopilotSettingsRepository
     ) {
-        self.probe = probe
+        self.billingProbe = probe
+        self.internalProbe = nil
+        self.settingsRepository = settingsRepository
+        // Copilot defaults to false (requires setup)
+        self.isEnabled = settingsRepository.isEnabled(forProvider: "copilot", defaultValue: false)
+        // Load persisted username
+        self.username = settingsRepository.getGithubUsername() ?? ""
+    }
+
+    /// Creates a Copilot provider with both billing and internal API probes
+    /// - Parameters:
+    ///   - billingProbe: The probe for fetching usage via GitHub Billing API
+    ///   - internalProbe: The probe for fetching usage via Copilot Internal API
+    ///   - settingsRepository: The repository for persisting settings (must be CopilotSettingsRepository for mode switching)
+    public init(
+        billingProbe: any UsageProbe,
+        internalProbe: any UsageProbe,
+        settingsRepository: any CopilotSettingsRepository
+    ) {
+        self.billingProbe = billingProbe
+        self.internalProbe = internalProbe
         self.settingsRepository = settingsRepository
         // Copilot defaults to false (requires setup)
         self.isEnabled = settingsRepository.isEnabled(forProvider: "copilot", defaultValue: false)
@@ -97,10 +150,11 @@ public final class CopilotProvider: AIProvider, @unchecked Sendable {
     // MARK: - AIProvider Protocol
 
     public func isAvailable() async -> Bool {
-        await probe.isAvailable()
+        await activeProbe.isAvailable()
     }
 
     /// Refreshes the usage data and updates the snapshot.
+    /// Uses the active probe based on current probe mode.
     /// Sets isSyncing during refresh and captures any errors.
     @discardableResult
     public func refresh() async throws -> UsageSnapshot {
@@ -108,7 +162,7 @@ public final class CopilotProvider: AIProvider, @unchecked Sendable {
         defer { isSyncing = false }
 
         do {
-            let newSnapshot = try await probe.probe()
+            let newSnapshot = try await activeProbe.probe()
             snapshot = newSnapshot
             lastError = nil
             return newSnapshot
@@ -116,5 +170,10 @@ public final class CopilotProvider: AIProvider, @unchecked Sendable {
             lastError = error
             throw error
         }
+    }
+
+    /// Whether Copilot Internal API mode is available (internal probe was provided)
+    public var supportsInternalApiMode: Bool {
+        internalProbe != nil
     }
 }

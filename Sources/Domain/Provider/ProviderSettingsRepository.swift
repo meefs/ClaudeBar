@@ -38,6 +38,14 @@ public protocol ZaiSettingsRepository: ProviderSettingsRepository {
 /// Tests can use UserDefaultsProviderSettingsRepository with test UserDefaults.
 /// App uses UserDefaultsProviderSettingsRepository.
 public protocol CopilotSettingsRepository: ProviderSettingsRepository {
+    // MARK: - Probe Mode
+
+    /// Gets the probe mode for Copilot (billing or copilotAPI)
+    func copilotProbeMode() -> CopilotProbeMode
+
+    /// Sets the probe mode for Copilot
+    func setCopilotProbeMode(_ mode: CopilotProbeMode)
+
     // MARK: - Configuration
 
     /// Gets the environment variable name for GitHub Copilot token (empty = no env fallback)
