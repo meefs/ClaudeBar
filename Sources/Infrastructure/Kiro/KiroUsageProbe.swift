@@ -58,7 +58,7 @@ public struct KiroUsageProbe: UsageProbe {
             throw ProbeError.executionFailed(error.localizedDescription)
         }
 
-        AppLog.probes.info("Kiro CLI /usage output:\n\(result.output)")
+        AppLog.probes.debug("Kiro CLI /usage output:\n\(result.output)")
 
         let snapshot = try Self.parse(result.output)
 
@@ -83,7 +83,7 @@ public struct KiroUsageProbe: UsageProbe {
             if let numMatch = bonusLine.range(of: pattern, options: .regularExpression) {
                 let numStr = String(bonusLine[numMatch])
                 let parts = numStr.split(separator: "/")
-                if parts.count == 2, let used = Double(parts[0]), let total = Double(parts[1]) {
+                if parts.count == 2, let used = Double(parts[0]), let total = Double(parts[1]), total > 0 {
                     let remaining = ((total - used) / total) * 100
                     
                     var resetsAt: Date?
@@ -113,7 +113,7 @@ public struct KiroUsageProbe: UsageProbe {
             if let numMatch = creditsLine.range(of: pattern, options: .regularExpression) {
                 let numStr = String(creditsLine[numMatch])
                 let parts = numStr.split(separator: " of ")
-                if parts.count == 2, let used = Double(parts[0]), let total = Double(parts[1]) {
+                if parts.count == 2, let used = Double(parts[0]), let total = Double(parts[1]), total > 0 {
                     let remaining = ((total - used) / total) * 100
                     
                     var resetsAt: Date?
@@ -127,6 +127,10 @@ public struct KiroUsageProbe: UsageProbe {
                             var dateComponents = Calendar.current.dateComponents([.year], from: Date())
                             dateComponents.month = components[0]
                             dateComponents.day = components[1]
+                            if var date = Calendar.current.date(from: dateComponents), date < Date() {
+                                // If date is in the past, assume next year
+                                dateComponents.year = (dateComponents.year ?? 0) + 1
+                            }
                             resetsAt = Calendar.current.date(from: dateComponents)
                         }
                     }

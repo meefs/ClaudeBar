@@ -31,9 +31,10 @@ public struct SimpleCLIExecutor: CLIExecutor {
         
         let inputPipe = Pipe()
         let outputPipe = Pipe()
+        let errorPipe = Pipe()
         task.standardInput = inputPipe
         task.standardOutput = outputPipe
-        task.standardError = outputPipe
+        task.standardError = errorPipe
         
         try task.run()
         
@@ -42,6 +43,20 @@ public struct SimpleCLIExecutor: CLIExecutor {
             inputPipe.fileHandleForWriting.write(data)
         }
         try? inputPipe.fileHandleForWriting.close()
+        
+        // Read output asynchronously to avoid deadlock
+        var outputData = Data()
+        var errorData = Data()
+        
+        let outputQueue = DispatchQueue(label: "kiro.cli.output")
+        let errorQueue = DispatchQueue(label: "kiro.cli.error")
+        
+        outputQueue.async {
+            outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+        }
+        errorQueue.async {
+            errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+        }
         
         // Wait for completion with timeout
         let deadline = Date().addingTimeInterval(timeout)
@@ -54,8 +69,14 @@ public struct SimpleCLIExecutor: CLIExecutor {
             throw ProbeError.executionFailed("Command timed out after \(timeout) seconds")
         }
         
-        let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
+        // Wait for async reads to complete
+        outputQueue.sync {}
+        errorQueue.sync {}
+        
+        // Combine stdout and stderr
+        var combinedData = outputData
+        combinedData.append(errorData)
+        let output = String(data: combinedData, encoding: .utf8) ?? ""
         
         return CLIResult(output: output, exitCode: task.terminationStatus)
     }
