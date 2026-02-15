@@ -190,6 +190,30 @@ public protocol KimiSettingsRepository: ProviderSettingsRepository {
     func setKimiProbeMode(_ mode: KimiProbeMode)
 }
 
+/// MiniMaxi-specific settings repository, extending base ProviderSettingsRepository.
+/// Stores API key configuration for MiniMaxi Coding Plan quota monitoring.
+/// Tests can use UserDefaultsProviderSettingsRepository with test UserDefaults.
+/// App uses UserDefaultsProviderSettingsRepository.
+public protocol MiniMaxiSettingsRepository: ProviderSettingsRepository {
+    /// Gets the environment variable name for MiniMaxi API key (empty = use default MINIMAX_API_KEY)
+    func minimaxiAuthEnvVar() -> String
+
+    /// Sets the environment variable name for MiniMaxi API key
+    func setMinimaxiAuthEnvVar(_ envVar: String)
+
+    /// Saves the MiniMaxi API key (for Settings UI input)
+    func saveMinimaxiApiKey(_ key: String)
+
+    /// Retrieves the MiniMaxi API key
+    func getMinimaxiApiKey() -> String?
+
+    /// Deletes the MiniMaxi API key
+    func deleteMinimaxiApiKey()
+
+    /// Checks if a MiniMaxi API key is saved
+    func hasMinimaxiApiKey() -> Bool
+}
+
 // MARK: - Default Implementation
 
 public extension ProviderSettingsRepository {

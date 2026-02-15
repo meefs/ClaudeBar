@@ -61,6 +61,14 @@ struct SettingsContentView: View {
     @State private var kimiConfigExpanded: Bool = false
     @State private var kimiProbeMode: KimiProbeMode = .cli
 
+    // MiniMaxi settings state
+    @State private var miniMaxiConfigExpanded: Bool = false
+    @State private var miniMaxiApiKeyInput: String = ""
+    @State private var miniMaxiAuthEnvVarInput: String = ""
+    @State private var showMiniMaxiApiKey: Bool = false
+    @State private var isTestingMiniMaxi = false
+    @State private var miniMaxiTestResult: String?
+
     // Hook settings state
     @State private var hooksExpanded: Bool = false
     @State private var hooksEnabled: Bool = false
@@ -74,6 +82,7 @@ struct SettingsContentView: View {
         static let zai = "zai"
         static let bedrock = "bedrock"
         static let kimi = "kimi"
+        static let minimaxi = "minimaxi"
     }
 
     /// The Claude provider from the monitor (cast to ClaudeProvider for probe mode access)
@@ -124,6 +133,10 @@ struct SettingsContentView: View {
         monitor.provider(for: ProviderID.kimi) as? KimiProvider
     }
 
+    private var isMiniMaxiEnabled: Bool {
+        monitor.provider(for: ProviderID.minimaxi)?.isEnabled ?? false
+    }
+
     private var isBedrockEnabled: Bool {
         monitor.provider(for: ProviderID.bedrock)?.isEnabled ?? false
     }
@@ -162,6 +175,10 @@ struct SettingsContentView: View {
                     }
                     if isKimiEnabled {
                         kimiConfigCard
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                    if isMiniMaxiEnabled {
+                        miniMaxiConfigCard
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     if isCopilotEnabled {
@@ -224,6 +241,9 @@ struct SettingsContentView: View {
 
             // Initialize Kimi settings
             kimiProbeMode = UserDefaultsProviderSettingsRepository.shared.kimiProbeMode()
+
+            // Initialize MiniMaxi settings
+            miniMaxiAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.minimaxiAuthEnvVar()
 
             // Initialize Hook settings
             hooksEnabled = UserDefaultsProviderSettingsRepository.shared.isHookEnabled()
@@ -494,6 +514,8 @@ struct SettingsContentView: View {
                                 claudeBudgetExpanded = false
                             case ProviderID.bedrock:
                                 bedrockConfigExpanded = false
+                            case ProviderID.minimaxi:
+                                miniMaxiConfigExpanded = false
                             default:
                                 break
                             }
@@ -992,6 +1014,251 @@ struct SettingsContentView: View {
                         .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
                         .foregroundStyle(theme.textTertiary)
                 }
+            }
+        }
+    }
+
+    // MARK: - MiniMaxi Config Card
+
+    private var miniMaxiConfigCard: some View {
+        DisclosureGroup(isExpanded: $miniMaxiConfigExpanded) {
+            Divider()
+                .background(theme.glassBorder)
+                .padding(.vertical, 12)
+
+            miniMaxiConfigForm
+        } label: {
+            miniMaxiConfigHeader
+                .contentShape(.rect)
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        miniMaxiConfigExpanded.toggle()
+                    }
+                }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(theme.cardGradient)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    theme.glassBorder, theme.glassBorder.opacity(0.5)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+    }
+
+    private var miniMaxiConfigHeader: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.91, green: 0.27, blue: 0.42),
+                                Color(red: 0.96, green: 0.53, blue: 0.24)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: "waveform")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("MiniMaxi Configuration")
+                    .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+
+                Text("Coding Plan quota tracking")
+                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+            }
+
+            Spacer()
+        }
+    }
+
+    private var miniMaxiConfigForm: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // API Key input
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("API KEY")
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                        .tracking(0.5)
+
+                    Spacer()
+
+                    if UserDefaultsProviderSettingsRepository.shared.hasMinimaxiApiKey() {
+                        HStack(spacing: 3) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 9))
+                            Text("Configured")
+                                .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        }
+                        .foregroundStyle(theme.statusHealthy)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Group {
+                        if showMiniMaxiApiKey {
+                            TextField("", text: $miniMaxiApiKeyInput, prompt: Text("eyJhbGci...").foregroundStyle(theme.textTertiary))
+                        } else {
+                            SecureField("", text: $miniMaxiApiKeyInput, prompt: Text("eyJhbGci...").foregroundStyle(theme.textTertiary))
+                        }
+                    }
+                    .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(theme.glassBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(theme.glassBorder, lineWidth: 1)
+                            )
+                    )
+
+                    // Eye button
+                    Button {
+                        showMiniMaxiApiKey.toggle()
+                    } label: {
+                        Image(systemName: showMiniMaxiApiKey ? "eye.slash.fill" : "eye.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(theme.textSecondary)
+                            .frame(width: 28, height: 28)
+                            .background(
+                                Circle()
+                                    .fill(theme.glassBackground)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Environment Variable (Alternative)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("API KEY ENV VAR (ALTERNATIVE)")
+                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textSecondary)
+                    .tracking(0.5)
+
+                TextField("", text: $miniMaxiAuthEnvVarInput, prompt: Text("MINIMAX_API_KEY").foregroundStyle(theme.textTertiary))
+                    .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(theme.glassBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(theme.glassBorder, lineWidth: 1)
+                            )
+                    )
+                    .onChange(of: miniMaxiAuthEnvVarInput) { _, newValue in
+                        UserDefaultsProviderSettingsRepository.shared.setMinimaxiAuthEnvVar(newValue)
+                    }
+            }
+
+            // Token lookup order
+            VStack(alignment: .leading, spacing: 4) {
+                Text("API KEY LOOKUP ORDER")
+                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textSecondary)
+                    .tracking(0.5)
+
+                Text("1. First checks environment variable (default: MINIMAX_API_KEY)")
+                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+                Text("2. Falls back to API key entered above")
+                    .font(.system(size: 10, weight: .medium, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+            }
+
+            // Save & Test button
+            if isTestingMiniMaxi {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    Text("Testing connection...")
+                        .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                }
+            } else {
+                Button {
+                    Task {
+                        await testMiniMaxiConnection()
+                    }
+                } label: {
+                    Text("Save & Test Connection")
+                        .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(theme.accentPrimary)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let result = miniMaxiTestResult {
+                Text(result)
+                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(result.contains("Success") ? theme.statusHealthy : theme.statusCritical)
+            }
+
+            // Help link
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Get your API key from MiniMaxi platform")
+                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textTertiary)
+
+                Link(destination: URL(string: "https://platform.minimaxi.com/user-center/basic-information/interface-key")!) {
+                    HStack(spacing: 3) {
+                        Text("Open MiniMaxi API Keys")
+                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 7, weight: .bold))
+                    }
+                    .foregroundStyle(theme.accentPrimary)
+                }
+            }
+
+            // Delete API key
+            if UserDefaultsProviderSettingsRepository.shared.hasMinimaxiApiKey() {
+                Button {
+                    UserDefaultsProviderSettingsRepository.shared.deleteMinimaxiApiKey()
+                    miniMaxiApiKeyInput = ""
+                    miniMaxiTestResult = nil
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 9))
+                        Text("Remove API Key")
+                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    }
+                    .foregroundStyle(theme.statusCritical)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -2659,6 +2926,34 @@ struct SettingsContentView: View {
         // Refresh state that may have been updated by the probe
         copilotApiReturnedEmpty = UserDefaultsProviderSettingsRepository.shared.copilotApiReturnedEmpty()
         isTestingCopilot = false
+    }
+
+    private func testMiniMaxiConnection() async {
+        isTestingMiniMaxi = true
+        miniMaxiTestResult = nil
+
+        // Save current inputs
+        UserDefaultsProviderSettingsRepository.shared.setMinimaxiAuthEnvVar(miniMaxiAuthEnvVarInput)
+        if !miniMaxiApiKeyInput.isEmpty {
+            AppLog.credentials.info("Saving MiniMaxi API key for connection test")
+            UserDefaultsProviderSettingsRepository.shared.saveMinimaxiApiKey(miniMaxiApiKeyInput)
+            miniMaxiApiKeyInput = ""
+        }
+
+        // Try to refresh the MiniMaxi provider
+        AppLog.credentials.info("Testing MiniMaxi connection via provider refresh")
+        await monitor.refresh(providerId: ProviderID.minimaxi)
+
+        // Check if there's an error after refresh
+        if let error = monitor.provider(for: ProviderID.minimaxi)?.lastError {
+            AppLog.credentials.error("MiniMaxi connection test failed: \(error.localizedDescription)")
+            miniMaxiTestResult = "Failed: \(error.localizedDescription)"
+        } else {
+            AppLog.credentials.info("MiniMaxi connection test succeeded")
+            miniMaxiTestResult = "Success: Connection verified"
+        }
+
+        isTestingMiniMaxi = false
     }
 }
 

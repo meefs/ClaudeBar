@@ -84,6 +84,10 @@ struct ClaudeBarApp: App {
                 apiProbe: KimiUsageProbe(),
                 settingsRepository: settingsRepository
             ),
+            MiniMaxiProvider(
+                probe: MiniMaxiUsageProbe(settingsRepository: settingsRepository),
+                settingsRepository: settingsRepository
+            ),
         ])
         AppLog.providers.info("Created \(repository.all.count) providers")
 
