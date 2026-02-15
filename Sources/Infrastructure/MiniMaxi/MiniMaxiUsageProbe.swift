@@ -66,7 +66,7 @@ public struct MiniMaxiUsageProbe: UsageProbe {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.timeoutInterval = timeout
 
         let (data, response) = try await networkClient.request(request)
@@ -138,9 +138,9 @@ public struct MiniMaxiUsageProbe: UsageProbe {
             // Confirmed via MiniMaxi dashboard: when dashboard shows "3% used",
             // API returns usage_count=1459 out of total=1500 (i.e. 1459 remaining).
             // (MiniMaxi API 命名有误导性：usage_count 实际是剩余次数，非已用次数)
-            let remainingCount = model.currentIntervalUsageCount
-            let usedCount = total - remainingCount
-            let remaining = total > 0 ? Double(remainingCount) / Double(total) * 100.0 : 0.0
+            let clampedRemaining = min(max(model.currentIntervalUsageCount, 0), total)
+            let usedCount = total - clampedRemaining
+            let remaining = total > 0 ? Double(clampedRemaining) / Double(total) * 100.0 : 0.0
 
             // Parse end_time as millisecond timestamp (毫秒时间戳)
             let resetsAt: Date? = model.endTime.map { Date(timeIntervalSince1970: Double($0) / 1000.0) }
