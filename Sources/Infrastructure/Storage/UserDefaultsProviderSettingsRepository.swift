@@ -3,7 +3,7 @@ import Domain
 
 /// UserDefaults-based implementation of ProviderSettingsRepository and its sub-protocols.
 /// Persists provider settings like isEnabled state and provider-specific configuration.
-public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, MiniMaxiSettingsRepository, HookSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, MiniMaxSettingsRepository, HookSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -249,7 +249,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         }
     }
 
-    // MARK: - MiniMaxiSettingsRepository
+    // MARK: - MiniMaxSettingsRepository
 
     public func minimaxiAuthEnvVar() -> String {
         userDefaults.string(forKey: Keys.minimaxiAuthEnvVar) ?? ""
@@ -324,7 +324,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let awsProfileName = "providerConfig.awsProfileName"
         static let bedrockRegions = "providerConfig.bedrockRegions"
         static let bedrockDailyBudget = "providerConfig.bedrockDailyBudget"
-        // MiniMaxi settings
+        // MiniMax settings (key strings kept for backward compatibility 保持向后兼容)
         static let minimaxiAuthEnvVar = "providerConfig.minimaxiAuthEnvVar"
         static let minimaxiApiKey = "com.claudebar.credentials.minimaxi-api-key"
         // Credentials (kept compatible with old UserDefaultsCredentialRepository keys)

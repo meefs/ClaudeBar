@@ -629,7 +629,7 @@ extension AppTheme {
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.60, blue: 0.20)
                 : Color(red: 0.92, green: 0.47, blue: 0.07)
-        case "minimaxi":
+        case "minimax":
             // MiniMax brand pink-orange
             return scheme == .dark
                 ? Color(red: 0.91, green: 0.27, blue: 0.42)
@@ -672,7 +672,7 @@ extension AppTheme {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.40, blue: 0.15)
                 : Color(red: 0.75, green: 0.30, blue: 0.05)
-        case "minimaxi":
+        case "minimax":
             // MiniMax pink-to-orange gradient
             secondaryColor = scheme == .dark
                 ? Color(red: 0.96, green: 0.53, blue: 0.24)
@@ -698,7 +698,7 @@ extension AppTheme {
         case "antigravity": return "AntigravityIcon"
         case "zai": return "ZaiIcon"
         case "bedrock": return "BedrockIcon"
-        case "minimaxi": return "MiniMaxiIcon"
+        case "minimax": return "MiniMaxIcon"
         default: return "QuestionIcon"
         }
     }
@@ -713,7 +713,7 @@ extension AppTheme {
         case "antigravity": return "Antigravity"
         case "zai": return "Z.ai"
         case "bedrock": return "AWS Bedrock"
-        case "minimaxi": return "MiniMaxi"
+        case "minimax": return "MiniMax"
         default: return providerId.capitalized
         }
     }
@@ -728,7 +728,7 @@ extension AppTheme {
         case "antigravity": return "wand.and.stars"
         case "zai": return "z.square.fill"
         case "bedrock": return "cloud.fill" // AWS cloud icon
-        case "minimaxi": return "waveform"
+        case "minimax": return "waveform"
         default: return "questionmark.circle.fill"
         }
     }

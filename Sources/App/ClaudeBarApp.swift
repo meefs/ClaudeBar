@@ -85,8 +85,8 @@ struct ClaudeBarApp: App {
                 settingsRepository: settingsRepository
             ),
             KiroProvider(probe: KiroUsageProbe(), settingsRepository: settingsRepository),
-            MiniMaxiProvider(
-                probe: MiniMaxiUsageProbe(settingsRepository: settingsRepository),
+            MiniMaxProvider(
+                probe: MiniMaxUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
             ),
         ])
