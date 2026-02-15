@@ -231,10 +231,23 @@ struct MenuContentView: View {
 
     private var headerView: some View {
         HStack(spacing: 12) {
-            // Custom Provider Icon - changes based on selected provider
+            // Custom Provider Icon - shows AppLogo in overview mode, provider icon otherwise
             // Avoid animation on provider icon to prevent constraint update loops in MenuBarExtra
             ZStack {
-                ProviderIconView(providerId: selectedProviderId, size: 38)
+                if settings.overviewModeEnabled, let logo = NSImage(named: "AppLogo") {
+                    Image(nsImage: logo)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 38, height: 38)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(theme.accentPrimary.opacity(0.3), lineWidth: 2)
+                        )
+                        .shadow(color: theme.accentPrimary.opacity(0.15), radius: 3, y: 1)
+                } else {
+                    ProviderIconView(providerId: selectedProviderId, size: 38)
+                }
 
                 // Christmas star sparkle overlay
                 if theme.id == "christmas" {
