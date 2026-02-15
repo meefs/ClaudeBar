@@ -268,6 +268,34 @@ extension KimiProvider: ProviderVisualIdentity {
     }
 }
 
+// MARK: - KiroProvider Visual Identity
+
+extension KiroProvider: ProviderVisualIdentity {
+    public var symbolIcon: String { "wand.and.stars.inverse" }
+
+    public var iconAssetName: String { "KiroIcon" }
+
+    public func themeColor(for scheme: ColorScheme) -> Color {
+        // Purple/magenta color matching Kiro branding
+        scheme == .dark
+            ? Color(red: 0.55, green: 0.35, blue: 0.85)
+            : Color(red: 0.45, green: 0.25, blue: 0.75)
+    }
+
+    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
+        LinearGradient(
+            colors: [
+                themeColor(for: scheme),
+                scheme == .dark
+                    ? Color(red: 0.70, green: 0.45, blue: 0.95)
+                    : Color(red: 0.60, green: 0.35, blue: 0.85)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 // MARK: - MiniMaxiProvider Visual Identity
 
 extension MiniMaxiProvider: ProviderVisualIdentity {
@@ -376,6 +404,10 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 0.30, green: 0.65, blue: 0.95)
                 : Color(red: 0.20, green: 0.55, blue: 0.85)
+        case "kiro":
+            return scheme == .dark
+                ? Color(red: 0.55, green: 0.35, blue: 0.85)
+                : Color(red: 0.45, green: 0.25, blue: 0.75)
         case "minimaxi":
             return scheme == .dark
                 ? Color(red: 0.91, green: 0.27, blue: 0.42)
@@ -427,6 +459,10 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.20, green: 0.50, blue: 0.80)
                 : Color(red: 0.10, green: 0.40, blue: 0.70)
+        case "kiro":
+            secondaryColor = scheme == .dark
+                ? Color(red: 0.70, green: 0.45, blue: 0.95)
+                : Color(red: 0.60, green: 0.35, blue: 0.85)
         case "minimaxi":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.96, green: 0.53, blue: 0.24)
@@ -458,6 +494,7 @@ enum ProviderVisualIdentityLookup {
         case "bedrock": return "BedrockIcon"
         case "ampcode": return "AmpCodeIcon"
         case "kimi": return "KimiIcon"
+        case "kiro": return "KiroIcon"
         case "minimaxi": return "MiniMaxiIcon"
         default: return "QuestionIcon"
         }
@@ -475,6 +512,7 @@ enum ProviderVisualIdentityLookup {
         case "bedrock": return "AWS Bedrock"
         case "ampcode": return "Amp"
         case "kimi": return "Kimi"
+        case "kiro": return "Kiro"
         case "minimaxi": return "MiniMaxi"
         default: return providerId.capitalized
         }
@@ -492,6 +530,7 @@ enum ProviderVisualIdentityLookup {
         case "bedrock": return "cloud.fill"
         case "ampcode": return "bolt.fill"
         case "kimi": return "k.square.fill"
+        case "kiro": return "wand.and.stars.inverse"
         case "minimaxi": return "waveform"
         default: return "questionmark.circle.fill"
         }

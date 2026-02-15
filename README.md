@@ -8,7 +8,7 @@
 [![Platform](https://img.shields.io/badge/Platform-macOS%2015-blue.svg)](https://developer.apple.com)
 [![Homebrew](https://img.shields.io/badge/Homebrew-Install-brightgreen.svg)](https://formulae.brew.sh/cask/claudebar)
 
-A macOS menu bar application that monitors AI coding assistant usage quotas. Keep track of your Claude, Codex, Gemini, GitHub Copilot, Antigravity, Z.ai, Kimi, and Amp usage at a glance.
+A macOS menu bar application that monitors AI coding assistant usage quotas. Keep track of your Claude, Codex, Gemini, GitHub Copilot, Antigravity, Z.ai, Kimi, Kiro, and Amp usage at a glance.
 
 <table align="center">
   <tr>
@@ -23,7 +23,7 @@ A macOS menu bar application that monitors AI coding assistant usage quotas. Kee
 
 ## Features
 
-- **Multi-Provider Support** - Monitor Claude, Codex, Gemini, GitHub Copilot, Antigravity, Z.ai, Kimi, and Amp quotas in one place
+- **Multi-Provider Support** - Monitor Claude, Codex, Gemini, GitHub Copilot, Antigravity, Z.ai, Kimi, Kiro, and Amp quotas in one place
 - **Provider Enable/Disable** - Toggle individual providers on/off from Settings to customize your monitoring
 - **Real-Time Quota Tracking** - View Session, Weekly, and Model-specific usage percentages
 - **Multiple Themes** - Light, Dark, CLI (terminal-style), and festive Christmas themes
@@ -54,6 +54,7 @@ A macOS menu bar application that monitors AI coding assistant usage quotas. Kee
   - [Antigravity](https://antigravity.google) - Auto-detected when running locally
   - [Z.ai](https://z.ai/subscribe) - Configure Claude Code with GLM Coding Plan endpoint
   - [Kimi](https://www.kimi.com/code/console) (`kimi`) - CLI mode (recommended) or API mode (see below)
+  - [Kiro](https://kiro.dev) (`kiro-cli`) - Requires kiro-cli installation (see below)
   - [Amp](https://ampcode.com) (`amp`) - Auto-detected when CLI is installed
 
 ### Kimi Setup
@@ -68,6 +69,16 @@ Kimi supports two probe modes, configurable in **Settings > Kimi Configuration**
 3. Restart ClaudeBar
 
 You can also set the `KIMI_AUTH_TOKEN` environment variable to bypass cookie reading in API mode.
+
+### Kiro Setup
+
+Kiro monitors AWS Kiro (formerly CodeWhisperer) usage through the `kiro-cli` command-line tool.
+
+**Installation**: `uv tool install kiro-cli` or `pip install kiro-cli`
+
+**Authentication**: Run `kiro-cli` and follow the login prompts.
+
+**Kiro IDE Users**: If you use Kiro IDE, simply install kiro-cli. Both share the same authentication, so no additional login is required.
 
 ## Installation
 
