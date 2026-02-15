@@ -11,19 +11,27 @@ import Domain
 ///
 /// The auth cookie format is: `WorkosCursorSessionToken={userId}::{accessToken}`
 ///
-/// API response shape (usage-summary):
+/// Actual API response shape (usage-summary):
 /// ```json
 /// {
-///   "membershipType": "pro",
-///   "planUsage": {
-///     "used": 123,
-///     "limit": 500,
-///     "remaining": 377,
-///     "percentUsed": 24.6
-///   },
-///   "onDemandUsage": { "used": 5, "limit": 100 },
-///   "billingCycleStart": "2025-01-01T00:00:00Z",
-///   "billingCycleEnd": "2025-02-01T00:00:00Z"
+///   "membershipType": "ultra",
+///   "isUnlimited": false,
+///   "billingCycleStart": "2026-02-06T03:34:49.000Z",
+///   "billingCycleEnd": "2026-03-06T03:34:49.000Z",
+///   "individualUsage": {
+///     "plan": {
+///       "enabled": true,
+///       "used": 326,
+///       "limit": 40000,
+///       "remaining": 39674
+///     },
+///     "onDemand": {
+///       "enabled": false,
+///       "used": 0,
+///       "limit": null,
+///       "remaining": null
+///     }
+///   }
 /// }
 /// ```
 public struct CursorUsageProbe: UsageProbe {
@@ -188,6 +196,8 @@ public struct CursorUsageProbe: UsageProbe {
     // MARK: - Response Parsing (static for testability)
 
     /// Parses the Cursor usage-summary API response into a UsageSnapshot.
+    ///
+    /// The API returns usage nested under `individualUsage.plan` and `individualUsage.onDemand`.
     public static func parseUsageSummary(_ data: Data) throws -> UsageSnapshot {
         let json: [String: Any]
         do {
@@ -219,11 +229,14 @@ public struct CursorUsageProbe: UsageProbe {
             }
         }
 
+        // The API nests usage under "individualUsage" with "plan" and "onDemand" sub-objects
+        let individualUsage = json["individualUsage"] as? [String: Any]
+
         // Parse plan usage (included requests)
-        if let planUsage = json["planUsage"] as? [String: Any],
+        if let planUsage = individualUsage?["plan"] as? [String: Any],
            let enabled = planUsage["enabled"] as? Bool, enabled {
-            let used = (planUsage["used"] as? Int) ?? (planUsage["used"] as? Double).map { Int($0) } ?? 0
-            let limit = (planUsage["limit"] as? Int) ?? (planUsage["limit"] as? Double).map { Int($0) } ?? 0
+            let used = Self.intValue(from: planUsage, key: "used") ?? 0
+            let limit = Self.intValue(from: planUsage, key: "limit") ?? 0
 
             if limit > 0 {
                 let percentRemaining = Double(limit - used) / Double(limit) * 100
@@ -240,10 +253,10 @@ public struct CursorUsageProbe: UsageProbe {
         }
 
         // Parse on-demand usage (usage-based pricing)
-        if let onDemand = json["onDemandUsage"] as? [String: Any],
+        if let onDemand = individualUsage?["onDemand"] as? [String: Any],
            let enabled = onDemand["enabled"] as? Bool, enabled {
-            let used = (onDemand["used"] as? Int) ?? (onDemand["used"] as? Double).map { Int($0) } ?? 0
-            let limit = (onDemand["limit"] as? Int) ?? (onDemand["limit"] as? Double).map { Int($0) } ?? 0
+            let used = Self.intValue(from: onDemand, key: "used") ?? 0
+            let limit = Self.intValue(from: onDemand, key: "limit") ?? 0
 
             if limit > 0 {
                 let percentRemaining = Double(limit - used) / Double(limit) * 100
@@ -277,6 +290,7 @@ public struct CursorUsageProbe: UsageProbe {
         case "pro": .custom("PRO")
         case "business": .custom("BUSINESS")
         case "free": .custom("FREE")
+        case "ultra": .custom("ULTRA")
         default: membershipType.isEmpty ? nil : .custom(membershipType.uppercased())
         }
 
@@ -286,5 +300,16 @@ public struct CursorUsageProbe: UsageProbe {
             capturedAt: Date(),
             accountTier: tier
         )
+    }
+
+    /// Safely extracts an Int from a JSON dictionary value that could be Int, Double, or NSNumber.
+    private static func intValue(from dict: [String: Any], key: String) -> Int? {
+        if let intVal = dict[key] as? Int {
+            return intVal
+        }
+        if let doubleVal = dict[key] as? Double {
+            return Int(doubleVal)
+        }
+        return nil
     }
 }
