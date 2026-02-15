@@ -268,6 +268,34 @@ extension KimiProvider: ProviderVisualIdentity {
     }
 }
 
+// MARK: - MiniMaxiProvider Visual Identity
+
+extension MiniMaxiProvider: ProviderVisualIdentity {
+    public var symbolIcon: String { "waveform" }
+
+    public var iconAssetName: String { "MiniMaxiIcon" }
+
+    public func themeColor(for scheme: ColorScheme) -> Color {
+        // MiniMax brand pink-orange
+        scheme == .dark
+            ? Color(red: 0.91, green: 0.27, blue: 0.42)
+            : Color(red: 0.82, green: 0.20, blue: 0.35)
+    }
+
+    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
+        LinearGradient(
+            colors: [
+                themeColor(for: scheme),
+                scheme == .dark
+                    ? Color(red: 0.96, green: 0.53, blue: 0.24)
+                    : Color(red: 0.86, green: 0.43, blue: 0.14)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 // MARK: - AIProvider Visual Identity Helper
 
 /// Extension to access visual identity from any AIProvider.
@@ -348,6 +376,10 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 0.30, green: 0.65, blue: 0.95)
                 : Color(red: 0.20, green: 0.55, blue: 0.85)
+        case "minimaxi":
+            return scheme == .dark
+                ? Color(red: 0.91, green: 0.27, blue: 0.42)
+                : Color(red: 0.82, green: 0.20, blue: 0.35)
         default:
             return BaseTheme.purpleVibrant
         }
@@ -395,6 +427,10 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.20, green: 0.50, blue: 0.80)
                 : Color(red: 0.10, green: 0.40, blue: 0.70)
+        case "minimaxi":
+            secondaryColor = scheme == .dark
+                ? Color(red: 0.96, green: 0.53, blue: 0.24)
+                : Color(red: 0.86, green: 0.43, blue: 0.14)
         default:
             return LinearGradient(
                 colors: [BaseTheme.coralAccent, BaseTheme.pinkHot],
@@ -422,6 +458,7 @@ enum ProviderVisualIdentityLookup {
         case "bedrock": return "BedrockIcon"
         case "ampcode": return "AmpCodeIcon"
         case "kimi": return "KimiIcon"
+        case "minimaxi": return "MiniMaxiIcon"
         default: return "QuestionIcon"
         }
     }
@@ -438,6 +475,7 @@ enum ProviderVisualIdentityLookup {
         case "bedrock": return "AWS Bedrock"
         case "ampcode": return "Amp"
         case "kimi": return "Kimi"
+        case "minimaxi": return "MiniMaxi"
         default: return providerId.capitalized
         }
     }
@@ -454,6 +492,7 @@ enum ProviderVisualIdentityLookup {
         case "bedrock": return "cloud.fill"
         case "ampcode": return "bolt.fill"
         case "kimi": return "k.square.fill"
+        case "minimaxi": return "waveform"
         default: return "questionmark.circle.fill"
         }
     }

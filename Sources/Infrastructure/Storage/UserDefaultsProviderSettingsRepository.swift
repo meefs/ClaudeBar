@@ -3,7 +3,7 @@ import Domain
 
 /// UserDefaults-based implementation of ProviderSettingsRepository and its sub-protocols.
 /// Persists provider settings like isEnabled state and provider-specific configuration.
-public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, HookSettingsRepository, @unchecked Sendable {
+public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository, CopilotSettingsRepository, BedrockSettingsRepository, ClaudeSettingsRepository, CodexSettingsRepository, KimiSettingsRepository, MiniMaxiSettingsRepository, HookSettingsRepository, @unchecked Sendable {
     /// Shared singleton instance
     public static let shared = UserDefaultsProviderSettingsRepository()
 
@@ -249,6 +249,32 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         }
     }
 
+    // MARK: - MiniMaxiSettingsRepository
+
+    public func minimaxiAuthEnvVar() -> String {
+        userDefaults.string(forKey: Keys.minimaxiAuthEnvVar) ?? ""
+    }
+
+    public func setMinimaxiAuthEnvVar(_ envVar: String) {
+        userDefaults.set(envVar, forKey: Keys.minimaxiAuthEnvVar)
+    }
+
+    public func saveMinimaxiApiKey(_ key: String) {
+        userDefaults.set(key, forKey: Keys.minimaxiApiKey)
+    }
+
+    public func getMinimaxiApiKey() -> String? {
+        userDefaults.string(forKey: Keys.minimaxiApiKey)
+    }
+
+    public func deleteMinimaxiApiKey() {
+        userDefaults.removeObject(forKey: Keys.minimaxiApiKey)
+    }
+
+    public func hasMinimaxiApiKey() -> Bool {
+        userDefaults.object(forKey: Keys.minimaxiApiKey) != nil
+    }
+
     // MARK: - HookSettingsRepository
 
     public func isHookEnabled() -> Bool {
@@ -298,6 +324,9 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let awsProfileName = "providerConfig.awsProfileName"
         static let bedrockRegions = "providerConfig.bedrockRegions"
         static let bedrockDailyBudget = "providerConfig.bedrockDailyBudget"
+        // MiniMaxi settings
+        static let minimaxiAuthEnvVar = "providerConfig.minimaxiAuthEnvVar"
+        static let minimaxiApiKey = "com.claudebar.credentials.minimaxi-api-key"
         // Credentials (kept compatible with old UserDefaultsCredentialRepository keys)
         static let githubToken = "com.claudebar.credentials.github-copilot-token"
         static let githubUsername = "com.claudebar.credentials.github-username"
