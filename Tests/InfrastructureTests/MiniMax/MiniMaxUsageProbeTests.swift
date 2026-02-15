@@ -5,7 +5,7 @@ import Mockable
 @testable import Domain
 
 @Suite
-struct MiniMaxiUsageProbeTests {
+struct MiniMaxUsageProbeTests {
 
     // MARK: - Sample Data
 
@@ -31,14 +31,14 @@ struct MiniMaxiUsageProbeTests {
         apiKey: String? = nil,
         envVar: String = "",
         networkClient: any NetworkClient = MockNetworkClient()
-    ) -> MiniMaxiUsageProbe {
-        let defaults = UserDefaults(suiteName: "MiniMaxiProbeTests.\(UUID().uuidString)")!
+    ) -> MiniMaxUsageProbe {
+        let defaults = UserDefaults(suiteName: "MiniMaxProbeTests.\(UUID().uuidString)")!
         let settingsRepository = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
         settingsRepository.setMinimaxiAuthEnvVar(envVar)
         if let apiKey {
             settingsRepository.saveMinimaxiApiKey(apiKey)
         }
-        return MiniMaxiUsageProbe(
+        return MiniMaxUsageProbe(
             networkClient: networkClient,
             settingsRepository: settingsRepository
         )
@@ -89,7 +89,7 @@ struct MiniMaxiUsageProbeTests {
         // Then
         #expect(snapshot.quotas.count == 1)
         #expect(snapshot.quotas[0].quotaType == .modelSpecific("minimax-m2"))
-        #expect(snapshot.providerId == "minimaxi")
+        #expect(snapshot.providerId == "minimax")
     }
 
     @Test

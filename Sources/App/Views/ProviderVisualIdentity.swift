@@ -296,12 +296,12 @@ extension KiroProvider: ProviderVisualIdentity {
     }
 }
 
-// MARK: - MiniMaxiProvider Visual Identity
+// MARK: - MiniMaxProvider Visual Identity
 
-extension MiniMaxiProvider: ProviderVisualIdentity {
+extension MiniMaxProvider: ProviderVisualIdentity {
     public var symbolIcon: String { "waveform" }
 
-    public var iconAssetName: String { "MiniMaxiIcon" }
+    public var iconAssetName: String { "MiniMaxIcon" }
 
     public func themeColor(for scheme: ColorScheme) -> Color {
         // MiniMax brand pink-orange
@@ -408,7 +408,7 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 0.55, green: 0.35, blue: 0.85)
                 : Color(red: 0.45, green: 0.25, blue: 0.75)
-        case "minimaxi":
+        case "minimax":
             return scheme == .dark
                 ? Color(red: 0.91, green: 0.27, blue: 0.42)
                 : Color(red: 0.82, green: 0.20, blue: 0.35)
@@ -463,7 +463,7 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.70, green: 0.45, blue: 0.95)
                 : Color(red: 0.60, green: 0.35, blue: 0.85)
-        case "minimaxi":
+        case "minimax":
             secondaryColor = scheme == .dark
                 ? Color(red: 0.96, green: 0.53, blue: 0.24)
                 : Color(red: 0.86, green: 0.43, blue: 0.14)
@@ -495,7 +495,7 @@ enum ProviderVisualIdentityLookup {
         case "ampcode": return "AmpCodeIcon"
         case "kimi": return "KimiIcon"
         case "kiro": return "KiroIcon"
-        case "minimaxi": return "MiniMaxiIcon"
+        case "minimax": return "MiniMaxIcon"
         default: return "QuestionIcon"
         }
     }
@@ -513,7 +513,7 @@ enum ProviderVisualIdentityLookup {
         case "ampcode": return "Amp"
         case "kimi": return "Kimi"
         case "kiro": return "Kiro"
-        case "minimaxi": return "MiniMaxi"
+        case "minimax": return "MiniMax"
         default: return providerId.capitalized
         }
     }
@@ -531,7 +531,7 @@ enum ProviderVisualIdentityLookup {
         case "ampcode": return "bolt.fill"
         case "kimi": return "k.square.fill"
         case "kiro": return "wand.and.stars.inverse"
-        case "minimaxi": return "waveform"
+        case "minimax": return "waveform"
         default: return "questionmark.circle.fill"
         }
     }

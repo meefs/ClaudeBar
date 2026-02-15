@@ -61,13 +61,13 @@ struct SettingsContentView: View {
     @State private var kimiConfigExpanded: Bool = false
     @State private var kimiProbeMode: KimiProbeMode = .cli
 
-    // MiniMaxi settings state
-    @State private var miniMaxiConfigExpanded: Bool = false
-    @State private var miniMaxiApiKeyInput: String = ""
-    @State private var miniMaxiAuthEnvVarInput: String = ""
-    @State private var showMiniMaxiApiKey: Bool = false
-    @State private var isTestingMiniMaxi = false
-    @State private var miniMaxiTestResult: String?
+    // MiniMax settings state
+    @State private var miniMaxConfigExpanded: Bool = false
+    @State private var miniMaxApiKeyInput: String = ""
+    @State private var miniMaxAuthEnvVarInput: String = ""
+    @State private var showMiniMaxApiKey: Bool = false
+    @State private var isTestingMiniMax = false
+    @State private var miniMaxTestResult: String?
 
     // Hook settings state
     @State private var hooksExpanded: Bool = false
@@ -82,7 +82,7 @@ struct SettingsContentView: View {
         static let zai = "zai"
         static let bedrock = "bedrock"
         static let kimi = "kimi"
-        static let minimaxi = "minimaxi"
+        static let minimax = "minimax"
     }
 
     /// The Claude provider from the monitor (cast to ClaudeProvider for probe mode access)
@@ -133,8 +133,8 @@ struct SettingsContentView: View {
         monitor.provider(for: ProviderID.kimi) as? KimiProvider
     }
 
-    private var isMiniMaxiEnabled: Bool {
-        monitor.provider(for: ProviderID.minimaxi)?.isEnabled ?? false
+    private var isMiniMaxEnabled: Bool {
+        monitor.provider(for: ProviderID.minimax)?.isEnabled ?? false
     }
 
     private var isBedrockEnabled: Bool {
@@ -177,8 +177,8 @@ struct SettingsContentView: View {
                         kimiConfigCard
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
-                    if isMiniMaxiEnabled {
-                        miniMaxiConfigCard
+                    if isMiniMaxEnabled {
+                        miniMaxConfigCard
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     if isCopilotEnabled {
@@ -242,8 +242,8 @@ struct SettingsContentView: View {
             // Initialize Kimi settings
             kimiProbeMode = UserDefaultsProviderSettingsRepository.shared.kimiProbeMode()
 
-            // Initialize MiniMaxi settings
-            miniMaxiAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.minimaxiAuthEnvVar()
+            // Initialize MiniMax settings
+            miniMaxAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.minimaxiAuthEnvVar()
 
             // Initialize Hook settings
             hooksEnabled = UserDefaultsProviderSettingsRepository.shared.isHookEnabled()
@@ -514,8 +514,8 @@ struct SettingsContentView: View {
                                 claudeBudgetExpanded = false
                             case ProviderID.bedrock:
                                 bedrockConfigExpanded = false
-                            case ProviderID.minimaxi:
-                                miniMaxiConfigExpanded = false
+                            case ProviderID.minimax:
+                                miniMaxConfigExpanded = false
                             default:
                                 break
                             }
@@ -1018,21 +1018,21 @@ struct SettingsContentView: View {
         }
     }
 
-    // MARK: - MiniMaxi Config Card
+    // MARK: - MiniMax Config Card
 
-    private var miniMaxiConfigCard: some View {
-        DisclosureGroup(isExpanded: $miniMaxiConfigExpanded) {
+    private var miniMaxConfigCard: some View {
+        DisclosureGroup(isExpanded: $miniMaxConfigExpanded) {
             Divider()
                 .background(theme.glassBorder)
                 .padding(.vertical, 12)
 
-            miniMaxiConfigForm
+            miniMaxConfigForm
         } label: {
-            miniMaxiConfigHeader
+            miniMaxConfigHeader
                 .contentShape(.rect)
                 .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        miniMaxiConfigExpanded.toggle()
+                        miniMaxConfigExpanded.toggle()
                     }
                 }
         }
@@ -1056,7 +1056,7 @@ struct SettingsContentView: View {
         )
     }
 
-    private var miniMaxiConfigHeader: some View {
+    private var miniMaxConfigHeader: some View {
         HStack(spacing: 10) {
             ZStack {
                 Circle()
@@ -1078,7 +1078,7 @@ struct SettingsContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("MiniMaxi Configuration")
+                Text("MiniMax Configuration")
                     .font(.system(size: 14, weight: .bold, design: theme.fontDesign))
                     .foregroundStyle(theme.textPrimary)
 
@@ -1091,7 +1091,7 @@ struct SettingsContentView: View {
         }
     }
 
-    private var miniMaxiConfigForm: some View {
+    private var miniMaxConfigForm: some View {
         VStack(alignment: .leading, spacing: 14) {
             // API Key input
             VStack(alignment: .leading, spacing: 6) {
@@ -1116,10 +1116,10 @@ struct SettingsContentView: View {
 
                 HStack(spacing: 6) {
                     Group {
-                        if showMiniMaxiApiKey {
-                            TextField("", text: $miniMaxiApiKeyInput, prompt: Text("eyJhbGci...").foregroundStyle(theme.textTertiary))
+                        if showMiniMaxApiKey {
+                            TextField("", text: $miniMaxApiKeyInput, prompt: Text("eyJhbGci...").foregroundStyle(theme.textTertiary))
                         } else {
-                            SecureField("", text: $miniMaxiApiKeyInput, prompt: Text("eyJhbGci...").foregroundStyle(theme.textTertiary))
+                            SecureField("", text: $miniMaxApiKeyInput, prompt: Text("eyJhbGci...").foregroundStyle(theme.textTertiary))
                         }
                     }
                     .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
@@ -1137,9 +1137,9 @@ struct SettingsContentView: View {
 
                     // Eye button
                     Button {
-                        showMiniMaxiApiKey.toggle()
+                        showMiniMaxApiKey.toggle()
                     } label: {
-                        Image(systemName: showMiniMaxiApiKey ? "eye.slash.fill" : "eye.fill")
+                        Image(systemName: showMiniMaxApiKey ? "eye.slash.fill" : "eye.fill")
                             .font(.system(size: 11))
                             .foregroundStyle(theme.textSecondary)
                             .frame(width: 28, height: 28)
@@ -1159,7 +1159,7 @@ struct SettingsContentView: View {
                     .foregroundStyle(theme.textSecondary)
                     .tracking(0.5)
 
-                TextField("", text: $miniMaxiAuthEnvVarInput, prompt: Text("MINIMAX_API_KEY").foregroundStyle(theme.textTertiary))
+                TextField("", text: $miniMaxAuthEnvVarInput, prompt: Text("MINIMAX_API_KEY").foregroundStyle(theme.textTertiary))
                     .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(theme.textPrimary)
                     .padding(.horizontal, 10)
@@ -1172,7 +1172,7 @@ struct SettingsContentView: View {
                                     .stroke(theme.glassBorder, lineWidth: 1)
                             )
                     )
-                    .onChange(of: miniMaxiAuthEnvVarInput) { _, newValue in
+                    .onChange(of: miniMaxAuthEnvVarInput) { _, newValue in
                         UserDefaultsProviderSettingsRepository.shared.setMinimaxiAuthEnvVar(newValue)
                     }
             }
@@ -1193,7 +1193,7 @@ struct SettingsContentView: View {
             }
 
             // Save & Test button
-            if isTestingMiniMaxi {
+            if isTestingMiniMax {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.7)
@@ -1204,7 +1204,7 @@ struct SettingsContentView: View {
             } else {
                 Button {
                     Task {
-                        await testMiniMaxiConnection()
+                        await testMiniMaxConnection()
                     }
                 } label: {
                     Text("Save & Test Connection")
@@ -1220,7 +1220,7 @@ struct SettingsContentView: View {
                 .buttonStyle(.plain)
             }
 
-            if let result = miniMaxiTestResult {
+            if let result = miniMaxTestResult {
                 Text(result)
                     .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(result.contains("Success") ? theme.statusHealthy : theme.statusCritical)
@@ -1228,13 +1228,13 @@ struct SettingsContentView: View {
 
             // Help link
             VStack(alignment: .leading, spacing: 4) {
-                Text("Get your API key from MiniMaxi platform")
+                Text("Get your API key from MiniMax platform")
                     .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
 
                 Link(destination: URL(string: "https://platform.minimaxi.com/user-center/basic-information/interface-key")!) {
                     HStack(spacing: 3) {
-                        Text("Open MiniMaxi API Keys")
+                        Text("Open MiniMax API Keys")
                             .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
                         Image(systemName: "arrow.up.right")
                             .font(.system(size: 7, weight: .bold))
@@ -1247,8 +1247,8 @@ struct SettingsContentView: View {
             if UserDefaultsProviderSettingsRepository.shared.hasMinimaxiApiKey() {
                 Button {
                     UserDefaultsProviderSettingsRepository.shared.deleteMinimaxiApiKey()
-                    miniMaxiApiKeyInput = ""
-                    miniMaxiTestResult = nil
+                    miniMaxApiKeyInput = ""
+                    miniMaxTestResult = nil
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "trash.fill")
@@ -2928,32 +2928,32 @@ struct SettingsContentView: View {
         isTestingCopilot = false
     }
 
-    private func testMiniMaxiConnection() async {
-        isTestingMiniMaxi = true
-        miniMaxiTestResult = nil
+    private func testMiniMaxConnection() async {
+        isTestingMiniMax = true
+        miniMaxTestResult = nil
 
         // Save current inputs
-        UserDefaultsProviderSettingsRepository.shared.setMinimaxiAuthEnvVar(miniMaxiAuthEnvVarInput)
-        if !miniMaxiApiKeyInput.isEmpty {
-            AppLog.credentials.info("Saving MiniMaxi API key for connection test")
-            UserDefaultsProviderSettingsRepository.shared.saveMinimaxiApiKey(miniMaxiApiKeyInput)
-            miniMaxiApiKeyInput = ""
+        UserDefaultsProviderSettingsRepository.shared.setMinimaxiAuthEnvVar(miniMaxAuthEnvVarInput)
+        if !miniMaxApiKeyInput.isEmpty {
+            AppLog.credentials.info("Saving MiniMax API key for connection test")
+            UserDefaultsProviderSettingsRepository.shared.saveMinimaxiApiKey(miniMaxApiKeyInput)
+            miniMaxApiKeyInput = ""
         }
 
-        // Try to refresh the MiniMaxi provider
-        AppLog.credentials.info("Testing MiniMaxi connection via provider refresh")
-        await monitor.refresh(providerId: ProviderID.minimaxi)
+        // Try to refresh the MiniMax provider
+        AppLog.credentials.info("Testing MiniMax connection via provider refresh")
+        await monitor.refresh(providerId: ProviderID.minimax)
 
         // Check if there's an error after refresh
-        if let error = monitor.provider(for: ProviderID.minimaxi)?.lastError {
-            AppLog.credentials.error("MiniMaxi connection test failed: \(error.localizedDescription)")
-            miniMaxiTestResult = "Failed: \(error.localizedDescription)"
+        if let error = monitor.provider(for: ProviderID.minimax)?.lastError {
+            AppLog.credentials.error("MiniMax connection test failed: \(error.localizedDescription)")
+            miniMaxTestResult = "Failed: \(error.localizedDescription)"
         } else {
-            AppLog.credentials.info("MiniMaxi connection test succeeded")
-            miniMaxiTestResult = "Success: Connection verified"
+            AppLog.credentials.info("MiniMax connection test succeeded")
+            miniMaxTestResult = "Success: Connection verified"
         }
 
-        isTestingMiniMaxi = false
+        isTestingMiniMax = false
     }
 }
 

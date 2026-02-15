@@ -94,7 +94,7 @@ struct ProviderIconView: View {
         case "gemini": return "sparkles"
         case "zai": return "z.square.fill"
         case "copilot": return "chevron.left.forwardslash.chevron.right"
-        case "minimaxi": return "waveform"
+        case "minimax": return "waveform"
         default: return "questionmark"
         }
     }

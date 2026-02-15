@@ -1,15 +1,15 @@
 import Foundation
 import Observation
 
-/// MiniMaxi AI provider - a rich domain model.
+/// MiniMax AI provider - a rich domain model.
 /// Observable class with its own state (isSyncing, snapshot, error).
 /// Owns its probe and manages its own data lifecycle.
 @Observable
-public final class MiniMaxiProvider: AIProvider, @unchecked Sendable {
+public final class MiniMaxProvider: AIProvider, @unchecked Sendable {
     // MARK: - Identity (Protocol Requirement)
 
-    public let id: String = "minimaxi"
-    public let name: String = "MiniMaxi"
+    public let id: String = "minimax"
+    public let name: String = "MiniMax"
     public let cliCommand: String = "" // API-only provider, no CLI (纯 API 提供者，无 CLI)
 
     public var dashboardURL: URL? {
@@ -42,18 +42,18 @@ public final class MiniMaxiProvider: AIProvider, @unchecked Sendable {
 
     /// The probe used to fetch usage data
     private let probe: any UsageProbe
-    private let settingsRepository: any MiniMaxiSettingsRepository
+    private let settingsRepository: any MiniMaxSettingsRepository
 
     // MARK: - Initialization
 
-    /// Creates a MiniMaxi provider with the specified probe
+    /// Creates a MiniMax provider with the specified probe
     /// - Parameter probe: The probe to use for fetching usage data
     /// - Parameter settingsRepository: The repository for persisting settings
-    public init(probe: any UsageProbe, settingsRepository: any MiniMaxiSettingsRepository) {
+    public init(probe: any UsageProbe, settingsRepository: any MiniMaxSettingsRepository) {
         self.probe = probe
         self.settingsRepository = settingsRepository
         // Default to disabled - requires API key configuration
-        self.isEnabled = settingsRepository.isEnabled(forProvider: "minimaxi", defaultValue: false)
+        self.isEnabled = settingsRepository.isEnabled(forProvider: "minimax", defaultValue: false)
     }
 
     // MARK: - AIProvider Protocol

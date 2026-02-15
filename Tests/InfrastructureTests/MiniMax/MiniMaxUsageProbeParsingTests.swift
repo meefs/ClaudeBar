@@ -4,7 +4,7 @@ import Foundation
 @testable import Domain
 
 @Suite
-struct MiniMaxiUsageProbeParsingTests {
+struct MiniMaxUsageProbeParsingTests {
 
     // MARK: - Sample Data
 
@@ -80,22 +80,22 @@ struct MiniMaxiUsageProbeParsingTests {
         let data = Data(Self.sampleSuccessResponse.utf8)
 
         // When
-        let snapshot = try MiniMaxiUsageProbe.parseResponse(data, providerId: "minimaxi")
+        let snapshot = try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
 
         // Then
         #expect(snapshot.quotas.count == 1)
         #expect(snapshot.quotas[0].quotaType == .modelSpecific("minimax-m2"))
-        #expect(snapshot.providerId == "minimaxi")
+        #expect(snapshot.providerId == "minimax")
     }
 
     @Test
     func `maps percentage correctly`() throws {
         // Given: usage_count=255 is actually REMAINING (not used) → 255/1500 = 17%
-        // MiniMaxi API naming is misleading - see probe comment for details
+        // MiniMax API naming is misleading - see probe comment for details
         let data = Data(Self.sampleSuccessResponse.utf8)
 
         // When
-        let snapshot = try MiniMaxiUsageProbe.parseResponse(data, providerId: "minimaxi")
+        let snapshot = try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
 
         // Then
         let expected = Double(255) / Double(1500) * 100.0
@@ -108,7 +108,7 @@ struct MiniMaxiUsageProbeParsingTests {
         let data = Data(Self.sampleSuccessResponse.utf8)
 
         // When
-        let snapshot = try MiniMaxiUsageProbe.parseResponse(data, providerId: "minimaxi")
+        let snapshot = try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
 
         // Then
         let expectedDate = Date(timeIntervalSince1970: 1735689600.0)
@@ -121,7 +121,7 @@ struct MiniMaxiUsageProbeParsingTests {
         let data = Data(Self.sampleMultiModelResponse.utf8)
 
         // When
-        let snapshot = try MiniMaxiUsageProbe.parseResponse(data, providerId: "minimaxi")
+        let snapshot = try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
 
         // Then
         #expect(snapshot.quotas.count == 2)
@@ -140,7 +140,7 @@ struct MiniMaxiUsageProbeParsingTests {
 
         // When & Then
         #expect(throws: ProbeError.self) {
-            try MiniMaxiUsageProbe.parseResponse(data, providerId: "minimaxi")
+            try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
         }
     }
 
@@ -151,7 +151,7 @@ struct MiniMaxiUsageProbeParsingTests {
 
         // When & Then
         #expect(throws: ProbeError.noData) {
-            try MiniMaxiUsageProbe.parseResponse(data, providerId: "minimaxi")
+            try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
         }
     }
 
@@ -161,7 +161,7 @@ struct MiniMaxiUsageProbeParsingTests {
         let data = Data(Self.sampleSuccessResponse.utf8)
 
         // When
-        let snapshot = try MiniMaxiUsageProbe.parseResponse(data, providerId: "minimaxi")
+        let snapshot = try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
 
         // Then
         // usage_count=255 is remaining, so used = 1500 - 255 = 1245
@@ -174,7 +174,7 @@ struct MiniMaxiUsageProbeParsingTests {
         let data = Data(Self.sampleNoEndTimeResponse.utf8)
 
         // When
-        let snapshot = try MiniMaxiUsageProbe.parseResponse(data, providerId: "minimaxi")
+        let snapshot = try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
 
         // Then
         #expect(snapshot.quotas[0].resetsAt == nil)
@@ -188,7 +188,7 @@ struct MiniMaxiUsageProbeParsingTests {
 
         // When & Then
         #expect(throws: ProbeError.self) {
-            try MiniMaxiUsageProbe.parseResponse(data, providerId: "minimaxi")
+            try MiniMaxUsageProbe.parseResponse(data, providerId: "minimax")
         }
     }
 }

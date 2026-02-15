@@ -1,19 +1,19 @@
 import Foundation
 import Domain
 
-/// Probes MiniMaxi Coding Plan API for usage quota information.
+/// Probes MiniMax Coding Plan API for usage quota information.
 /// Uses REST API: GET https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains
 /// Authentication: Bearer token from env var or stored API key.
-public struct MiniMaxiUsageProbe: UsageProbe {
+public struct MiniMaxUsageProbe: UsageProbe {
     private let networkClient: any NetworkClient
-    private let settingsRepository: any MiniMaxiSettingsRepository
+    private let settingsRepository: any MiniMaxSettingsRepository
     private let timeout: TimeInterval
 
     private static let apiURL = "https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains"
 
     public init(
         networkClient: any NetworkClient = URLSession.shared,
-        settingsRepository: any MiniMaxiSettingsRepository,
+        settingsRepository: any MiniMaxSettingsRepository,
         timeout: TimeInterval = 30
     ) {
         self.networkClient = networkClient
@@ -28,13 +28,13 @@ public struct MiniMaxiUsageProbe: UsageProbe {
         let envVarName = settingsRepository.minimaxiAuthEnvVar()
         let effectiveEnvVar = envVarName.isEmpty ? "MINIMAX_API_KEY" : envVarName
         if let envValue = ProcessInfo.processInfo.environment[effectiveEnvVar], !envValue.isEmpty {
-            AppLog.probes.debug("MiniMaxi: Using API key from env var '\(effectiveEnvVar)'")
+            AppLog.probes.debug("MiniMax: Using API key from env var '\(effectiveEnvVar)'")
             return envValue
         }
 
         // Fall back to stored API key
         if let storedKey = settingsRepository.getMinimaxiApiKey(), !storedKey.isEmpty {
-            AppLog.probes.debug("MiniMaxi: Using stored API key")
+            AppLog.probes.debug("MiniMax: Using stored API key")
             return storedKey
         }
 
@@ -46,21 +46,21 @@ public struct MiniMaxiUsageProbe: UsageProbe {
     public func isAvailable() async -> Bool {
         let hasKey = getApiKey() != nil
         if !hasKey {
-            AppLog.probes.debug("MiniMaxi: Not available - no API key configured")
+            AppLog.probes.debug("MiniMax: Not available - no API key configured")
         }
         return hasKey
     }
 
     public func probe() async throws -> UsageSnapshot {
         guard let apiKey = getApiKey(), !apiKey.isEmpty else {
-            AppLog.probes.error("MiniMaxi: No API key configured (check env var or settings)")
+            AppLog.probes.error("MiniMax: No API key configured (check env var or settings)")
             throw ProbeError.authenticationRequired
         }
 
-        AppLog.probes.info("Starting MiniMaxi probe...")
+        AppLog.probes.info("Starting MiniMax probe...")
 
         guard let url = URL(string: Self.apiURL) else {
-            throw ProbeError.executionFailed("Invalid MiniMaxi API URL")
+            throw ProbeError.executionFailed("Invalid MiniMax API URL")
         }
 
         var request = URLRequest(url: url)
@@ -76,21 +76,21 @@ public struct MiniMaxiUsageProbe: UsageProbe {
         }
 
         guard httpResponse.statusCode == 200 else {
-            AppLog.probes.error("MiniMaxi API returned HTTP \(httpResponse.statusCode)")
+            AppLog.probes.error("MiniMax API returned HTTP \(httpResponse.statusCode)")
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 throw ProbeError.authenticationRequired
             }
-            throw ProbeError.executionFailed("MiniMaxi API returned HTTP \(httpResponse.statusCode)")
+            throw ProbeError.executionFailed("MiniMax API returned HTTP \(httpResponse.statusCode)")
         }
 
         // Log raw response at debug level
         if let responseText = String(data: data, encoding: .utf8) {
-            AppLog.probes.debug("MiniMaxi API response: \(responseText.prefix(500))")
+            AppLog.probes.debug("MiniMax API response: \(responseText.prefix(500))")
         }
 
-        let snapshot = try Self.parseResponse(data, providerId: "minimaxi")
+        let snapshot = try Self.parseResponse(data, providerId: "minimax")
 
-        AppLog.probes.info("MiniMaxi probe success: \(snapshot.quotas.count) quotas found")
+        AppLog.probes.info("MiniMax probe success: \(snapshot.quotas.count) quotas found")
         for quota in snapshot.quotas {
             AppLog.probes.info("  - \(quota.quotaType.displayName): \(Int(quota.percentRemaining))% remaining")
         }
@@ -100,18 +100,18 @@ public struct MiniMaxiUsageProbe: UsageProbe {
 
     // MARK: - Response Parsing (Static for testability)
 
-    /// Parses the MiniMaxi Coding Plan remains API response into a UsageSnapshot
+    /// Parses the MiniMax Coding Plan remains API response into a UsageSnapshot
     static func parseResponse(_ data: Data, providerId: String) throws -> UsageSnapshot {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
 
-        let response: MiniMaxiRemainsResponse
+        let response: MiniMaxRemainsResponse
         do {
-            response = try decoder.decode(MiniMaxiRemainsResponse.self, from: data)
+            response = try decoder.decode(MiniMaxRemainsResponse.self, from: data)
         } catch {
-            AppLog.probes.error("MiniMaxi parse failed: Invalid JSON - \(error.localizedDescription)")
+            AppLog.probes.error("MiniMax parse failed: Invalid JSON - \(error.localizedDescription)")
             if let rawString = String(data: data, encoding: .utf8) {
-                AppLog.probes.debug("MiniMaxi raw response: \(rawString.prefix(500))")
+                AppLog.probes.debug("MiniMax raw response: \(rawString.prefix(500))")
             }
             throw ProbeError.parseFailed("Invalid JSON: \(error.localizedDescription)")
         }
@@ -119,25 +119,25 @@ public struct MiniMaxiUsageProbe: UsageProbe {
         // Check API error status
         if response.baseResp.statusCode != 0 {
             let message = response.baseResp.statusMsg ?? "Unknown error"
-            AppLog.probes.error("MiniMaxi API error: \(response.baseResp.statusCode) - \(message)")
-            throw ProbeError.executionFailed("MiniMaxi API error: \(message)")
+            AppLog.probes.error("MiniMax API error: \(response.baseResp.statusCode) - \(message)")
+            throw ProbeError.executionFailed("MiniMax API error: \(message)")
         }
 
         let modelRemains = response.modelRemains ?? []
 
         guard !modelRemains.isEmpty else {
-            AppLog.probes.error("MiniMaxi: Empty model_remains in response")
+            AppLog.probes.error("MiniMax: Empty model_remains in response")
             throw ProbeError.noData
         }
 
         let quotas = modelRemains.map { model -> UsageQuota in
             let total = model.currentIntervalTotalCount
-            // ⚠️ MiniMaxi API naming is misleading:
+            // ⚠️ MiniMax API naming is misleading:
             // Despite being called "current_interval_usage_count", this field
             // actually represents the REMAINING count, not the used count.
-            // Confirmed via MiniMaxi dashboard: when dashboard shows "3% used",
+            // Confirmed via MiniMax dashboard: when dashboard shows "3% used",
             // API returns usage_count=1459 out of total=1500 (i.e. 1459 remaining).
-            // (MiniMaxi API 命名有误导性：usage_count 实际是剩余次数，非已用次数)
+            // (MiniMax API 命名有误导性：usage_count 实际是剩余次数，非已用次数)
             let clampedRemaining = min(max(model.currentIntervalUsageCount, 0), total)
             let usedCount = total - clampedRemaining
             let remaining = total > 0 ? Double(clampedRemaining) / Double(total) * 100.0 : 0.0
@@ -166,7 +166,7 @@ public struct MiniMaxiUsageProbe: UsageProbe {
 
 // MARK: - Response Models (Internal)
 
-struct MiniMaxiRemainsResponse: Decodable {
+struct MiniMaxRemainsResponse: Decodable {
     let baseResp: BaseResp
     let modelRemains: [ModelRemain]?
 }

@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "minimaxi_64.png",
+      "filename" : "minimax_64.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "minimaxi_128.png",
+      "filename" : "minimax_128.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "minimaxi_192.png",
+      "filename" : "minimax_192.png",
       "idiom" : "universal",
       "scale" : "3x"
     }
