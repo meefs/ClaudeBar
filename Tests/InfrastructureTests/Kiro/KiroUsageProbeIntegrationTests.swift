@@ -3,11 +3,13 @@ import Testing
 
 @Suite("KiroUsageProbe Integration Tests")
 struct KiroUsageProbeIntegrationTests {
-    @Test
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["CI"] == nil))
     func `execute kiro-cli and parse usage`() async throws {
         let probe = KiroUsageProbe()
         
-        try #require(await probe.isAvailable(), "kiro-cli not available")
+        guard await probe.isAvailable() else {
+            return // Skip if kiro-cli not available
+        }
         
         let snapshot = try await probe.probe()
         
