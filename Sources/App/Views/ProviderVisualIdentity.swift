@@ -296,6 +296,34 @@ extension KiroProvider: ProviderVisualIdentity {
     }
 }
 
+// MARK: - CursorProvider Visual Identity
+
+extension CursorProvider: ProviderVisualIdentity {
+    public var symbolIcon: String { "cursorarrow.rays" }
+
+    public var iconAssetName: String { "CursorIcon" }
+
+    public func themeColor(for scheme: ColorScheme) -> Color {
+        // Cursor brand teal/cyan
+        scheme == .dark
+            ? Color(red: 0.20, green: 0.78, blue: 0.82)
+            : Color(red: 0.12, green: 0.62, blue: 0.66)
+    }
+
+    public func themeGradient(for scheme: ColorScheme) -> LinearGradient {
+        LinearGradient(
+            colors: [
+                themeColor(for: scheme),
+                scheme == .dark
+                    ? Color(red: 0.15, green: 0.55, blue: 0.75)
+                    : Color(red: 0.08, green: 0.45, blue: 0.60)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 // MARK: - MiniMaxProvider Visual Identity
 
 extension MiniMaxProvider: ProviderVisualIdentity {
@@ -412,6 +440,10 @@ enum ProviderVisualIdentityLookup {
             return scheme == .dark
                 ? Color(red: 0.91, green: 0.27, blue: 0.42)
                 : Color(red: 0.82, green: 0.20, blue: 0.35)
+        case "cursor":
+            return scheme == .dark
+                ? Color(red: 0.20, green: 0.78, blue: 0.82)
+                : Color(red: 0.12, green: 0.62, blue: 0.66)
         default:
             return BaseTheme.purpleVibrant
         }
@@ -467,6 +499,10 @@ enum ProviderVisualIdentityLookup {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.96, green: 0.53, blue: 0.24)
                 : Color(red: 0.86, green: 0.43, blue: 0.14)
+        case "cursor":
+            secondaryColor = scheme == .dark
+                ? Color(red: 0.15, green: 0.55, blue: 0.75)
+                : Color(red: 0.08, green: 0.45, blue: 0.60)
         default:
             return LinearGradient(
                 colors: [BaseTheme.coralAccent, BaseTheme.pinkHot],
@@ -496,6 +532,7 @@ enum ProviderVisualIdentityLookup {
         case "kimi": return "KimiIcon"
         case "kiro": return "KiroIcon"
         case "minimax": return "MiniMaxIcon"
+        case "cursor": return "CursorIcon"
         default: return "QuestionIcon"
         }
     }
@@ -514,6 +551,7 @@ enum ProviderVisualIdentityLookup {
         case "kimi": return "Kimi"
         case "kiro": return "Kiro"
         case "minimax": return "MiniMax"
+        case "cursor": return "Cursor"
         default: return providerId.capitalized
         }
     }
@@ -532,6 +570,7 @@ enum ProviderVisualIdentityLookup {
         case "kimi": return "k.square.fill"
         case "kiro": return "wand.and.stars.inverse"
         case "minimax": return "waveform"
+        case "cursor": return "cursorarrow.rays"
         default: return "questionmark.circle.fill"
         }
     }
