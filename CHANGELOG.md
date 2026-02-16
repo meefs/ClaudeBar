@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.36] - 2026-02-16
+
+### Added
+- **Cursor Support**: Monitor your [Cursor](https://cursor.com) IDE subscription usage (included requests and on-demand spending) directly from the menu bar. Supports Pro, Business, Free, and Ultra plans with automatic tier detection.
+  - Reads auth token from Cursor's local SQLite database automatically
+  - Calls `cursor.com/api/usage-summary` for real-time usage data
+  - Displays monthly included requests and on-demand usage
+- **Overview Mode AppLogo**: The header now displays the ClaudeBar logo when Overview mode is enabled, instead of the last selected provider's icon.
+
+### Fixed
+- **Cursor API parsing**: Fixed parsing to match the real Cursor API response structure (`individualUsage.plan` and `individualUsage.onDemand`).
+
+### Technical
+- Added `CursorProvider` domain model following Kiro/AmpCode pattern
+- Added `CursorUsageProbe` with HTTP API + SQLite token extraction
+- Added Cursor visual identity (icon, brand color, gradient)
+- 15+ parsing tests covering all Cursor response formats
+
+## [0.4.35] - 2026-02-15
+
+### Added
+- **Kiro Support**: Monitor your [Kiro](https://kiro.dev) (by AWS) AI coding assistant usage quotas via `kiro-cli`. Displays weekly bonus credits and monthly regular credits with reset time tracking.
+  - Install with `uv tool install kiro-cli` and authenticate via Kiro IDE
+  - Automatically parses usage data from `kiro-cli /usage` output
+
+### Fixed
+- **MiniMax Branding**: Renamed "MiniMaxi" to "MiniMax" for correct branding consistency (#116).
+
+### Technical
+- Added `KiroProvider` domain model and `KiroUsageProbe` with CLI output parsing
+- Added `SimpleCLIExecutor` for lightweight Process-based CLI execution
+- Migrated Kiro tests from XCTest to Swift Testing
+
+## [0.4.34] - 2026-02-15
+
+### Added
+- **MiniMax Support**: Monitor your [MiniMax](https://www.minimax.io) Coding Plan usage quota directly from the menu bar. Queries the MiniMax API for remaining coding plan credits.
+  - Configurable API key and environment variable support in Settings
+  - Test connection button to verify API key
+
+### Fixed
+- **Docs**: Corrected release build command in CLAUDE.md and README (`-C Release` → `-configuration Release`).
+
+### Technical
+- Added `MiniMaxiProvider` domain model with API-based quota tracking
+- Added `MiniMaxiUsageProbe` querying `/v1/api/openplatform/coding_plan/remains`
+- Added `MiniMaxiSettingsRepository` sub-protocol for API key and env var configuration
+- Parsing and probe unit tests
+
 ## [0.4.33] - 2026-02-14
 
 ### Added
