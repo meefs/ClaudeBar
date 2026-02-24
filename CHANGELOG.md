@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.37] - 2026-02-24
+
+### Fixed
+- **Codex process leak**: Fixed a critical bug where ClaudeBar would spawn a new `codex app-server` process on every usage refresh without ever terminating it. Over time this caused thousands of orphaned processes that degraded system performance (reported in [#113](https://github.com/tddworks/ClaudeBar/issues/113)). The locally-created `ProcessRPCTransport` is now properly closed after each RPC call via `defer`.
+
 ## [0.4.36] - 2026-02-16
 
 ### Added

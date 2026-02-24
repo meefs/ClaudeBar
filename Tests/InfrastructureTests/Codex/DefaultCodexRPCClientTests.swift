@@ -252,4 +252,48 @@ struct DefaultCodexRPCClientTests {
 
         verify(mockTransport).close().called(.atLeastOnce)
     }
+
+    // MARK: - Process Leak Fix Tests
+
+    @Test
+    func `fetchRateLimits closes locally created transport after successful fetch`() async throws {
+        // Given - production path: no injected transport, factory provides a mock
+        let mockTransport = MockRPCTransport()
+        let mockExecutor = MockCLIExecutor()
+        setupMockTransport(mockTransport, rateLimitsResponse: """
+        {"id":2,"result":{"rateLimits":{"planType":"pro","primary":{"usedPercent":30,"resetsAt":1735000000}}}}
+        """)
+
+        let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
+        client.transportFactory = { _, _ in mockTransport }
+
+        // When - fetch succeeds, shutdown is NOT called (simulates if caller forgets)
+        _ = try await client.fetchRateLimits()
+
+        // Then - transport must be closed even without shutdown(), preventing process leak
+        verify(mockTransport).close().called(.atLeastOnce)
+    }
+
+    @Test
+    func `fetchRateLimits closes locally created transport even when RPC throws`() async throws {
+        // Given - RPC will fail, TTY fallback will also fail
+        let mockTransport = MockRPCTransport()
+        let mockExecutor = MockCLIExecutor()
+        given(mockTransport).send(.any).willReturn(())
+        given(mockTransport).receive().willThrow(ProbeError.executionFailed("RPC failed"))
+        given(mockTransport).close().willReturn(())
+        given(mockExecutor).execute(binary: .any, args: .any, input: .any, timeout: .any, workingDirectory: .any, autoResponses: .any)
+            .willThrow(ProbeError.executionFailed("TTY not available"))
+
+        let client = DefaultCodexRPCClient(executable: "codex", cliExecutor: mockExecutor)
+        client.transportFactory = { _, _ in mockTransport }
+
+        // When - fetch throws
+        await #expect(throws: ProbeError.self) {
+            try await client.fetchRateLimits()
+        }
+
+        // Then - transport must still be closed despite the error
+        verify(mockTransport).close().called(.atLeastOnce)
+    }
 }

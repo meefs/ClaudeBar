@@ -9,6 +9,9 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
     private let transport: RPCTransport?
     private var nextID = 1
 
+    /// Package-internal: allows tests to inject a mock transport for the production (no-injection) code path.
+    var transportFactory: ((String, [String]) throws -> RPCTransport)?
+
     /// Default initializer - uses real CLI executor and creates transport lazily.
     public init(executable: String = "codex", cliExecutor: CLIExecutor? = nil) {
         self.executable = executable
@@ -51,13 +54,21 @@ public final class DefaultCodexRPCClient: CodexRPCClient, @unchecked Sendable {
 
     private func fetchViaRPC() async throws -> CodexRateLimitsResponse {
         let activeTransport: RPCTransport
+        let ownsTransport: Bool
         if let transport = self.transport {
             activeTransport = transport
+            ownsTransport = false
         } else {
-            activeTransport = try ProcessRPCTransport(
-                executable: executable,
-                arguments: ["-s", "read-only", "-a", "untrusted", "app-server"]
-            )
+            let factory = transportFactory ?? { exec, args in
+                try ProcessRPCTransport(executable: exec, arguments: args)
+            }
+            activeTransport = try factory(executable, ["-s", "read-only", "-a", "untrusted", "app-server"])
+            ownsTransport = true
+        }
+        defer {
+            if ownsTransport {
+                activeTransport.close()
+            }
         }
 
         // Initialize RPC connection
