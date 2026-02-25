@@ -65,6 +65,7 @@ struct SettingsContentView: View {
     @State private var miniMaxConfigExpanded: Bool = false
     @State private var miniMaxApiKeyInput: String = ""
     @State private var miniMaxAuthEnvVarInput: String = ""
+    @State private var miniMaxRegion: MiniMaxRegion = .china
     @State private var showMiniMaxApiKey: Bool = false
     @State private var isTestingMiniMax = false
     @State private var miniMaxTestResult: String?
@@ -243,7 +244,8 @@ struct SettingsContentView: View {
             kimiProbeMode = UserDefaultsProviderSettingsRepository.shared.kimiProbeMode()
 
             // Initialize MiniMax settings
-            miniMaxAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.minimaxiAuthEnvVar()
+            miniMaxRegion = UserDefaultsProviderSettingsRepository.shared.minimaxRegion()
+            miniMaxAuthEnvVarInput = UserDefaultsProviderSettingsRepository.shared.minimaxAuthEnvVar()
 
             // Initialize Hook settings
             hooksEnabled = UserDefaultsProviderSettingsRepository.shared.isHookEnabled()
@@ -1093,6 +1095,27 @@ struct SettingsContentView: View {
 
     private var miniMaxConfigForm: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // Region selector (区域选择)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("REGION")
+                    .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                    .foregroundStyle(theme.textSecondary)
+                    .tracking(0.5)
+
+                Picker("", selection: $miniMaxRegion) {
+                    ForEach(MiniMaxRegion.allCases, id: \.self) { region in
+                        Text(region.displayName).tag(region)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: miniMaxRegion) { _, newValue in
+                    UserDefaultsProviderSettingsRepository.shared.setMinimaxRegion(newValue)
+                    Task {
+                        await monitor.refresh(providerId: ProviderID.minimax)
+                    }
+                }
+            }
+
             // API Key input
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -1103,7 +1126,7 @@ struct SettingsContentView: View {
 
                     Spacer()
 
-                    if UserDefaultsProviderSettingsRepository.shared.hasMinimaxiApiKey() {
+                    if UserDefaultsProviderSettingsRepository.shared.hasMinimaxApiKey() {
                         HStack(spacing: 3) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 9))
@@ -1173,7 +1196,7 @@ struct SettingsContentView: View {
                             )
                     )
                     .onChange(of: miniMaxAuthEnvVarInput) { _, newValue in
-                        UserDefaultsProviderSettingsRepository.shared.setMinimaxiAuthEnvVar(newValue)
+                        UserDefaultsProviderSettingsRepository.shared.setMinimaxAuthEnvVar(newValue)
                     }
             }
 
@@ -1232,7 +1255,7 @@ struct SettingsContentView: View {
                     .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
                     .foregroundStyle(theme.textTertiary)
 
-                Link(destination: URL(string: "https://platform.minimaxi.com/user-center/basic-information/interface-key")!) {
+                Link(destination: miniMaxRegion.apiKeysURL) {
                     HStack(spacing: 3) {
                         Text("Open MiniMax API Keys")
                             .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
@@ -1244,9 +1267,9 @@ struct SettingsContentView: View {
             }
 
             // Delete API key
-            if UserDefaultsProviderSettingsRepository.shared.hasMinimaxiApiKey() {
+            if UserDefaultsProviderSettingsRepository.shared.hasMinimaxApiKey() {
                 Button {
-                    UserDefaultsProviderSettingsRepository.shared.deleteMinimaxiApiKey()
+                    UserDefaultsProviderSettingsRepository.shared.deleteMinimaxApiKey()
                     miniMaxApiKeyInput = ""
                     miniMaxTestResult = nil
                 } label: {
@@ -2933,10 +2956,10 @@ struct SettingsContentView: View {
         miniMaxTestResult = nil
 
         // Save current inputs
-        UserDefaultsProviderSettingsRepository.shared.setMinimaxiAuthEnvVar(miniMaxAuthEnvVarInput)
+        UserDefaultsProviderSettingsRepository.shared.setMinimaxAuthEnvVar(miniMaxAuthEnvVarInput)
         if !miniMaxApiKeyInput.isEmpty {
             AppLog.credentials.info("Saving MiniMax API key for connection test")
-            UserDefaultsProviderSettingsRepository.shared.saveMinimaxiApiKey(miniMaxApiKeyInput)
+            UserDefaultsProviderSettingsRepository.shared.saveMinimaxApiKey(miniMaxApiKeyInput)
             miniMaxApiKeyInput = ""
         }
 

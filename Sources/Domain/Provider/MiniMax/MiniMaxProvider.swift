@@ -13,7 +13,7 @@ public final class MiniMaxProvider: AIProvider, @unchecked Sendable {
     public let cliCommand: String = "" // API-only provider, no CLI (纯 API 提供者，无 CLI)
 
     public var dashboardURL: URL? {
-        URL(string: "https://platform.minimaxi.com/user-center/payment/coding-plan")
+        settingsRepository.minimaxRegion().dashboardURL
     }
 
     public var statusPageURL: URL? {

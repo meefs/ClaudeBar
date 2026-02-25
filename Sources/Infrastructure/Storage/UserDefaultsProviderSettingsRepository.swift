@@ -251,27 +251,40 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
 
     // MARK: - MiniMaxSettingsRepository
 
-    public func minimaxiAuthEnvVar() -> String {
+    public func minimaxRegion() -> MiniMaxRegion {
+        // Legacy compatibility: key absent means user upgraded from pre-region version,
+        // which only supported china (minimaxi.com). (兼容旧版：无 key 则默认中国区)
+        guard let rawValue = userDefaults.string(forKey: Keys.minimaxRegion) else {
+            return .china
+        }
+        return MiniMaxRegion(rawValue: rawValue) ?? .china
+    }
+
+    public func setMinimaxRegion(_ region: MiniMaxRegion) {
+        userDefaults.set(region.rawValue, forKey: Keys.minimaxRegion)
+    }
+
+    public func minimaxAuthEnvVar() -> String {
         userDefaults.string(forKey: Keys.minimaxiAuthEnvVar) ?? ""
     }
 
-    public func setMinimaxiAuthEnvVar(_ envVar: String) {
+    public func setMinimaxAuthEnvVar(_ envVar: String) {
         userDefaults.set(envVar, forKey: Keys.minimaxiAuthEnvVar)
     }
 
-    public func saveMinimaxiApiKey(_ key: String) {
+    public func saveMinimaxApiKey(_ key: String) {
         userDefaults.set(key, forKey: Keys.minimaxiApiKey)
     }
 
-    public func getMinimaxiApiKey() -> String? {
+    public func getMinimaxApiKey() -> String? {
         userDefaults.string(forKey: Keys.minimaxiApiKey)
     }
 
-    public func deleteMinimaxiApiKey() {
+    public func deleteMinimaxApiKey() {
         userDefaults.removeObject(forKey: Keys.minimaxiApiKey)
     }
 
-    public func hasMinimaxiApiKey() -> Bool {
+    public func hasMinimaxApiKey() -> Bool {
         userDefaults.object(forKey: Keys.minimaxiApiKey) != nil
     }
 
@@ -325,6 +338,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let bedrockRegions = "providerConfig.bedrockRegions"
         static let bedrockDailyBudget = "providerConfig.bedrockDailyBudget"
         // MiniMax settings (key strings kept for backward compatibility 保持向后兼容)
+        static let minimaxRegion = "providerConfig.minimaxRegion"
         static let minimaxiAuthEnvVar = "providerConfig.minimaxiAuthEnvVar"
         static let minimaxiApiKey = "com.claudebar.credentials.minimaxi-api-key"
         // Credentials (kept compatible with old UserDefaultsCredentialRepository keys)
