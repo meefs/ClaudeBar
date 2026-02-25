@@ -2,14 +2,18 @@ import Foundation
 import Domain
 
 /// Probes MiniMax Coding Plan API for usage quota information.
-/// Uses REST API: GET https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains
+/// Supports both international (minimax.io) and China (minimaxi.com) regions.
+/// (支持国际版和中国版两个区域)
 /// Authentication: Bearer token from env var or stored API key.
 public struct MiniMaxUsageProbe: UsageProbe {
     private let networkClient: any NetworkClient
     private let settingsRepository: any MiniMaxSettingsRepository
     private let timeout: TimeInterval
 
-    private static let apiURL = "https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains"
+    /// Resolves the API URL based on the configured region (根据区域配置动态选择 API URL)
+    var apiURL: String {
+        settingsRepository.minimaxRegion().codingPlanRemainsURL
+    }
 
     public init(
         networkClient: any NetworkClient = URLSession.shared,
@@ -25,7 +29,7 @@ public struct MiniMaxUsageProbe: UsageProbe {
 
     func getApiKey() -> String? {
         // First, check environment variable if configured
-        let envVarName = settingsRepository.minimaxiAuthEnvVar()
+        let envVarName = settingsRepository.minimaxAuthEnvVar()
         let effectiveEnvVar = envVarName.isEmpty ? "MINIMAX_API_KEY" : envVarName
         if let envValue = ProcessInfo.processInfo.environment[effectiveEnvVar], !envValue.isEmpty {
             AppLog.probes.debug("MiniMax: Using API key from env var '\(effectiveEnvVar)'")
@@ -33,7 +37,7 @@ public struct MiniMaxUsageProbe: UsageProbe {
         }
 
         // Fall back to stored API key
-        if let storedKey = settingsRepository.getMinimaxiApiKey(), !storedKey.isEmpty {
+        if let storedKey = settingsRepository.getMinimaxApiKey(), !storedKey.isEmpty {
             AppLog.probes.debug("MiniMax: Using stored API key")
             return storedKey
         }
@@ -59,7 +63,7 @@ public struct MiniMaxUsageProbe: UsageProbe {
 
         AppLog.probes.info("Starting MiniMax probe...")
 
-        guard let url = URL(string: Self.apiURL) else {
+        guard let url = URL(string: apiURL) else {
             throw ProbeError.executionFailed("Invalid MiniMax API URL")
         }
 

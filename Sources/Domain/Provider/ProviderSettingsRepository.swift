@@ -191,27 +191,34 @@ public protocol KimiSettingsRepository: ProviderSettingsRepository {
 }
 
 /// MiniMax-specific settings repository, extending base ProviderSettingsRepository.
-/// Stores API key configuration for MiniMax Coding Plan quota monitoring.
+/// Stores API key and region configuration for MiniMax Coding Plan quota monitoring.
 /// Tests can use UserDefaultsProviderSettingsRepository with test UserDefaults.
 /// App uses UserDefaultsProviderSettingsRepository.
 public protocol MiniMaxSettingsRepository: ProviderSettingsRepository {
+    /// Gets the API region (international or china, default: china for legacy compatibility)
+    /// (获取 API 区域设置，默认中国区以兼容旧版用户)
+    func minimaxRegion() -> MiniMaxRegion
+
+    /// Sets the API region (设置 API 区域)
+    func setMinimaxRegion(_ region: MiniMaxRegion)
+
     /// Gets the environment variable name for MiniMax API key (empty = use default MINIMAX_API_KEY)
-    func minimaxiAuthEnvVar() -> String
+    func minimaxAuthEnvVar() -> String
 
     /// Sets the environment variable name for MiniMax API key
-    func setMinimaxiAuthEnvVar(_ envVar: String)
+    func setMinimaxAuthEnvVar(_ envVar: String)
 
     /// Saves the MiniMax API key (for Settings UI input)
-    func saveMinimaxiApiKey(_ key: String)
+    func saveMinimaxApiKey(_ key: String)
 
     /// Retrieves the MiniMax API key
-    func getMinimaxiApiKey() -> String?
+    func getMinimaxApiKey() -> String?
 
     /// Deletes the MiniMax API key
-    func deleteMinimaxiApiKey()
+    func deleteMinimaxApiKey()
 
     /// Checks if a MiniMax API key is saved
-    func hasMinimaxiApiKey() -> Bool
+    func hasMinimaxApiKey() -> Bool
 }
 
 // MARK: - Default Implementation

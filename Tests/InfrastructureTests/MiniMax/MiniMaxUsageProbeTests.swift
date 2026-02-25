@@ -27,16 +27,21 @@ struct MiniMaxUsageProbeTests {
     // MARK: - Helper
 
     /// Creates a probe with test UserDefaults and mock network client
+    /// Pass nil for region to test the "not configured" fallback path (传 nil 测试未配置 region 的回退路径)
     private func makeProbe(
         apiKey: String? = nil,
         envVar: String = "",
+        region: MiniMaxRegion? = .china,
         networkClient: any NetworkClient = MockNetworkClient()
     ) -> MiniMaxUsageProbe {
         let defaults = UserDefaults(suiteName: "MiniMaxProbeTests.\(UUID().uuidString)")!
         let settingsRepository = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
-        settingsRepository.setMinimaxiAuthEnvVar(envVar)
+        if let region {
+            settingsRepository.setMinimaxRegion(region)
+        }
+        settingsRepository.setMinimaxAuthEnvVar(envVar)
         if let apiKey {
-            settingsRepository.saveMinimaxiApiKey(apiKey)
+            settingsRepository.saveMinimaxApiKey(apiKey)
         }
         return MiniMaxUsageProbe(
             networkClient: networkClient,
@@ -72,7 +77,7 @@ struct MiniMaxUsageProbeTests {
         let mockNetwork = MockNetworkClient()
         let responseData = Data(Self.sampleApiResponse.utf8)
         let httpResponse = HTTPURLResponse(
-            url: URL(string: "https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains")!,
+            url: URL(string: "https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains")!,
             statusCode: 200,
             httpVersion: nil,
             headerFields: nil
@@ -108,7 +113,7 @@ struct MiniMaxUsageProbeTests {
         // Given
         let mockNetwork = MockNetworkClient()
         let httpResponse = HTTPURLResponse(
-            url: URL(string: "https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains")!,
+            url: URL(string: "https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains")!,
             statusCode: 401,
             httpVersion: nil,
             headerFields: nil
@@ -130,7 +135,7 @@ struct MiniMaxUsageProbeTests {
         // Given
         let mockNetwork = MockNetworkClient()
         let httpResponse = HTTPURLResponse(
-            url: URL(string: "https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains")!,
+            url: URL(string: "https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains")!,
             statusCode: 500,
             httpVersion: nil,
             headerFields: nil
@@ -145,5 +150,66 @@ struct MiniMaxUsageProbeTests {
         await #expect(throws: ProbeError.self) {
             try await probe.probe()
         }
+    }
+
+    // MARK: - Region Tests
+
+    @Test
+    func `apiURL defaults to china when region not configured`() {
+        // Given: no region set, simulating legacy user upgrade (模拟旧版用户升级，未配置 region)
+        let probe = makeProbe(apiKey: "test-key", region: nil)
+
+        // Then: falls back to china for backward compatibility (兼容旧版默认中国区)
+        #expect(probe.apiURL == "https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains")
+    }
+
+    @Test
+    func `apiURL uses china region when explicitly configured`() {
+        // Given
+        let probe = makeProbe(apiKey: "test-key", region: .china)
+
+        // Then
+        #expect(probe.apiURL == "https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains")
+    }
+
+    @Test
+    func `apiURL uses international region when configured`() {
+        // Given
+        let probe = makeProbe(apiKey: "test-key", region: .international)
+
+        // Then
+        #expect(probe.apiURL == "https://api.minimax.io/v1/api/openplatform/coding_plan/remains")
+    }
+
+    @Test
+    func `probe uses international API URL when region is international`() async throws {
+        // Given
+        let mockNetwork = MockNetworkClient()
+        let responseData = Data(Self.sampleApiResponse.utf8)
+        let httpResponse = HTTPURLResponse(
+            url: URL(string: "https://api.minimax.io/v1/api/openplatform/coding_plan/remains")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+        // Capture the request to verify URL (捕获请求以验证 URL)
+        var capturedRequest: URLRequest?
+        given(mockNetwork)
+            .request(.any)
+            .willProduce { request in
+                capturedRequest = request
+                return (responseData, httpResponse)
+            }
+
+        let probe = makeProbe(apiKey: "test-key", region: .international, networkClient: mockNetwork)
+
+        // When
+        let snapshot = try await probe.probe()
+
+        // Then: verify response parsing
+        #expect(snapshot.quotas.count == 1)
+        #expect(snapshot.providerId == "minimax")
+        // Verify the request was sent to international endpoint (验证请求发送到国际版端点)
+        #expect(capturedRequest?.url?.absoluteString == "https://api.minimax.io/v1/api/openplatform/coding_plan/remains")
     }
 }
