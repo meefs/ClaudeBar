@@ -176,6 +176,10 @@ jobs:
             <string>manual</string>
             <key>destination</key>
             <string>export</string>
+            <key>signingCertificate</key>
+            <string>3rd Party Mac Developer Application</string>
+            <key>installerSigningCertificate</key>
+            <string>3rd Party Mac Developer Installer</string>
             <key>provisioningProfiles</key>
             <dict>
               <key>com.tddworks.claudebar</key>
