@@ -157,7 +157,7 @@ jobs:
           xcodebuild archive \
             -workspace "${APP_NAME}.xcworkspace" \
             -scheme "${APP_NAME}" \
-            -configuration Release \
+            -configuration AppStore \
             -archivePath "$RUNNER_TEMP/${APP_NAME}.xcarchive" \
             -destination "generic/platform=macOS" \
             -skipMacroValidation \
