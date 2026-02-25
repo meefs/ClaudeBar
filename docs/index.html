@@ -378,6 +378,53 @@
         .provider-icon.copilot { background: linear-gradient(135deg, #6e40c9, #8957e5); }
         .provider-icon.antigravity { background: linear-gradient(135deg, #09b6a2, #00d4aa); }
 
+        /* Contributors Section */
+        .contributors {
+            padding: 6rem 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .contributors-grid {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+
+        .contributor-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.6rem;
+            text-decoration: none;
+            transition: transform 0.3s ease;
+        }
+
+        .contributor-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .contributor-avatar {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            border: 2px solid var(--glass-border);
+            background: var(--glass-bg);
+            transition: border-color 0.3s ease;
+        }
+
+        .contributor-card:hover .contributor-avatar {
+            border-color: var(--glow-purple);
+        }
+
+        .contributor-name {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-family: 'Outfit', sans-serif;
+            font-weight: 500;
+        }
+
         /* Features Section */
         .features {
             padding: 6rem 2rem;
@@ -748,6 +795,59 @@
                 <h3>Auto Updates</h3>
                 <p>Powered by Sparkle framework. Get the latest features and improvements automatically without manual downloads.</p>
             </div>
+        </div>
+    </section>
+
+    <section class="contributors" id="contributors">
+        <div class="section-header">
+            <h2>Built by the community</h2>
+            <p>Thanks to everyone who has contributed to ClaudeBar.</p>
+        </div>
+        <div class="contributors-grid">
+            <a href="https://github.com/hanrw" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/hanrw.png?size=144" width="72" height="72" alt="hanrw" class="contributor-avatar"/>
+                <span class="contributor-name">hanrw</span>
+            </a>
+            <a href="https://github.com/ramarivera" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/ramarivera.png?size=144" width="72" height="72" alt="ramarivera" class="contributor-avatar"/>
+                <span class="contributor-name">ramarivera</span>
+            </a>
+            <a href="https://github.com/zenibako" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/zenibako.png?size=144" width="72" height="72" alt="zenibako" class="contributor-avatar"/>
+                <span class="contributor-name">zenibako</span>
+            </a>
+            <a href="https://github.com/AlexanderWillner" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/AlexanderWillner.png?size=144" width="72" height="72" alt="AlexanderWillner" class="contributor-avatar"/>
+                <span class="contributor-name">AlexanderWillner</span>
+            </a>
+            <a href="https://github.com/avishj" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/avishj.png?size=144" width="72" height="72" alt="avishj" class="contributor-avatar"/>
+                <span class="contributor-name">avishj</span>
+            </a>
+            <a href="https://github.com/BryanQQYue" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/BryanQQYue.png?size=144" width="72" height="72" alt="BryanQQYue" class="contributor-avatar"/>
+                <span class="contributor-name">BryanQQYue</span>
+            </a>
+            <a href="https://github.com/frankhommers" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/frankhommers.png?size=144" width="72" height="72" alt="frankhommers" class="contributor-avatar"/>
+                <span class="contributor-name">frankhommers</span>
+            </a>
+            <a href="https://github.com/hagiwaratakayuki" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/hagiwaratakayuki.png?size=144" width="72" height="72" alt="hagiwaratakayuki" class="contributor-avatar"/>
+                <span class="contributor-name">hagiwaratakayuki</span>
+            </a>
+            <a href="https://github.com/tomstetson" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/tomstetson.png?size=144" width="72" height="72" alt="tomstetson" class="contributor-avatar"/>
+                <span class="contributor-name">tomstetson</span>
+            </a>
+            <a href="https://github.com/logancox" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/logancox.png?size=144" width="72" height="72" alt="logancox" class="contributor-avatar"/>
+                <span class="contributor-name">logancox</span>
+            </a>
+            <a href="https://github.com/hansonkim" target="_blank" rel="noopener" class="contributor-card">
+                <img src="https://github.com/hansonkim.png?size=144" width="72" height="72" alt="hansonkim" class="contributor-avatar"/>
+                <span class="contributor-name">hansonkim</span>
+            </a>
         </div>
     </section>
 

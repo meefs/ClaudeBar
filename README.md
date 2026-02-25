@@ -243,6 +243,28 @@ Version is set in `Sources/App/Info.plist` and flows through to Sparkle auto-upd
 
 The workflow will automatically build, sign, notarize, and publish to GitHub Releases.
 
+## Contributors
+
+Thanks to everyone who has contributed to ClaudeBar!
+
+<table>
+  <tr>
+    <td align="center"><a href="https://github.com/hanrw"><img src="https://github.com/hanrw.png?size=80" width="80" alt="hanrw"/><br/><sub><b>hanrw</b></sub></a></td>
+    <td align="center"><a href="https://github.com/ramarivera"><img src="https://github.com/ramarivera.png?size=80" width="80" alt="ramarivera"/><br/><sub><b>ramarivera</b></sub></a></td>
+    <td align="center"><a href="https://github.com/zenibako"><img src="https://github.com/zenibako.png?size=80" width="80" alt="zenibako"/><br/><sub><b>zenibako</b></sub></a></td>
+    <td align="center"><a href="https://github.com/AlexanderWillner"><img src="https://github.com/AlexanderWillner.png?size=80" width="80" alt="AlexanderWillner"/><br/><sub><b>AlexanderWillner</b></sub></a></td>
+    <td align="center"><a href="https://github.com/avishj"><img src="https://github.com/avishj.png?size=80" width="80" alt="avishj"/><br/><sub><b>avishj</b></sub></a></td>
+    <td align="center"><a href="https://github.com/BryanQQYue"><img src="https://github.com/BryanQQYue.png?size=80" width="80" alt="BryanQQYue"/><br/><sub><b>BryanQQYue</b></sub></a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/frankhommers"><img src="https://github.com/frankhommers.png?size=80" width="80" alt="frankhommers"/><br/><sub><b>frankhommers</b></sub></a></td>
+    <td align="center"><a href="https://github.com/hagiwaratakayuki"><img src="https://github.com/hagiwaratakayuki.png?size=80" width="80" alt="hagiwaratakayuki"/><br/><sub><b>hagiwaratakayuki</b></sub></a></td>
+    <td align="center"><a href="https://github.com/tomstetson"><img src="https://github.com/tomstetson.png?size=80" width="80" alt="tomstetson"/><br/><sub><b>tomstetson</b></sub></a></td>
+    <td align="center"><a href="https://github.com/logancox"><img src="https://github.com/logancox.png?size=80" width="80" alt="logancox"/><br/><sub><b>logancox</b></sub></a></td>
+    <td align="center"><a href="https://github.com/hansonkim"><img src="https://github.com/hansonkim.png?size=80" width="80" alt="hansonkim"/><br/><sub><b>hansonkim</b></sub></a></td>
+  </tr>
+</table>
+
 ## License
 
 MIT
