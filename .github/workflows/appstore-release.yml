@@ -159,8 +159,10 @@ jobs:
             -scheme "${APP_NAME}" \
             -configuration AppStore \
             -archivePath "$RUNNER_TEMP/${APP_NAME}.xcarchive" \
-            -destination "generic/platform=macOS" \
+            -destination "generic/platform=macOS,arch=arm64" \
             -skipMacroValidation \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=NO \
             DEVELOPMENT_TEAM="${{ vars.DEVELOPMENT_TEAM }}"
 
       - name: Export PKG for App Store

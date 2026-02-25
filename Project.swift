@@ -20,9 +20,12 @@ let project = Project(
             .release(name: "Release", settings: [
                 "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "MOCKING",
             ]),
-            // AppStore extends Release but scopes MAS signing to the ClaudeBar target only
+            // AppStore extends Release but scopes MAS signing to the ClaudeBar target only.
+            // ENABLE_DEBUG_DYLIB must be NO — the base YES is for Previews only and breaks
+            // cross-project module resolution (e.g. Mockable) in a production archive.
             .release(name: "AppStore", settings: [
                 "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "MOCKING",
+                "ENABLE_DEBUG_DYLIB": "NO",
             ]),
         ]
     ),
@@ -107,6 +110,7 @@ let project = Project(
                     ]),
                     .release(name: "AppStore", settings: [
                         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "ENABLE_SPARKLE",
+                        "ENABLE_DEBUG_DYLIB": "NO",
                         "CODE_SIGN_STYLE": "Manual",
                         "CODE_SIGN_IDENTITY": "3rd Party Mac Developer Application",
                         "PROVISIONING_PROFILE_SPECIFIER": "ClaudeBar Mac App Store",
