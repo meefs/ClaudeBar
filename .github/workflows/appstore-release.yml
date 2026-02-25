@@ -171,9 +171,11 @@ jobs:
           fi
 
           # Fetch the MAC_APP_STORE profile and extract its content
+          # asccli may return attributes at the top level (flattened) or nested under .attributes
           PROFILE_JSON=$(asc profiles list --bundle-id-id "$BUNDLE_ID_ID" --type MAC_APP_STORE)
-          PROFILE_CONTENT=$(echo "$PROFILE_JSON" | jq -r '.data[0].profileContent')
-          PP_NAME=$(echo "$PROFILE_JSON" | jq -r '.data[0].name')
+          PROFILE_ID=$(echo "$PROFILE_JSON" | jq -r '.data[0].id')
+          PROFILE_CONTENT=$(echo "$PROFILE_JSON" | jq -r '.data[0].profileContent // .data[0].attributes.profileContent')
+          PP_NAME=$(echo "$PROFILE_JSON" | jq -r '.data[0].name // .data[0].attributes.name')
 
           if [ -z "$PROFILE_CONTENT" ] || [ "$PROFILE_CONTENT" = "null" ]; then
             echo "Error: No MAC_APP_STORE profile found for $BUNDLE_ID"
@@ -186,6 +188,11 @@ jobs:
           # printf '%s' avoids the trailing newline echo adds, which breaks macOS base64 -D
           PP_PATH="$RUNNER_TEMP/mas.provisionprofile"
           printf '%s' "$PROFILE_CONTENT" | base64 -D > "$PP_PATH"
+          if [ ! -s "$PP_PATH" ]; then
+            echo "Error: Provisioning profile decoded to an empty file (profile ID: $PROFILE_ID)"
+            echo "Profile content length: ${#PROFILE_CONTENT}"
+            exit 1
+          fi
           PP_UUID=$(security cms -D -i "$PP_PATH" | /usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin)
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PP_UUID.provisionprofile"
