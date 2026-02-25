@@ -3,21 +3,28 @@ name: App Store Release
 # Uploads a Mac App Store build to App Store Connect, distributes to TestFlight,
 # and optionally submits for App Store review.
 #
+# The provisioning profile is downloaded automatically from App Store Connect via
+# `asc profiles list` — no need to store it as a secret.
+#
 # Required GitHub Secrets:
 #   MAS_CERTIFICATE_P12        — Base64-encoded P12 containing both:
 #                                  • "3rd Party Mac Developer Application: ..." (signs the app)
 #                                  • "3rd Party Mac Developer Installer: ..." (signs the PKG)
 #   MAS_CERTIFICATE_PASSWORD   — Password for MAS_CERTIFICATE_P12
-#   MAS_PROVISIONING_PROFILE   — Base64-encoded Mac App Store provisioning profile (.provisionprofile)
 #   ASC_KEY_ID                 — App Store Connect API Key ID  (same key as APP_STORE_CONNECT_KEY_ID)
 #   ASC_ISSUER_ID              — Issuer ID UUID               (same as APP_STORE_CONNECT_ISSUER_ID)
 #   ASC_PRIVATE_KEY            — PEM content of .p8 file      (cat AuthKey_XXXX.p8 — NOT base64)
 #
 # Required GitHub Variables (Settings → Variables → Actions):
-#   APP_ID              — Numeric App Store Connect app ID (asc apps list to find it)
-#   BETA_GROUP_ID       — TestFlight beta group ID (asc testflight groups list --app-id $APP_ID)
-#   DEVELOPMENT_TEAM    — Apple Developer Team ID (10-character string, e.g. ABCD123456)
-#   MAS_PROFILE_NAME    — Provisioning profile name (as shown in Xcode / Apple Developer portal)
+#   APP_ID              — Numeric App Store Connect app ID  (asc apps list)
+#   BETA_GROUP_ID       — TestFlight beta group ID          (asc testflight groups list --app-id $APP_ID)
+#   DEVELOPMENT_TEAM    — Apple Developer Team ID           (10-char string, e.g. ABCD123456)
+#
+# One-time setup (run locally with `asc` before first CI run):
+#   asc bundle-ids list --identifier com.tddworks.claudebar --platform macos
+#   asc certificates list --type MAC_APP_DISTRIBUTION
+#   asc profiles create --name "ClaudeBar Mac App Store" --type MAC_APP_STORE \
+#     --bundle-id-id <id> --certificate-ids <cert-id>
 
 on:
   workflow_dispatch:
@@ -43,6 +50,7 @@ on:
 
 env:
   APP_NAME: ClaudeBar
+  BUNDLE_ID: com.tddworks.claudebar
   SWIFT_VERSION: "6.2"
   APP_ID: ${{ vars.APP_ID }}
   BETA_GROUP_ID: ${{ vars.BETA_GROUP_ID }}
@@ -109,10 +117,10 @@ jobs:
             "https://www.apple.com/certificateauthority/AppleRootCA-G2.cer"
           curl -sL -o "$RUNNER_TEMP/AppleWWDRCAG3.cer" \
             "https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer"
-          security import "$RUNNER_TEMP/AppleRootCA-G2.cer"  -k "$KEYCHAIN_PATH" -T /usr/bin/codesign 2>&1 || true
-          security import "$RUNNER_TEMP/AppleWWDRCAG3.cer"   -k "$KEYCHAIN_PATH" -T /usr/bin/codesign 2>&1 || true
+          security import "$RUNNER_TEMP/AppleRootCA-G2.cer" -k "$KEYCHAIN_PATH" -T /usr/bin/codesign 2>&1 || true
+          security import "$RUNNER_TEMP/AppleWWDRCAG3.cer"  -k "$KEYCHAIN_PATH" -T /usr/bin/codesign 2>&1 || true
 
-          # Import Mac App Store certificates (Application + Installer)
+          # Import Mac App Store certificates (Application + Installer, both in the P12)
           echo "$MAS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/mas-cert.p12"
           security import "$RUNNER_TEMP/mas-cert.p12" \
             -k "$KEYCHAIN_PATH" \
@@ -128,16 +136,47 @@ jobs:
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
           echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
 
-      - name: Install Provisioning Profile
+      - name: Install asc CLI
+        run: brew tap tddworks/tap && brew install asccli
+
+      - name: Download & Install Provisioning Profile
+        # Downloads the MAC_APP_STORE profile directly from App Store Connect via `asc`.
+        # No MAS_PROVISIONING_PROFILE secret needed — always fetches the latest version.
         env:
-          MAS_PROVISIONING_PROFILE: ${{ secrets.MAS_PROVISIONING_PROFILE }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
+          # Resolve the bundle ID resource ID for this app
+          BUNDLE_ID_ID=$(asc bundle-ids list --identifier "$BUNDLE_ID" --platform macos \
+            | jq -r '.data[0].id')
+          if [ -z "$BUNDLE_ID_ID" ] || [ "$BUNDLE_ID_ID" = "null" ]; then
+            echo "Error: Bundle ID '$BUNDLE_ID' not found in App Store Connect"
+            echo "Run: asc bundle-ids create --name ClaudeBar --identifier $BUNDLE_ID --platform macos"
+            exit 1
+          fi
+
+          # Fetch the MAC_APP_STORE profile and extract its content
+          PROFILE_JSON=$(asc profiles list --bundle-id-id "$BUNDLE_ID_ID" --type MAC_APP_STORE)
+          PROFILE_CONTENT=$(echo "$PROFILE_JSON" | jq -r '.data[0].profileContent')
+          PP_NAME=$(echo "$PROFILE_JSON" | jq -r '.data[0].name')
+
+          if [ -z "$PROFILE_CONTENT" ] || [ "$PROFILE_CONTENT" = "null" ]; then
+            echo "Error: No MAC_APP_STORE profile found for $BUNDLE_ID"
+            echo "Run: asc profiles create --name 'ClaudeBar Mac App Store' --type MAC_APP_STORE \\"
+            echo "       --bundle-id-id $BUNDLE_ID_ID --certificate-ids <cert-id>"
+            exit 1
+          fi
+
+          # Decode and install the profile
           PP_PATH="$RUNNER_TEMP/mas.provisionprofile"
-          echo "$MAS_PROVISIONING_PROFILE" | base64 --decode > "$PP_PATH"
+          echo "$PROFILE_CONTENT" | base64 --decode > "$PP_PATH"
           PP_UUID=$(security cms -D -i "$PP_PATH" | /usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin)
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PP_UUID.provisionprofile"
-          echo "Installed provisioning profile: $PP_UUID"
+
+          echo "PP_NAME=$PP_NAME" >> $GITHUB_ENV
+          echo "Installed profile: $PP_NAME ($PP_UUID)"
 
       - name: Archive for Mac App Store
         run: |
@@ -151,7 +190,7 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="${{ vars.DEVELOPMENT_TEAM }}" \
             CODE_SIGN_IDENTITY="3rd Party Mac Developer Application" \
-            PROVISIONING_PROFILE_SPECIFIER="${{ vars.MAS_PROFILE_NAME }}"
+            PROVISIONING_PROFILE_SPECIFIER="$PP_NAME"
 
       - name: Export PKG for App Store
         run: |
@@ -183,9 +222,6 @@ jobs:
           fi
           echo "PKG_FILE=$PKG_FILE" >> $GITHUB_ENV
           echo "Exported: $PKG_FILE"
-
-      - name: Install asc CLI
-        run: brew tap tddworks/tap && brew install asccli
 
       - name: Upload to App Store Connect
         env:
