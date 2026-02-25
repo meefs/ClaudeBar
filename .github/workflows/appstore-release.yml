@@ -143,14 +143,16 @@ jobs:
       - name: Setup ASC credentials
         # Decode the base64-encoded .p8 key into raw PEM that asc CLI expects via ASC_PRIVATE_KEY.
         # Setting all three vars in $GITHUB_ENV avoids repeating them in every asc step.
+        # printf '%s\n' guarantees a trailing newline so the EOF delimiter is on its own line.
         env:
           ASC_PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           echo "ASC_KEY_ID=${{ secrets.APP_STORE_CONNECT_KEY_ID }}" >> $GITHUB_ENV
           echo "ASC_ISSUER_ID=${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" >> $GITHUB_ENV
+          DECODED_KEY=$(echo "$ASC_PRIVATE_KEY_B64" | base64 -D)
           {
             echo 'ASC_PRIVATE_KEY<<EOF'
-            echo "$ASC_PRIVATE_KEY_B64" | base64 --decode
+            printf '%s\n' "$DECODED_KEY"
             echo 'EOF'
           } >> $GITHUB_ENV
 
