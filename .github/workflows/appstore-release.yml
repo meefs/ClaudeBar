@@ -3,29 +3,20 @@ name: App Store Release
 # Uploads a Mac App Store build to App Store Connect, distributes to TestFlight,
 # and optionally submits for App Store review.
 #
-# The provisioning profile is downloaded automatically from App Store Connect via
-# `asc profiles list` — no need to store it as a secret.
-#
 # Required GitHub Secrets:
-#   APPLE_MAS_CERTIFICATE_P12      — Base64-encoded P12 containing both:
-#                                      • "3rd Party Mac Developer Application: ..." (signs the app)
-#                                      • "3rd Party Mac Developer Installer: ..." (signs the PKG)
-#                                    Different cert type from APPLE_CERTIFICATE_P12 (Developer ID).
-#   APPLE_MAS_CERTIFICATE_PASSWORD — Password for APPLE_MAS_CERTIFICATE_P12
-#   APP_STORE_CONNECT_KEY_ID      — App Store Connect API Key ID  (same key as APP_STORE_CONNECT_KEY_ID)
-#   APP_STORE_CONNECT_ISSUER_ID   — Issuer ID UUID               (same as APP_STORE_CONNECT_ISSUER_ID)
-#   APP_STORE_CONNECT_API_KEY_P8  — PEM content of .p8 file      (cat AuthKey_XXXX.p8 — NOT base64)
+#   APPLE_MAS_CERTIFICATE_P12        — Base64-encoded P12 containing both:
+#                                        • "3rd Party Mac Developer Application: ..." (signs the app)
+#                                        • "3rd Party Mac Developer Installer: ..." (signs the PKG)
+#   APPLE_MAS_CERTIFICATE_PASSWORD   — Password for APPLE_MAS_CERTIFICATE_P12
+#   APP_STORE_CONNECT_KEY_ID         — App Store Connect API Key ID
+#   APP_STORE_CONNECT_ISSUER_ID      — Issuer ID UUID
+#   APP_STORE_CONNECT_API_KEY_P8     — Base64-encoded .p8 key file
+#                                        base64 -i AuthKey_XXXX.p8 | pbcopy
 #
 # Required GitHub Variables (Settings → Variables → Actions):
-#   APP_ID              — Numeric App Store Connect app ID  (asc apps list)
-#   BETA_GROUP_ID       — TestFlight beta group ID          (asc testflight groups list --app-id $APP_ID)
-#   DEVELOPMENT_TEAM    — Apple Developer Team ID           (10-char string, e.g. ABCD123456)
-#
-# One-time setup (run locally with `asc` before first CI run):
-#   asc bundle-ids list --identifier com.tddworks.claudebar --platform macos
-#   asc certificates list --type MAC_APP_DISTRIBUTION
-#   asc profiles create --name "ClaudeBar Mac App Store" --type MAC_APP_STORE \
-#     --bundle-id-id <id> --certificate-ids <cert-id>
+#   APP_ID              — Numeric App Store Connect app ID
+#   BETA_GROUP_ID       — TestFlight beta group ID
+#   DEVELOPMENT_TEAM    — Apple Developer Team ID (10-char string, e.g. ABCD123456)
 
 on:
   workflow_dispatch:
@@ -142,8 +133,7 @@ jobs:
 
       - name: Setup ASC credentials
         # Decode the base64-encoded .p8 key into raw PEM that asc CLI expects via ASC_PRIVATE_KEY.
-        # Setting all three vars in $GITHUB_ENV avoids repeating them in every asc step.
-        # printf '%s\n' guarantees a trailing newline so the EOF delimiter is on its own line.
+        # Setting all three vars globally avoids repeating them in every asc step.
         env:
           ASC_PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
@@ -156,49 +146,11 @@ jobs:
             echo 'EOF'
           } >> $GITHUB_ENV
 
-      - name: Download & Install Provisioning Profile
-        # Downloads the MAC_APP_STORE profile directly from App Store Connect via `asc`.
-        # No MAS_PROVISIONING_PROFILE secret needed — always fetches the latest version.
-        # ASC_KEY_ID / ASC_ISSUER_ID / ASC_PRIVATE_KEY are set globally by "Setup ASC credentials".
+      - name: Install Provisioning Profile
+        # ASC credentials are set globally by "Setup ASC credentials" — no extra secret needed.
         run: |
-          # Resolve the bundle ID resource ID for this app
-          BUNDLE_ID_ID=$(asc bundle-ids list --identifier "$BUNDLE_ID" --platform macos \
-            | jq -r '.data[0].id')
-          if [ -z "$BUNDLE_ID_ID" ] || [ "$BUNDLE_ID_ID" = "null" ]; then
-            echo "Error: Bundle ID '$BUNDLE_ID' not found in App Store Connect"
-            echo "Run: asc bundle-ids create --name ClaudeBar --identifier $BUNDLE_ID --platform macos"
-            exit 1
-          fi
-
-          # Fetch the MAC_APP_STORE profile and extract its content
-          # asccli may return attributes at the top level (flattened) or nested under .attributes
-          PROFILE_JSON=$(asc profiles list --bundle-id-id "$BUNDLE_ID_ID" --type MAC_APP_STORE)
-          PROFILE_ID=$(echo "$PROFILE_JSON" | jq -r '.data[0].id')
-          PROFILE_CONTENT=$(echo "$PROFILE_JSON" | jq -r '.data[0].profileContent // .data[0].attributes.profileContent')
-          PP_NAME=$(echo "$PROFILE_JSON" | jq -r '.data[0].name // .data[0].attributes.name')
-
-          if [ -z "$PROFILE_CONTENT" ] || [ "$PROFILE_CONTENT" = "null" ]; then
-            echo "Error: No MAC_APP_STORE profile found for $BUNDLE_ID"
-            echo "Run: asc profiles create --name 'ClaudeBar Mac App Store' --type MAC_APP_STORE \\"
-            echo "       --bundle-id-id $BUNDLE_ID_ID --certificate-ids <cert-id>"
-            exit 1
-          fi
-
-          # Decode and install the profile
-          # printf '%s' avoids the trailing newline echo adds, which breaks macOS base64 -D
-          PP_PATH="$RUNNER_TEMP/mas.provisionprofile"
-          printf '%s' "$PROFILE_CONTENT" | base64 -D > "$PP_PATH"
-          if [ ! -s "$PP_PATH" ]; then
-            echo "Error: Provisioning profile decoded to an empty file (profile ID: $PROFILE_ID)"
-            echo "Profile content length: ${#PROFILE_CONTENT}"
-            exit 1
-          fi
-          PP_UUID=$(security cms -D -i "$PP_PATH" | /usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin)
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PP_UUID.provisionprofile"
-
+          PP_NAME=$(./scripts/install-mas-profile.sh)
           echo "PP_NAME=$PP_NAME" >> $GITHUB_ENV
-          echo "Installed profile: $PP_NAME ($PP_UUID)"
 
       - name: Archive for Mac App Store
         run: |
@@ -294,3 +246,4 @@ jobs:
             security delete-keychain "$KEYCHAIN_PATH" || true
           fi
           rm -f "$RUNNER_TEMP/mas-cert.p12" || true
+          rm -f "$RUNNER_TEMP/profile.b64" || true
