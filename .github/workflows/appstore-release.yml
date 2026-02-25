@@ -122,7 +122,7 @@ jobs:
           security import "$RUNNER_TEMP/AppleWWDRCAG3.cer"  -k "$KEYCHAIN_PATH" -T /usr/bin/codesign 2>&1 || true
 
           # Import Mac App Store certificates (Application + Installer, both in the P12)
-          echo "$APPLE_MAS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/mas-cert.p12"
+          printf '%s' "$APPLE_MAS_CERTIFICATE_P12" | base64 -D > "$RUNNER_TEMP/mas-cert.p12"
           security import "$RUNNER_TEMP/mas-cert.p12" \
             -k "$KEYCHAIN_PATH" \
             -P "$APPLE_MAS_CERTIFICATE_PASSWORD" \
@@ -183,8 +183,9 @@ jobs:
           fi
 
           # Decode and install the profile
+          # printf '%s' avoids the trailing newline echo adds, which breaks macOS base64 -D
           PP_PATH="$RUNNER_TEMP/mas.provisionprofile"
-          echo "$PROFILE_CONTENT" | base64 --decode > "$PP_PATH"
+          printf '%s' "$PROFILE_CONTENT" | base64 -D > "$PP_PATH"
           PP_UUID=$(security cms -D -i "$PP_PATH" | /usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin)
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PP_UUID.provisionprofile"
