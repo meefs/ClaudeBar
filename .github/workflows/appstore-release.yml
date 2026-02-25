@@ -148,9 +148,9 @@ jobs:
 
       - name: Install Provisioning Profile
         # ASC credentials are set globally by "Setup ASC credentials" — no extra secret needed.
-        run: |
-          PP_NAME=$(./scripts/install-mas-profile.sh)
-          echo "PP_NAME=$PP_NAME" >> $GITHUB_ENV
+        # Signing settings (CODE_SIGN_STYLE, CODE_SIGN_IDENTITY, PROVISIONING_PROFILE_SPECIFIER)
+        # are in Project.swift Release config so they only apply to the ClaudeBar target.
+        run: ./scripts/install-mas-profile.sh
 
       - name: Archive for Mac App Store
         run: |
@@ -161,10 +161,7 @@ jobs:
             -archivePath "$RUNNER_TEMP/${APP_NAME}.xcarchive" \
             -destination "generic/platform=macOS" \
             -skipMacroValidation \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM="${{ vars.DEVELOPMENT_TEAM }}" \
-            CODE_SIGN_IDENTITY="3rd Party Mac Developer Application" \
-            PROVISIONING_PROFILE_SPECIFIER="$PP_NAME"
+            DEVELOPMENT_TEAM="${{ vars.DEVELOPMENT_TEAM }}"
 
       - name: Export PKG for App Store
         run: |

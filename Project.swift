@@ -97,6 +97,10 @@ let project = Project(
                 ],
                 release: [
                     "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "ENABLE_SPARKLE",
+                    // MAS signing — scoped to this target only so dependencies are unaffected
+                    "CODE_SIGN_STYLE": "Manual",
+                    "CODE_SIGN_IDENTITY": "3rd Party Mac Developer Application",
+                    "PROVISIONING_PROFILE_SPECIFIER": "ClaudeBar Mac App Store",
                 ]
             )
         ),
