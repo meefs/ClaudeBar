@@ -12,9 +12,9 @@ name: App Store Release
 #                                      • "3rd Party Mac Developer Installer: ..." (signs the PKG)
 #                                    Different cert type from APPLE_CERTIFICATE_P12 (Developer ID).
 #   APPLE_APPLE_MAS_CERTIFICATE_PASSWORD — Password for APPLE_APPLE_MAS_CERTIFICATE_P12
-#   ASC_KEY_ID                 — App Store Connect API Key ID  (same key as APP_STORE_CONNECT_KEY_ID)
-#   ASC_ISSUER_ID              — Issuer ID UUID               (same as APP_STORE_CONNECT_ISSUER_ID)
-#   ASC_PRIVATE_KEY            — PEM content of .p8 file      (cat AuthKey_XXXX.p8 — NOT base64)
+#   APP_STORE_CONNECT_KEY_ID      — App Store Connect API Key ID  (same key as APP_STORE_CONNECT_KEY_ID)
+#   APP_STORE_CONNECT_ISSUER_ID   — Issuer ID UUID               (same as APP_STORE_CONNECT_ISSUER_ID)
+#   APP_STORE_CONNECT_API_KEY_P8  — PEM content of .p8 file      (cat AuthKey_XXXX.p8 — NOT base64)
 #
 # Required GitHub Variables (Settings → Variables → Actions):
 #   APP_ID              — Numeric App Store Connect app ID  (asc apps list)
@@ -144,9 +144,9 @@ jobs:
         # Downloads the MAC_APP_STORE profile directly from App Store Connect via `asc`.
         # No MAS_PROVISIONING_PROFILE secret needed — always fetches the latest version.
         env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           # Resolve the bundle ID resource ID for this app
           BUNDLE_ID_ID=$(asc bundle-ids list --identifier "$BUNDLE_ID" --platform macos \
@@ -226,9 +226,9 @@ jobs:
 
       - name: Upload to App Store Connect
         env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           asc builds upload \
             --app-id "$APP_ID" \
@@ -239,9 +239,9 @@ jobs:
 
       - name: Get Build ID
         env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           BUILD_ID=$(asc builds list --app-id "$APP_ID" | jq -r '.data[0].id')
           echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
@@ -249,9 +249,9 @@ jobs:
 
       - name: Distribute to TestFlight
         env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           asc builds add-beta-group \
             --build-id "$BUILD_ID" \
@@ -265,9 +265,9 @@ jobs:
       - name: Submit for App Store Review
         if: ${{ inputs.submit_for_review }}
         env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           VERSION_ID=$(asc versions list --app-id "$APP_ID" | jq -r '.data[0].id')
           asc versions set-build --version-id "$VERSION_ID" --build-id "$BUILD_ID"
