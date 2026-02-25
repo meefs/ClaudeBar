@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.38] - 2026-02-25
+
+### Added
+- **Claude Setup-Token Support**: ClaudeBar now recognizes users who authenticate via `claude setup-token`. The app loads the `CLAUDE_CODE_OAUTH_TOKEN` environment variable as a credential source and gracefully falls back to stored credentials (file/keychain) that have full scope, so quota monitoring continues to work seamlessly regardless of how you authenticated (contributed by [@brendandebeasi](https://github.com/brendandebeasi) in [#129](https://github.com/tddworks/ClaudeBar/pull/129)).
+
+### Fixed
+- **MiniMax Region Support**: MiniMax settings now include a region selector (International vs. China) to point to the correct API endpoint. Previously the app hardcoded the China-region URL (`minimaxi.com`), preventing international users from fetching quota data. Select your region in Settings → MiniMax to fix connection issues (contributed by [@BryanQQYue](https://github.com/BryanQQYue) in [#125](https://github.com/tddworks/ClaudeBar/issues/125)).
+
 ## [0.4.37] - 2026-02-24
 
 ### Fixed
