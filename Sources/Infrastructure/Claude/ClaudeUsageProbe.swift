@@ -4,11 +4,21 @@ import SwiftTerm
 
 /// Infrastructure adapter that probes the Claude CLI to fetch usage quotas.
 /// Implements the UsageProbe protocol from the domain layer.
+///
+/// When using the default CLI executor, this probe strips `CLAUDE_CODE_OAUTH_TOKEN`
+/// from the subprocess environment. This ensures `claude /usage` falls back to stored
+/// credentials (from `claude login`) which have the full `user:profile` scope required
+/// for quota data, rather than using the inference-only setup-token.
 public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     private let claudeBinary: String
     private let timeout: TimeInterval
     private let cliExecutor: CLIExecutor
     private let terminalRenderer: TerminalRenderer
+
+    /// Environment variables to strip from the CLI subprocess.
+    /// `CLAUDE_CODE_OAUTH_TOKEN` is excluded because setup-tokens only have
+    /// `user:inference` scope and cannot access quota data via `/usage`.
+    static let envExclusions = ["CLAUDE_CODE_OAUTH_TOKEN"]
 
     public init(
         claudeBinary: String = "claude",
@@ -17,7 +27,7 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
     ) {
         self.claudeBinary = claudeBinary
         self.timeout = timeout
-        self.cliExecutor = cliExecutor ?? DefaultCLIExecutor()
+        self.cliExecutor = cliExecutor ?? DefaultCLIExecutor(environmentExclusions: Self.envExclusions)
         self.terminalRenderer = TerminalRenderer(cols: 160, rows: 50)
     }
 

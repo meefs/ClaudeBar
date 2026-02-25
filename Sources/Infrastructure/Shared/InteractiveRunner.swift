@@ -34,17 +34,23 @@ public struct InteractiveRunner: Sendable {
         /// Automatic responses to prompts. Maps prompt text to the response to send.
         /// Example: `["Continue? [y/n]": "y\r"]` will auto-respond "y" when prompted.
         public var autoResponses: [String: String]
+        /// Environment variable keys to exclude from the subprocess environment.
+        /// Use this to prevent env vars like `CLAUDE_CODE_OAUTH_TOKEN` from being
+        /// inherited by the subprocess, forcing it to use stored credentials instead.
+        public var environmentExclusions: [String]
 
         public init(
             timeout: TimeInterval = 20.0,
             workingDirectory: URL? = nil,
             arguments: [String] = [],
-            autoResponses: [String: String] = [:]
+            autoResponses: [String: String] = [:],
+            environmentExclusions: [String] = []
         ) {
             self.timeout = timeout
             self.workingDirectory = workingDirectory
             self.arguments = arguments
             self.autoResponses = autoResponses
+            self.environmentExclusions = environmentExclusions
         }
     }
 
@@ -205,7 +211,7 @@ public struct InteractiveRunner: Sendable {
         process.standardInput = terminalHandle
         process.standardOutput = terminalHandle
         process.standardError = terminalHandle
-        process.environment = Self.terminalEnvironment()
+        process.environment = Self.terminalEnvironment(excluding: options.environmentExclusions)
 
         if let workingDirectory = options.workingDirectory {
             process.currentDirectoryURL = workingDirectory
@@ -382,8 +388,14 @@ public struct InteractiveRunner: Sendable {
 
     /// Environment variables for the terminal session.
     /// Ensures CLI tools behave as they would in a normal terminal.
-    private static func terminalEnvironment() -> [String: String] {
+    /// - Parameter excluding: Environment variable keys to remove from the subprocess.
+    ///   Use this to prevent tokens like `CLAUDE_CODE_OAUTH_TOKEN` from being inherited.
+    private static func terminalEnvironment(excluding: [String] = []) -> [String: String] {
         var env = ProcessInfo.processInfo.environment
+        // Remove excluded keys before setting defaults
+        for key in excluding {
+            env.removeValue(forKey: key)
+        }
         env["PATH"] = ensureCommonPathsIncluded(BinaryLocator.shellPath())
         env["HOME"] = env["HOME"] ?? NSHomeDirectory()
         env["TERM"] = env["TERM"] ?? "xterm-256color"

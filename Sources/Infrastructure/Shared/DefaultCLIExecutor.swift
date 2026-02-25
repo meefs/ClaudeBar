@@ -3,7 +3,14 @@ import Foundation
 /// Default CLIExecutor that uses BinaryLocator and InteractiveRunner.
 /// This is an adapter that wraps system APIs for CLI execution.
 public struct DefaultCLIExecutor: CLIExecutor {
-    public init() {}
+    /// Environment variable keys to exclude from the subprocess environment.
+    /// When set, these keys are removed before the subprocess launches,
+    /// preventing tokens like `CLAUDE_CODE_OAUTH_TOKEN` from being inherited.
+    private let environmentExclusions: [String]
+
+    public init(environmentExclusions: [String] = []) {
+        self.environmentExclusions = environmentExclusions
+    }
 
     public func locate(_ binary: String) -> String? {
         BinaryLocator.which(binary)
@@ -22,7 +29,8 @@ public struct DefaultCLIExecutor: CLIExecutor {
             timeout: timeout,
             workingDirectory: workingDirectory,
             arguments: args,
-            autoResponses: autoResponses
+            autoResponses: autoResponses,
+            environmentExclusions: environmentExclusions
         )
 
         let result = try runner.run(binary: binary, input: input ?? "", options: options)

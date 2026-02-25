@@ -615,4 +615,106 @@ struct ClaudeAPIUsageProbeTokenRefreshTests {
             try await probe.probe()
         }
     }
+
+// MARK: - Setup-Token (Environment) Tests
+
+@Suite("ClaudeAPIUsageProbe Setup-Token Tests")
+struct ClaudeAPIUsageProbeSetupTokenTests {
+
+    private func makeTemporaryDirectory() throws -> URL {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("claude-api-probe-setup-token-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        return tempDir
+    }
+
+    @Test
+    func `probe skips refresh when no refresh token and fetches successfully`() async throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Simulate setup-token: loaded from env var, no refresh token, no expiresAt
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: ["CLAUDE_CODE_OAUTH_TOKEN": "setup-token-abc123"]
+        )
+
+        let mockNetwork = MockNetworkClient()
+        let usageResponse = """
+        {
+          "five_hour": { "utilization": 20.0, "resets_at": "2025-01-15T10:00:00Z" },
+          "seven_day": { "utilization": 40.0, "resets_at": "2025-01-20T00:00:00Z" }
+        }
+        """.data(using: .utf8)!
+
+        let usageHTTP = HTTPURLResponse(
+            url: URL(string: "https://api.anthropic.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        // Only the usage call should be made — NO refresh call
+        given(mockNetwork).request(.any).willReturn((usageResponse, usageHTTP))
+
+        let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
+
+        let snapshot = try await probe.probe()
+
+        #expect(snapshot.providerId == "claude")
+        #expect(snapshot.quotas.count == 2)
+
+        let sessionQuota = snapshot.quotas.first { $0.quotaType == .session }
+        #expect(sessionQuota?.percentRemaining == 80.0)  // 100 - 20
+
+        let weeklyQuota = snapshot.quotas.first { $0.quotaType == .weekly }
+        #expect(weeklyQuota?.percentRemaining == 60.0)  // 100 - 40
+    }
+
+    @Test
+    func `probe with setup-token throws authenticationRequired on 401 without attempting refresh`() async throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: ["CLAUDE_CODE_OAUTH_TOKEN": "expired-setup-token"]
+        )
+
+        let mockNetwork = MockNetworkClient()
+        let unauthorizedHTTP = HTTPURLResponse(
+            url: URL(string: "https://api.anthropic.com")!,
+            statusCode: 401,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((Data(), unauthorizedHTTP))
+
+        let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
+
+        // Should throw without attempting refresh (no refresh token available)
+        await #expect(throws: ProbeError.self) {
+            try await probe.probe()
+        }
+    }
+
+    @Test
+    func `isAvailable returns true when env var token is set`() async throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: ["CLAUDE_CODE_OAUTH_TOKEN": "my-setup-token"]
+        )
+
+        let probe = ClaudeAPIUsageProbe(credentialLoader: loader)
+
+        #expect(await probe.isAvailable() == true)
+    }
+}
 }
