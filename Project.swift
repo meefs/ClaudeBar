@@ -12,21 +12,12 @@ let project = Project(
             "MACOSX_DEPLOYMENT_TARGET": "15.0",
             "ENABLE_DEBUG_DYLIB": "YES",
         ],
-        configurations: [
-            .debug(name: "Debug", settings: [
-                "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG MOCKING",
-                "ENABLE_DEBUG_DYLIB": "YES",
-            ]),
-            .release(name: "Release", settings: [
-                "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "MOCKING",
-            ]),
-            // AppStore extends Release but scopes MAS signing to the ClaudeBar target only.
-            // ENABLE_DEBUG_DYLIB must be NO — the base YES is for Previews only and breaks
-            // cross-project module resolution (e.g. Mockable) in a production archive.
-            .release(name: "AppStore", settings: [
-                "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "MOCKING",
-                "ENABLE_DEBUG_DYLIB": "NO",
-            ]),
+        debug: [
+            "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG MOCKING",
+            "ENABLE_DEBUG_DYLIB": "YES",
+        ],
+        release: [
+            "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "MOCKING",
         ]
     ),
     targets: [
@@ -101,20 +92,11 @@ let project = Project(
                     "CODE_SIGN_IDENTITY": "-",
                     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
                 ],
-                configurations: [
-                    .debug(name: "Debug", settings: [
-                        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG ENABLE_SPARKLE",
-                    ]),
-                    .release(name: "Release", settings: [
-                        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "ENABLE_SPARKLE",
-                    ]),
-                    .release(name: "AppStore", settings: [
-                        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "ENABLE_SPARKLE",
-                        "ENABLE_DEBUG_DYLIB": "NO",
-                        "CODE_SIGN_STYLE": "Manual",
-                        "CODE_SIGN_IDENTITY": "3rd Party Mac Developer Application",
-                        "PROVISIONING_PROFILE_SPECIFIER": "ClaudeBar Mac App Store",
-                    ]),
+                debug: [
+                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG ENABLE_SPARKLE",
+                ],
+                release: [
+                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "ENABLE_SPARKLE",
                 ]
             )
         ),
