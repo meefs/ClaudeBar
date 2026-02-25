@@ -7,10 +7,11 @@ name: App Store Release
 # `asc profiles list` — no need to store it as a secret.
 #
 # Required GitHub Secrets:
-#   MAS_CERTIFICATE_P12        — Base64-encoded P12 containing both:
-#                                  • "3rd Party Mac Developer Application: ..." (signs the app)
-#                                  • "3rd Party Mac Developer Installer: ..." (signs the PKG)
-#   MAS_CERTIFICATE_PASSWORD   — Password for MAS_CERTIFICATE_P12
+#   APPLE_APPLE_MAS_CERTIFICATE_P12      — Base64-encoded P12 containing both:
+#                                      • "3rd Party Mac Developer Application: ..." (signs the app)
+#                                      • "3rd Party Mac Developer Installer: ..." (signs the PKG)
+#                                    Different cert type from APPLE_CERTIFICATE_P12 (Developer ID).
+#   APPLE_APPLE_MAS_CERTIFICATE_PASSWORD — Password for APPLE_APPLE_MAS_CERTIFICATE_P12
 #   ASC_KEY_ID                 — App Store Connect API Key ID  (same key as APP_STORE_CONNECT_KEY_ID)
 #   ASC_ISSUER_ID              — Issuer ID UUID               (same as APP_STORE_CONNECT_ISSUER_ID)
 #   ASC_PRIVATE_KEY            — PEM content of .p8 file      (cat AuthKey_XXXX.p8 — NOT base64)
@@ -102,8 +103,8 @@ jobs:
 
       - name: Import Mac App Store Certificates
         env:
-          MAS_CERTIFICATE_P12: ${{ secrets.MAS_CERTIFICATE_P12 }}
-          MAS_CERTIFICATE_PASSWORD: ${{ secrets.MAS_CERTIFICATE_PASSWORD }}
+          APPLE_MAS_CERTIFICATE_P12: ${{ secrets.APPLE_MAS_CERTIFICATE_P12 }}
+          APPLE_MAS_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_MAS_CERTIFICATE_PASSWORD }}
         run: |
           KEYCHAIN_PATH="$RUNNER_TEMP/mas-signing.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
@@ -121,10 +122,10 @@ jobs:
           security import "$RUNNER_TEMP/AppleWWDRCAG3.cer"  -k "$KEYCHAIN_PATH" -T /usr/bin/codesign 2>&1 || true
 
           # Import Mac App Store certificates (Application + Installer, both in the P12)
-          echo "$MAS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/mas-cert.p12"
+          echo "$APPLE_MAS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/mas-cert.p12"
           security import "$RUNNER_TEMP/mas-cert.p12" \
             -k "$KEYCHAIN_PATH" \
-            -P "$MAS_CERTIFICATE_PASSWORD" \
+            -P "$APPLE_MAS_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign \
             -T /usr/bin/productbuild \
             -T /usr/bin/security \
