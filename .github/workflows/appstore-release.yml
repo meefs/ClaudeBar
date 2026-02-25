@@ -140,13 +140,24 @@ jobs:
       - name: Install asc CLI
         run: brew tap tddworks/tap && brew install asccli
 
+      - name: Setup ASC credentials
+        # Decode the base64-encoded .p8 key into raw PEM that asc CLI expects via ASC_PRIVATE_KEY.
+        # Setting all three vars in $GITHUB_ENV avoids repeating them in every asc step.
+        env:
+          ASC_PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          echo "ASC_KEY_ID=${{ secrets.APP_STORE_CONNECT_KEY_ID }}" >> $GITHUB_ENV
+          echo "ASC_ISSUER_ID=${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" >> $GITHUB_ENV
+          {
+            echo 'ASC_PRIVATE_KEY<<EOF'
+            echo "$ASC_PRIVATE_KEY_B64" | base64 --decode
+            echo 'EOF'
+          } >> $GITHUB_ENV
+
       - name: Download & Install Provisioning Profile
         # Downloads the MAC_APP_STORE profile directly from App Store Connect via `asc`.
         # No MAS_PROVISIONING_PROFILE secret needed — always fetches the latest version.
-        env:
-          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        # ASC_KEY_ID / ASC_ISSUER_ID / ASC_PRIVATE_KEY are set globally by "Setup ASC credentials".
         run: |
           # Resolve the bundle ID resource ID for this app
           BUNDLE_ID_ID=$(asc bundle-ids list --identifier "$BUNDLE_ID" --platform macos \
@@ -225,10 +236,6 @@ jobs:
           echo "Exported: $PKG_FILE"
 
       - name: Upload to App Store Connect
-        env:
-          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           asc builds upload \
             --app-id "$APP_ID" \
@@ -238,20 +245,12 @@ jobs:
             --wait
 
       - name: Get Build ID
-        env:
-          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           BUILD_ID=$(asc builds list --app-id "$APP_ID" | jq -r '.data[0].id')
           echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
           echo "Build ID: $BUILD_ID"
 
       - name: Distribute to TestFlight
-        env:
-          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           asc builds add-beta-group \
             --build-id "$BUILD_ID" \
@@ -264,10 +263,6 @@ jobs:
 
       - name: Submit for App Store Review
         if: ${{ inputs.submit_for_review }}
-        env:
-          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           VERSION_ID=$(asc versions list --app-id "$APP_ID" | jq -r '.data[0].id')
           asc versions set-build --version-id "$VERSION_ID" --build-id "$BUILD_ID"
