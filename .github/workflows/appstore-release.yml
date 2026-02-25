@@ -174,7 +174,7 @@ jobs:
             -scheme "${APP_NAME}" \
             -configuration Release \
             -archivePath "$RUNNER_TEMP/${APP_NAME}.xcarchive" \
-            -destination "generic/platform=macOS,arch=arm64" \
+            -destination "generic/platform=macOS" \
             -skipMacroValidation \
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=NO \
