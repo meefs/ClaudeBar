@@ -23,6 +23,7 @@ public struct ClaudeOAuthCredentials: Sendable, Equatable {
 
 /// Source of loaded credentials.
 public enum CredentialSource: Sendable, Equatable {
+    case environment
     case file
     case keychain
 }
@@ -42,15 +43,17 @@ public struct ClaudeCredentialResult: @unchecked Sendable {
     }
 }
 
-/// Loads Claude OAuth credentials from file or Keychain.
+/// Loads Claude OAuth credentials from file, Keychain, or environment.
 ///
 /// Credential resolution order:
-/// 1. File: `~/.claude/.credentials.json`
+/// 1. File: `~/.claude/.credentials.json` (full-scope from `claude login`)
 /// 2. Keychain: Service "Claude Code-credentials" (if enabled)
+/// 3. Environment: `CLAUDE_CODE_OAUTH_TOKEN` env var (inference-only from `claude setup-token`)
 public struct ClaudeCredentialLoader: Sendable {
     private let homeDirectory: String
     private let keychainService: String
     private let useKeychain: Bool
+    private let environment: [String: String]
 
     /// Refresh buffer: 5 minutes before expiration
     private static let refreshBufferMs: Double = 5 * 60 * 1000
@@ -58,11 +61,13 @@ public struct ClaudeCredentialLoader: Sendable {
     public init(
         homeDirectory: String = NSHomeDirectory(),
         keychainService: String = "Claude Code-credentials",
-        useKeychain: Bool = true
+        useKeychain: Bool = true,
+        environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.homeDirectory = homeDirectory
         self.keychainService = keychainService
         self.useKeychain = useKeychain
+        self.environment = environment
     }
 
     /// The path to the credentials file.
@@ -70,17 +75,27 @@ public struct ClaudeCredentialLoader: Sendable {
         (homeDirectory as NSString).appendingPathComponent(".claude/.credentials.json")
     }
 
-    /// Loads credentials from file or Keychain.
+    /// Loads credentials from file, Keychain, or environment.
     /// Returns nil if no valid credentials are found.
+    ///
+    /// Priority: file/keychain credentials (full-scope from `claude login`) are preferred
+    /// over the `CLAUDE_CODE_OAUTH_TOKEN` env var (inference-only from `claude setup-token`).
+    /// This ensures quota monitoring uses full-scope credentials when available,
+    /// while still falling back to the env var token if nothing else exists.
     public func loadCredentials() -> ClaudeCredentialResult? {
-        // Try file first
+        // Try file first (full-scope OAuth from `claude login`)
         if let fileResult = loadFromFile() {
             return fileResult
         }
 
-        // Fallback to Keychain (if enabled)
+        // Keychain (if enabled)
         if useKeychain, let keychainResult = loadFromKeychain() {
             return keychainResult
+        }
+
+        // Fallback to environment variable (setup-token, inference-only scope)
+        if let envResult = loadFromEnvironment() {
+            return envResult
         }
 
         return nil
@@ -97,6 +112,11 @@ public struct ClaudeCredentialLoader: Sendable {
 
     /// Saves updated credentials back to the original source.
     public func saveCredentials(_ result: ClaudeCredentialResult) {
+        // Environment credentials are read-only (set via env var, not persisted by us)
+        if result.source == .environment {
+            return
+        }
+
         var updatedData = result.fullData
 
         // Update the OAuth section
@@ -115,11 +135,30 @@ public struct ClaudeCredentialLoader: Sendable {
         updatedData["claudeAiOauth"] = oauthDict
 
         switch result.source {
+        case .environment:
+            return  // Already handled above, but satisfy exhaustive switch
         case .file:
             saveToFile(updatedData)
         case .keychain:
             saveToKeychain(updatedData)
         }
+    }
+
+    // MARK: - Private: Environment Operations
+
+    private func loadFromEnvironment() -> ClaudeCredentialResult? {
+        guard let token = environment["CLAUDE_CODE_OAUTH_TOKEN"],
+              !token.isEmpty else {
+            return nil
+        }
+
+        let oauth = ClaudeOAuthCredentials(
+            accessToken: token,
+            refreshToken: nil,
+            expiresAt: nil
+        )
+
+        return ClaudeCredentialResult(oauth: oauth, source: .environment, fullData: [:])
     }
 
     // MARK: - Private: File Operations

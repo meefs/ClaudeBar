@@ -74,12 +74,18 @@ public struct ClaudeAPIUsageProbe: UsageProbe, @unchecked Sendable {
 
         // Check if token needs refresh
         if credentialLoader.needsRefresh(credentials.oauth) {
-            AppLog.probes.info("Claude API: Token expired or expiring soon, refreshing...")
-            do {
-                credentials = try await refreshToken(credentials)
-            } catch {
-                AppLog.probes.error("Claude API: Token refresh failed: \(error.localizedDescription)")
-                throw error
+            if credentials.oauth.refreshToken != nil {
+                AppLog.probes.info("Claude API: Token expired or expiring soon, refreshing...")
+                do {
+                    credentials = try await refreshToken(credentials)
+                } catch {
+                    AppLog.probes.error("Claude API: Token refresh failed: \(error.localizedDescription)")
+                    throw error
+                }
+            } else {
+                // Long-lived token (e.g. from `claude setup-token`) — no refresh mechanism.
+                // Proceed directly with the token; the API call will fail with 401 if it's actually expired.
+                AppLog.probes.info("Claude API: Token has no expiry info and no refresh token (setup-token), proceeding...")
             }
         }
 
@@ -89,12 +95,18 @@ public struct ClaudeAPIUsageProbe: UsageProbe, @unchecked Sendable {
             usageData = try await fetchUsage(accessToken: credentials.oauth.accessToken)
         } catch let error as ProbeError where error == .authenticationRequired {
             // Token might have been invalidated, try refreshing once
-            AppLog.probes.info("Claude API: Got 401/403, attempting token refresh...")
-            do {
-                credentials = try await refreshToken(credentials)
-                usageData = try await fetchUsage(accessToken: credentials.oauth.accessToken)
-            } catch {
-                AppLog.probes.error("Claude API: Retry after refresh failed: \(error.localizedDescription)")
+            if credentials.oauth.refreshToken != nil {
+                AppLog.probes.info("Claude API: Got 401/403, attempting token refresh...")
+                do {
+                    credentials = try await refreshToken(credentials)
+                    usageData = try await fetchUsage(accessToken: credentials.oauth.accessToken)
+                } catch {
+                    AppLog.probes.error("Claude API: Retry after refresh failed: \(error.localizedDescription)")
+                    throw error
+                }
+            } else {
+                // No refresh token (setup-token) — can't recover from 401/403
+                AppLog.probes.error("Claude API: Got 401/403 with no refresh token available")
                 throw error
             }
         }

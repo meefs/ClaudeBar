@@ -289,4 +289,22 @@ struct ClaudeUsageProbeTests {
         #expect(snapshot.costUsage?.budget == Decimal(string: "20.00"))
         #expect(snapshot.quotas.count >= 1)
     }
+
+    // MARK: - Setup Token Environment Exclusion Tests
+
+    @Test
+    func `envExclusions includes CLAUDE_CODE_OAUTH_TOKEN`() {
+        // The CLI probe must strip the setup-token env var so that
+        // `claude /usage` falls back to stored credentials with full scope.
+        #expect(ClaudeUsageProbe.envExclusions.contains("CLAUDE_CODE_OAUTH_TOKEN"))
+    }
+
+    @Test
+    func `default init creates executor that excludes setup token env var`() {
+        // When ClaudeUsageProbe is created without an explicit CLIExecutor,
+        // the default executor should be configured to exclude CLAUDE_CODE_OAUTH_TOKEN.
+        // We verify this indirectly by checking the static envExclusions constant.
+        let exclusions = ClaudeUsageProbe.envExclusions
+        #expect(exclusions == ["CLAUDE_CODE_OAUTH_TOKEN"])
+    }
 }

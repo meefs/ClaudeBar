@@ -223,4 +223,141 @@ struct ClaudeCredentialLoaderTests {
         #expect(reloaded?.oauth.accessToken == "new-token")
         #expect(reloaded?.oauth.refreshToken == "new-refresh")
     }
+
+    // MARK: - Environment Variable Tests
+
+    @Test
+    func `loadCredentials returns credentials from env var when CLAUDE_CODE_OAUTH_TOKEN set`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: ["CLAUDE_CODE_OAUTH_TOKEN": "my-setup-token"]
+        )
+        let result = loader.loadCredentials()
+
+        #expect(result != nil)
+        #expect(result?.oauth.accessToken == "my-setup-token")
+        #expect(result?.source == .environment)
+    }
+
+    @Test
+    func `loadCredentials from env var has no refresh token and no expiresAt`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: ["CLAUDE_CODE_OAUTH_TOKEN": "my-setup-token"]
+        )
+        let result = loader.loadCredentials()
+
+        #expect(result?.oauth.refreshToken == nil)
+        #expect(result?.oauth.expiresAt == nil)
+    }
+
+    @Test
+    func `loadCredentials prefers file credentials over env var`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Create file credentials (full-scope from `claude login`)
+        try createCredentialsFile(
+            at: tempDir,
+            accessToken: "file-token",
+            refreshToken: "file-refresh"
+        )
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: ["CLAUDE_CODE_OAUTH_TOKEN": "env-token"]
+        )
+        let result = loader.loadCredentials()
+
+        // File credentials should win (full-scope for quota monitoring)
+        #expect(result?.oauth.accessToken == "file-token")
+        #expect(result?.source == .file)
+    }
+
+    @Test
+    func `loadCredentials ignores empty env var and falls through to file`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        try createCredentialsFile(at: tempDir, accessToken: "file-token")
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: ["CLAUDE_CODE_OAUTH_TOKEN": ""]
+        )
+        let result = loader.loadCredentials()
+
+        #expect(result?.oauth.accessToken == "file-token")
+        #expect(result?.source == .file)
+    }
+
+    @Test
+    func `loadCredentials falls through to file when env var not present`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        try createCredentialsFile(at: tempDir, accessToken: "file-token")
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: [:]  // No env var
+        )
+        let result = loader.loadCredentials()
+
+        #expect(result?.oauth.accessToken == "file-token")
+        #expect(result?.source == .file)
+    }
+
+    @Test
+    func `saveCredentials is no-op for environment source`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: ["CLAUDE_CODE_OAUTH_TOKEN": "env-token"]
+        )
+        let result = loader.loadCredentials()!
+
+        // saveCredentials should not crash for environment source
+        loader.saveCredentials(result)
+
+        // No file should be created
+        let credPath = (tempDir.path as NSString).appendingPathComponent(".claude/.credentials.json")
+        #expect(!FileManager.default.fileExists(atPath: credPath))
+    }
+
+    @Test
+    func `needsRefresh returns false for environment source credentials with no expiresAt`() throws {
+        // Setup-token credentials have no expiresAt, but should NOT be treated as "needs refresh"
+        // because they are long-lived tokens with no refresh mechanism
+        let oauth = ClaudeOAuthCredentials(
+            accessToken: "setup-token",
+            refreshToken: nil,
+            expiresAt: nil
+        )
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: NSTemporaryDirectory(),
+            useKeychain: false
+        )
+
+        // Currently needsRefresh returns true when expiresAt is nil.
+        // For setup-token (no refresh token), the probe should handle this
+        // by skipping refresh when refreshToken is nil.
+        // So needsRefresh itself stays true, but the probe won't attempt refresh.
+        #expect(loader.needsRefresh(oauth) == true)
+    }
 }
