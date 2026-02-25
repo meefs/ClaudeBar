@@ -7,11 +7,11 @@ name: App Store Release
 # `asc profiles list` — no need to store it as a secret.
 #
 # Required GitHub Secrets:
-#   APPLE_APPLE_MAS_CERTIFICATE_P12      — Base64-encoded P12 containing both:
+#   APPLE_MAS_CERTIFICATE_P12      — Base64-encoded P12 containing both:
 #                                      • "3rd Party Mac Developer Application: ..." (signs the app)
 #                                      • "3rd Party Mac Developer Installer: ..." (signs the PKG)
 #                                    Different cert type from APPLE_CERTIFICATE_P12 (Developer ID).
-#   APPLE_APPLE_MAS_CERTIFICATE_PASSWORD — Password for APPLE_APPLE_MAS_CERTIFICATE_P12
+#   APPLE_MAS_CERTIFICATE_PASSWORD — Password for APPLE_MAS_CERTIFICATE_P12
 #   APP_STORE_CONNECT_KEY_ID      — App Store Connect API Key ID  (same key as APP_STORE_CONNECT_KEY_ID)
 #   APP_STORE_CONNECT_ISSUER_ID   — Issuer ID UUID               (same as APP_STORE_CONNECT_ISSUER_ID)
 #   APP_STORE_CONNECT_API_KEY_P8  — PEM content of .p8 file      (cat AuthKey_XXXX.p8 — NOT base64)
@@ -144,9 +144,9 @@ jobs:
         # Downloads the MAC_APP_STORE profile directly from App Store Connect via `asc`.
         # No MAS_PROVISIONING_PROFILE secret needed — always fetches the latest version.
         env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
           # Resolve the bundle ID resource ID for this app
           BUNDLE_ID_ID=$(asc bundle-ids list --identifier "$BUNDLE_ID" --platform macos \
