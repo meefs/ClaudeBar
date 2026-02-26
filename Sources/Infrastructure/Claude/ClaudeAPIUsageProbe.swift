@@ -199,7 +199,7 @@ public struct ClaudeAPIUsageProbe: UsageProbe, @unchecked Sendable {
     private func fetchUsage(accessToken: String) async throws -> UsageResponse {
         var request = URLRequest(url: Self.usageURL)
         request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken.trimmingCharacters(in: .whitespaces))", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(accessToken.trimmingCharacters(in: .whitespacesAndNewlines))", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")

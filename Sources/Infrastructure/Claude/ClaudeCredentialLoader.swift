@@ -147,8 +147,12 @@ public struct ClaudeCredentialLoader: Sendable {
     // MARK: - Private: Environment Operations
 
     private func loadFromEnvironment() -> ClaudeCredentialResult? {
-        guard let token = environment["CLAUDE_CODE_OAUTH_TOKEN"],
-              !token.isEmpty else {
+        guard let rawToken = environment["CLAUDE_CODE_OAUTH_TOKEN"] else {
+            return nil
+        }
+
+        let token = rawToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else {
             return nil
         }
 
@@ -173,10 +177,12 @@ public struct ClaudeCredentialLoader: Sendable {
             let data = try Data(contentsOf: URL(fileURLWithPath: path))
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let oauthDict = json["claudeAiOauth"] as? [String: Any],
-                  let accessToken = oauthDict["accessToken"] as? String,
-                  !accessToken.isEmpty else {
+                  let rawAccessToken = oauthDict["accessToken"] as? String else {
                 return nil
             }
+
+            let accessToken = rawAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !accessToken.isEmpty else { return nil }
 
             let oauth = ClaudeOAuthCredentials(
                 accessToken: accessToken,
@@ -227,10 +233,12 @@ public struct ClaudeCredentialLoader: Sendable {
             guard let jsonData = jsonString.data(using: .utf8),
                   let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                   let oauthDict = json["claudeAiOauth"] as? [String: Any],
-                  let accessToken = oauthDict["accessToken"] as? String,
-                  !accessToken.isEmpty else {
+                  let rawAccessToken = oauthDict["accessToken"] as? String else {
                 return nil
             }
+
+            let accessToken = rawAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !accessToken.isEmpty else { return nil }
 
             let oauth = ClaudeOAuthCredentials(
                 accessToken: accessToken,

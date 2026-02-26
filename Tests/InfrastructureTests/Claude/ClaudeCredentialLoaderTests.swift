@@ -260,6 +260,21 @@ struct ClaudeCredentialLoaderTests {
     }
 
     @Test
+    func `loadCredentials trims whitespace and newlines from env token`() throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: ["CLAUDE_CODE_OAUTH_TOKEN": "  my-setup-token\n"]
+        )
+        let result = loader.loadCredentials()
+
+        #expect(result?.oauth.accessToken == "my-setup-token")
+    }
+
+    @Test
     func `loadCredentials prefers file credentials over env var`() throws {
         let tempDir = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: tempDir) }

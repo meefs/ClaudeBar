@@ -130,7 +130,21 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
     // MARK: - AIProvider Protocol
 
     public func isAvailable() async -> Bool {
-        await activeProbe.isAvailable()
+        switch probeMode {
+        case .cli:
+            if await cliProbe.isAvailable() {
+                return true
+            }
+            if let apiProbe, await apiProbe.isAvailable() {
+                return true
+            }
+            return false
+        case .api:
+            if let apiProbe, await apiProbe.isAvailable() {
+                return true
+            }
+            return await cliProbe.isAvailable()
+        }
     }
 
     /// Refreshes the usage data and updates the snapshot.
@@ -142,13 +156,46 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
         defer { isSyncing = false }
 
         do {
-            let newSnapshot = try await activeProbe.probe()
+            let newSnapshot = try await primaryProbe().probe()
             snapshot = newSnapshot
             lastError = nil
             return newSnapshot
         } catch {
+            if let fallback = await fallbackProbe() {
+                do {
+                    let newSnapshot = try await fallback.probe()
+                    snapshot = newSnapshot
+                    lastError = nil
+                    return newSnapshot
+                } catch {
+                    lastError = error
+                    throw error
+                }
+            }
+
             lastError = error
             throw error
+        }
+    }
+
+    private func primaryProbe() -> any UsageProbe {
+        switch probeMode {
+        case .cli:
+            return cliProbe
+        case .api:
+            return apiProbe ?? cliProbe
+        }
+    }
+
+    private func fallbackProbe() async -> (any UsageProbe)? {
+        switch probeMode {
+        case .cli:
+            guard let apiProbe, await apiProbe.isAvailable() else {
+                return nil
+            }
+            return apiProbe
+        case .api:
+            return await cliProbe.isAvailable() ? cliProbe : nil
         }
     }
 

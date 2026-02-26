@@ -93,6 +93,84 @@ struct ClaudeConfigSpec {
             // Then — persisted
             #expect(settings.claudeProbeMode() == .api)
         }
+
+        @Test
+        func `api mode falls back to CLI when OAuth API is unavailable`() async throws {
+            let suiteName = "com.claudebar.test.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+            settings.setEnabled(true, forProvider: "claude")
+            settings.setClaudeProbeMode(.api)
+
+            let cliProbe = MockUsageProbe()
+            given(cliProbe).isAvailable().willReturn(true)
+            given(cliProbe).probe().willReturn(UsageSnapshot(
+                providerId: "claude",
+                quotas: [UsageQuota(percentRemaining: 63, quotaType: .session, providerId: "claude")],
+                capturedAt: Date()
+            ))
+
+            let apiProbe = MockUsageProbe()
+            given(apiProbe).isAvailable().willReturn(false)
+            given(apiProbe).probe().willThrow(ProbeError.authenticationRequired)
+
+            let claude = ClaudeProvider(
+                cliProbe: cliProbe,
+                apiProbe: apiProbe,
+                settingsRepository: settings
+            )
+
+            let monitor = QuotaMonitor(
+                providers: AIProviders(providers: [claude]),
+                clock: TestClock()
+            )
+
+            await monitor.refresh(providerId: "claude")
+
+            #expect(claude.snapshot?.quotas.first?.percentRemaining == 63)
+            #expect(claude.lastError == nil)
+        }
+
+        @Test
+        func `cli mode falls back to API when CLI parsing fails and OAuth is available`() async throws {
+            let suiteName = "com.claudebar.test.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+            settings.setEnabled(true, forProvider: "claude")
+            settings.setClaudeProbeMode(.cli)
+
+            let cliProbe = MockUsageProbe()
+            given(cliProbe).isAvailable().willReturn(true)
+            given(cliProbe).probe().willThrow(ProbeError.parseFailed("could not find Current session"))
+
+            let apiProbe = MockUsageProbe()
+            given(apiProbe).isAvailable().willReturn(true)
+            given(apiProbe).probe().willReturn(UsageSnapshot(
+                providerId: "claude",
+                quotas: [
+                    UsageQuota(percentRemaining: 81, quotaType: .session, providerId: "claude"),
+                    UsageQuota(percentRemaining: 74, quotaType: .weekly, providerId: "claude")
+                ],
+                capturedAt: Date()
+            ))
+
+            let claude = ClaudeProvider(
+                cliProbe: cliProbe,
+                apiProbe: apiProbe,
+                settingsRepository: settings
+            )
+
+            let monitor = QuotaMonitor(
+                providers: AIProviders(providers: [claude]),
+                clock: TestClock()
+            )
+
+            await monitor.refresh(providerId: "claude")
+
+            #expect(claude.snapshot?.quotas.count == 2)
+            #expect(claude.snapshot?.quotas.first?.percentRemaining == 81)
+            #expect(claude.lastError == nil)
+        }
     }
 
     // MARK: - #29: API mode credential status
