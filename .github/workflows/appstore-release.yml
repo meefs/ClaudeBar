@@ -265,7 +265,7 @@ jobs:
         run: |
           asc builds add-beta-group \
             --build-id "$BUILD_ID" \
-            --group-id "$BETA_GROUP_ID"
+            --beta-group-id "$BETA_GROUP_ID"
 
           asc builds update-beta-notes \
             --build-id "$BUILD_ID" \
