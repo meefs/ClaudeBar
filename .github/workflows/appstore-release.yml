@@ -248,7 +248,16 @@ jobs:
 
       - name: Get Build ID
         run: |
-          BUILD_ID=$(asc builds list --app-id "$APP_ID" | jq -r '.data[0].id')
+          # Filter by exact build number (the `version` field in ASC API is CFBundleVersion)
+          BUILD_NUMBER="${{ steps.build.outputs.build_number }}"
+          BUILD_ID=$(asc builds list --app-id "$APP_ID" \
+            | jq -r --arg bn "$BUILD_NUMBER" '.data[] | select(.version == $bn) | .id' \
+            | head -1)
+          if [ -z "$BUILD_ID" ] || [ "$BUILD_ID" = "null" ]; then
+            echo "Error: could not find build with version=$BUILD_NUMBER in App Store Connect"
+            asc builds list --app-id "$APP_ID" | jq '.data[] | {id, version, processingState}'
+            exit 1
+          fi
           echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
           echo "Build ID: $BUILD_ID"
 
@@ -256,7 +265,7 @@ jobs:
         run: |
           asc builds add-beta-group \
             --build-id "$BUILD_ID" \
-            --beta-group-id "$BETA_GROUP_ID"
+            --group-id "$BETA_GROUP_ID"
 
           asc builds update-beta-notes \
             --build-id "$BUILD_ID" \
