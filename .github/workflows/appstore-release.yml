@@ -263,14 +263,26 @@ jobs:
 
       - name: Distribute to TestFlight
         run: |
-          asc builds add-beta-group \
-            --build-id "$BUILD_ID" \
-            --beta-group-id "$BETA_GROUP_ID"
+          # Verify the build is VALID and externally assignable before proceeding
+          PROCESSING_STATE=$(asc builds list --app-id "$APP_ID" \
+            | jq -r --arg id "$BUILD_ID" '.data[] | select(.id == $id) | .processingState')
+          if [ "$PROCESSING_STATE" != "VALID" ]; then
+            echo "Error: build $BUILD_ID is in state '$PROCESSING_STATE', expected VALID"
+            exit 1
+          fi
 
+          # Set What's New notes before adding to the group
           asc builds update-beta-notes \
             --build-id "$BUILD_ID" \
             --locale en-US \
             --notes "${{ inputs.whats_new }}"
+
+          # Add to external group — triggers Beta App Review automatically.
+          # Requires: ITSAppUsesNonExemptEncryption in Info.plist + Test Information
+          # set in App Store Connect (feedback email, description, what to test).
+          asc builds add-beta-group \
+            --build-id "$BUILD_ID" \
+            --beta-group-id "$BETA_GROUP_ID"
 
       - name: Submit for App Store Review
         if: ${{ inputs.submit_for_review }}
