@@ -673,6 +673,44 @@ struct ClaudeAPIUsageProbeSetupTokenTests {
     }
 
     @Test
+    func `probe trims newline in setup-token before Authorization header`() async throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: tempDir.path,
+            useKeychain: false,
+            environment: ["CLAUDE_CODE_OAUTH_TOKEN": "setup-token-abc123\n"]
+        )
+
+        let mockNetwork = MockNetworkClient()
+        let usageResponse = """
+        {
+          "five_hour": { "utilization": 20.0, "resets_at": "2025-01-15T10:00:00Z" }
+        }
+        """.data(using: .utf8)!
+
+        let usageHTTP = HTTPURLResponse(
+            url: URL(string: "https://api.anthropic.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        var capturedAuthorizationHeader: String?
+        given(mockNetwork).request(.any).willProduce { request in
+            capturedAuthorizationHeader = request.value(forHTTPHeaderField: "Authorization")
+            return (usageResponse, usageHTTP)
+        }
+
+        let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
+
+        _ = try await probe.probe()
+
+        #expect(capturedAuthorizationHeader == "Bearer setup-token-abc123")
+    }
+
+    @Test
     func `probe with setup-token throws authenticationRequired on 401 without attempting refresh`() async throws {
         let tempDir = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: tempDir) }
