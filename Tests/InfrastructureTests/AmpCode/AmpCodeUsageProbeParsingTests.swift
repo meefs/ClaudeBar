@@ -183,6 +183,7 @@ struct AmpCodeUsageProbeParsingTests {
         #expect(snapshot.quotas[0].quotaType == .modelSpecific("Individual"))
         #expect(snapshot.quotas[0].dollarRemaining == 50)
     }
+
     @Test
     func `maps to correct QuotaType`() throws {
         // Given
