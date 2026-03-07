@@ -887,7 +887,7 @@ struct WrappedStatCard: View {
 
                 Spacer()
 
-                Text(quota.isDollarBased ? "remaining" : effectiveDisplayMode.displayLabel)
+                Text(quota.isDollarBased ? "Remaining" : effectiveDisplayMode.displayLabel)
                     .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
                     .foregroundStyle(effectiveDisplayMode == .pace ? paceColor.opacity(0.8) : theme.textTertiary)
             }
