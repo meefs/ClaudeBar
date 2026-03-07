@@ -68,8 +68,12 @@ struct AmpCodeUsageProbeTests {
 
         // Then
         #expect(snapshot.accountEmail == "user@example.com")
-        #expect(snapshot.quotas.count == 1)
-        #expect(snapshot.quotas[0].percentRemaining == 87.95)
+        #expect(snapshot.quotas.count == 2)
+        let freeQuota = snapshot.quotas.first { $0.quotaType == .modelSpecific("Amp Free") }
+        let creditsQuota = snapshot.quotas.first { $0.quotaType == .modelSpecific("Individual credits") }
+        #expect(freeQuota?.percentRemaining == 87.95)
+        #expect(creditsQuota?.dollarRemaining == 0)
+        #expect(creditsQuota?.percentRemaining == 100)
     }
 
     @Test
