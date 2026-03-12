@@ -234,7 +234,7 @@ struct AlibabaUsageProbeTests {
             _ = try await probe.probe()
             Issue.record("Expected sessionExpired error")
         } catch {
-            #expect(error as? ProbeError == .sessionExpired)
+            #expect(error as? ProbeError == .sessionExpired())
         }
     }
 

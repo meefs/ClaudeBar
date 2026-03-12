@@ -406,7 +406,7 @@ struct ClaudeAPIUsageProbeTests {
         let loader = ClaudeCredentialLoader(homeDirectory: tempDir.path, useKeychain: false)
         let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
-        await #expect(throws: ProbeError.sessionExpired) {
+        await #expect(throws: ProbeError.sessionExpired()) {
             try await probe.probe()
         }
     }
@@ -611,7 +611,7 @@ struct ClaudeAPIUsageProbeTokenRefreshTests {
         let loader = ClaudeCredentialLoader(homeDirectory: tempDir.path, useKeychain: false)
         let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
-        await #expect(throws: ProbeError.sessionExpired) {
+        await #expect(throws: ProbeError.sessionExpired()) {
             try await probe.probe()
         }
     }
@@ -667,7 +667,7 @@ struct ClaudeAPIUsageProbeTokenRefreshTests {
         let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
         // First probe: old token fails refresh → sessionExpired (file still has old creds)
-        await #expect(throws: ProbeError.sessionExpired) {
+        await #expect(throws: ProbeError.sessionExpired()) {
             try await probe.probe()
         }
 

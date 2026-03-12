@@ -118,12 +118,12 @@ public struct CodexAPIUsageProbe: UsageProbe, @unchecked Sendable {
 
                 if code == "refresh_token_expired" || code == "refresh_token_reused" || code == "refresh_token_invalidated" {
                     AppLog.probes.error("Codex API: Session expired (\(code ?? "unknown")) - run `codex` to re-authenticate")
-                    throw ProbeError.sessionExpired
+                    throw ProbeError.sessionExpired(hint: "Run `codex` in terminal to log in again.")
                 }
             }
 
             AppLog.probes.error("Codex API: Token expired or invalid (HTTP \(httpResponse.statusCode))")
-            throw ProbeError.sessionExpired
+            throw ProbeError.sessionExpired(hint: "Run `codex` in terminal to log in again.")
         }
 
         guard httpResponse.statusCode >= 200, httpResponse.statusCode < 300 else {

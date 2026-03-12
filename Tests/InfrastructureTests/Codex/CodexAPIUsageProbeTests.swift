@@ -319,7 +319,7 @@ struct CodexAPIUsageProbeTests {
         let loader = CodexCredentialLoader(homeDirectory: tempDir.path)
         let probe = CodexAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
-        await #expect(throws: ProbeError.sessionExpired) {
+        await #expect(throws: ProbeError.sessionExpired()) {
             try await probe.probe()
         }
     }
@@ -522,7 +522,7 @@ struct CodexAPIUsageProbeTokenRefreshTests {
         let loader = CodexCredentialLoader(homeDirectory: tempDir.path)
         let probe = CodexAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
 
-        await #expect(throws: ProbeError.sessionExpired) {
+        await #expect(throws: ProbeError.sessionExpired()) {
             try await probe.probe()
         }
     }

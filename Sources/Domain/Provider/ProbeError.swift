@@ -1,15 +1,16 @@
 import Foundation
 
 /// Errors that can occur when probing a CLI
-public enum ProbeError: Error, Equatable, Sendable, LocalizedError {
+public enum ProbeError: Error, Sendable, LocalizedError {
     /// The CLI binary was not found on the system
     case cliNotFound(String)
 
     /// User needs to log in to the CLI
     case authenticationRequired
 
-    /// OAuth session has expired - user needs to re-authenticate
-    case sessionExpired
+    /// OAuth session has expired - user needs to re-authenticate.
+    /// The optional hint provides provider-specific recovery instructions.
+    case sessionExpired(hint: String? = nil)
 
     /// The CLI output could not be parsed
     case parseFailed(String)
@@ -40,8 +41,11 @@ public enum ProbeError: Error, Equatable, Sendable, LocalizedError {
             return "CLI not found: \(binary)"
         case .authenticationRequired:
             return "Authentication required. Please log in."
-        case .sessionExpired:
-            return "Session expired. Run `claude` in terminal to log in again."
+        case .sessionExpired(let hint):
+            if let hint {
+                return "Session expired. \(hint)"
+            }
+            return "Session expired. Please log in again."
         case .parseFailed(let reason):
             return "Failed to parse output: \(reason)"
         case .timeout:
@@ -56,6 +60,37 @@ public enum ProbeError: Error, Equatable, Sendable, LocalizedError {
             return reason
         case .subscriptionRequired:
             return "Subscription required for usage data"
+        }
+    }
+}
+
+// MARK: - Equatable (hint ignored for sessionExpired)
+
+extension ProbeError: Equatable {
+    public static func == (lhs: ProbeError, rhs: ProbeError) -> Bool {
+        switch (lhs, rhs) {
+        case (.cliNotFound(let a), .cliNotFound(let b)):
+            return a == b
+        case (.authenticationRequired, .authenticationRequired):
+            return true
+        case (.sessionExpired, .sessionExpired):
+            return true
+        case (.parseFailed(let a), .parseFailed(let b)):
+            return a == b
+        case (.timeout, .timeout):
+            return true
+        case (.noData, .noData):
+            return true
+        case (.updateRequired, .updateRequired):
+            return true
+        case (.folderTrustRequired, .folderTrustRequired):
+            return true
+        case (.executionFailed(let a), .executionFailed(let b)):
+            return a == b
+        case (.subscriptionRequired, .subscriptionRequired):
+            return true
+        default:
+            return false
         }
     }
 }

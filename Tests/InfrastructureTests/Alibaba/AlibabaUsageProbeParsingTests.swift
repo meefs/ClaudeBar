@@ -293,7 +293,7 @@ struct AlibabaUsageProbeParsingTests {
         """
         let data = Data(response.utf8)
 
-        #expect(throws: ProbeError.sessionExpired) {
+        #expect(throws: ProbeError.sessionExpired()) {
             try AlibabaUsageProbe.parseResponse(data, providerId: "alibaba")
         }
     }

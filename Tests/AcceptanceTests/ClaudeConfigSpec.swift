@@ -211,7 +211,7 @@ struct ClaudeConfigSpec {
 
             let probe = MockUsageProbe()
             given(probe).isAvailable().willReturn(true)
-            given(probe).probe().willThrow(ProbeError.sessionExpired)
+            given(probe).probe().willThrow(ProbeError.sessionExpired(hint: "Run `claude` in terminal to log in again."))
 
             let claude = ClaudeProvider(probe: probe, settingsRepository: settings)
             let monitor = QuotaMonitor(
@@ -222,7 +222,7 @@ struct ClaudeConfigSpec {
             // When — API returns 401
             await monitor.refresh(providerId: "claude")
 
-            // Then — user sees actionable error
+            // Then — user sees actionable error with provider-specific hint
             #expect(claude.lastError != nil)
             let description = claude.lastError?.localizedDescription ?? ""
             #expect(description.contains("Session expired"))

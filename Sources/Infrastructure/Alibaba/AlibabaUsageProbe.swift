@@ -125,7 +125,7 @@ public struct AlibabaUsageProbe: UsageProbe {
         }
 
         if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            throw ProbeError.sessionExpired
+            throw ProbeError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
         }
 
         guard httpResponse.statusCode == 200 else {
@@ -150,7 +150,7 @@ public struct AlibabaUsageProbe: UsageProbe {
         let (data, _) = try await networkClient.request(request)
         guard let html = String(data: data, encoding: .utf8),
               let token = Self.extractSecTokenFromHTML(html) else {
-            throw ProbeError.sessionExpired
+            throw ProbeError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
         }
 
         return token
@@ -238,14 +238,14 @@ public struct AlibabaUsageProbe: UsageProbe {
         if let code = findFirstString(forKeys: ["code", "status"], in: dictionary) {
             let normalized = code.lowercased()
             if normalized.contains("needlogin") || normalized.contains("login") {
-                throw ProbeError.sessionExpired
+                throw ProbeError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
             }
         }
 
         if let message = findFirstString(forKeys: ["message", "msg"], in: dictionary) {
             let normalized = message.lowercased()
             if normalized.contains("log in") || normalized.contains("login") {
-                throw ProbeError.sessionExpired
+                throw ProbeError.sessionExpired(hint: "Re-authenticate in Alibaba Cloud console.")
             }
         }
 

@@ -183,7 +183,7 @@ public struct CursorUsageProbe: UsageProbe {
             return data
         case 401:
             AppLog.probes.error("Cursor: Authentication failed (401) - token may be expired")
-            throw ProbeError.sessionExpired
+            throw ProbeError.sessionExpired(hint: "Re-authenticate in Cursor settings.")
         case 403:
             AppLog.probes.error("Cursor: Forbidden (403)")
             throw ProbeError.authenticationRequired
