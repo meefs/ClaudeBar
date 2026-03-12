@@ -12,10 +12,12 @@ struct ModelPricingTests {
         #expect(price.cacheReadPer1M == Decimal(string: "0.30"))
     }
 
-    @Test func `opus pricing matches published rates`() {
+    @Test func `opus 4_6 pricing matches published rates`() {
         let price = ModelPricing.price(for: "claude-opus-4-6")
-        #expect(price.inputPer1M == 15)
-        #expect(price.outputPer1M == 75)
+        #expect(price.inputPer1M == 5)
+        #expect(price.outputPer1M == 25)
+        #expect(price.cacheWritePer1M == Decimal(string: "6.25"))
+        #expect(price.cacheReadPer1M == Decimal(string: "0.50"))
     }
 
     @Test func `unknown model falls back to sonnet pricing`() {
@@ -24,9 +26,9 @@ struct ModelPricingTests {
         #expect(price.outputPer1M == 15)
     }
 
-    @Test func `model with opus in name uses opus pricing`() {
+    @Test func `model with opus in name uses opus 4_6 pricing`() {
         let price = ModelPricing.price(for: "claude-opus-4-99-20260101")
-        #expect(price.inputPer1M == 15)
+        #expect(price.inputPer1M == 5)
     }
 
     @Test func `calculates cost for token usage record`() {

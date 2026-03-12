@@ -10,7 +10,7 @@ struct TokenUsageRecord: Sendable, Equatable {
     let timestamp: Date
 
     var totalTokens: Int {
-        inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens
+        inputTokens + outputTokens
     }
 }
 

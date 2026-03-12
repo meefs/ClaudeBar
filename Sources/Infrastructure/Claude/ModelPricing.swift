@@ -14,7 +14,9 @@ enum ModelPricing {
     static let prices: [String: Price] = [
         // Claude Opus 4
         "claude-opus-4-20250514": Price(inputPer1M: 15, outputPer1M: 75, cacheWritePer1M: 18.75, cacheReadPer1M: 1.50),
-        "claude-opus-4-6": Price(inputPer1M: 15, outputPer1M: 75, cacheWritePer1M: 18.75, cacheReadPer1M: 1.50),
+
+        // Claude Opus 4.6
+        "claude-opus-4-6": Price(inputPer1M: 5, outputPer1M: 25, cacheWritePer1M: 6.25, cacheReadPer1M: 0.50),
 
         // Claude Sonnet 4
         "claude-sonnet-4-20250514": Price(inputPer1M: 3, outputPer1M: 15, cacheWritePer1M: 3.75, cacheReadPer1M: 0.30),
@@ -25,7 +27,9 @@ enum ModelPricing {
 
         // Claude 3.5 Haiku
         "claude-3-5-haiku-20241022": Price(inputPer1M: 0.80, outputPer1M: 4, cacheWritePer1M: 1.00, cacheReadPer1M: 0.08),
-        "claude-haiku-4-5-20251001": Price(inputPer1M: 0.80, outputPer1M: 4, cacheWritePer1M: 1.00, cacheReadPer1M: 0.08),
+
+        // Claude Haiku 4.5
+        "claude-haiku-4-5-20251001": Price(inputPer1M: 1, outputPer1M: 5, cacheWritePer1M: 1.25, cacheReadPer1M: 0.10),
     ]
 
     /// Default pricing (Sonnet-level) for unknown models
