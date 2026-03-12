@@ -40,9 +40,17 @@ struct AlibabaUsageProbeTests {
         return repo
     }
 
-    private func makeNoOpCookieProvider() -> MockAlibabaCookieProviding {
+    /// Cookie provider that returns no cookies (browser has nothing).
+    private func makeBrowserWithNoCookies() -> MockAlibabaCookieProviding {
         let mock = MockAlibabaCookieProviding()
         given(mock).extractBrowserCookies().willReturn(nil)
+        return mock
+    }
+
+    /// Cookie provider that returns cookies (browser is logged in).
+    private func makeBrowserWithCookies(_ cookie: String = "login_aliyunid_ticket=abc; sec_token=browser_sec_token") -> MockAlibabaCookieProviding {
+        let mock = MockAlibabaCookieProviding()
+        given(mock).extractBrowserCookies().willReturn(cookie)
         return mock
     }
 
@@ -60,11 +68,11 @@ struct AlibabaUsageProbeTests {
     // MARK: - isAvailable
 
     @Test
-    func `isAvailable returns false when no cookie and no API key`() async {
+    func `isAvailable returns false when manual cookie source and no cookie set`() async {
         let repo = makeSettingsRepository()
         repo.setAlibabaCookieSource(.manual)
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeNoOpCookieProvider())
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeBrowserWithNoCookies())
 
         let available = await probe.isAvailable()
         #expect(available == false)
@@ -75,7 +83,8 @@ struct AlibabaUsageProbeTests {
         let repo = makeSettingsRepository()
         repo.saveAlibabaApiKey("sk-test-key-123")
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeNoOpCookieProvider())
+        // API key takes priority — cookie provider should not matter
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeBrowserWithNoCookies())
 
         let available = await probe.isAvailable()
         #expect(available == true)
@@ -87,18 +96,29 @@ struct AlibabaUsageProbeTests {
         repo.setAlibabaCookieSource(.manual)
         repo.saveAlibabaManualCookie("login_aliyunid_ticket=abc123")
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeNoOpCookieProvider())
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeBrowserWithNoCookies())
 
         let available = await probe.isAvailable()
         #expect(available == true)
     }
 
     @Test
-    func `isAvailable returns false for auto cookie source without browser cookies`() async {
+    func `isAvailable returns true when auto cookie source and browser has cookies`() async {
         let repo = makeSettingsRepository()
         repo.setAlibabaCookieSource(.auto)
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeNoOpCookieProvider())
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeBrowserWithCookies())
+
+        let available = await probe.isAvailable()
+        #expect(available == true)
+    }
+
+    @Test
+    func `isAvailable returns false when auto cookie source and browser has no cookies`() async {
+        let repo = makeSettingsRepository()
+        repo.setAlibabaCookieSource(.auto)
+
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeBrowserWithNoCookies())
 
         let available = await probe.isAvailable()
         #expect(available == false)
@@ -107,9 +127,10 @@ struct AlibabaUsageProbeTests {
     @Test
     func `isAvailable returns false when API key is empty string`() async {
         let repo = makeSettingsRepository()
+        repo.setAlibabaCookieSource(.manual)
         repo.saveAlibabaApiKey("")
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeNoOpCookieProvider())
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeBrowserWithNoCookies())
 
         let available = await probe.isAvailable()
         #expect(available == false)
@@ -126,7 +147,8 @@ struct AlibabaUsageProbeTests {
         let mockNetwork = MockNetworkClient()
         given(mockNetwork).request(.any).willReturn(mockSuccessResponse())
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeNoOpCookieProvider())
+        // API key path — cookie provider not used
+        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeBrowserWithNoCookies())
 
         let snapshot = try await probe.probe()
         #expect(snapshot.providerId == "alibaba")
@@ -143,7 +165,7 @@ struct AlibabaUsageProbeTests {
         let response = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 401, httpVersion: nil, headerFields: nil)!
         given(mockNetwork).request(.any).willReturn((Data(), response))
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeNoOpCookieProvider())
+        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeBrowserWithNoCookies())
 
         do {
             _ = try await probe.probe()
@@ -162,7 +184,7 @@ struct AlibabaUsageProbeTests {
         let response = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 403, httpVersion: nil, headerFields: nil)!
         given(mockNetwork).request(.any).willReturn((Data(), response))
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeNoOpCookieProvider())
+        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeBrowserWithNoCookies())
 
         do {
             _ = try await probe.probe()
@@ -181,7 +203,7 @@ struct AlibabaUsageProbeTests {
         let response = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 500, httpVersion: nil, headerFields: nil)!
         given(mockNetwork).request(.any).willReturn((Data(), response))
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeNoOpCookieProvider())
+        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeBrowserWithNoCookies())
 
         do {
             _ = try await probe.probe()
@@ -200,7 +222,7 @@ struct AlibabaUsageProbeTests {
         let mockNetwork = MockNetworkClient()
         given(mockNetwork).request(.any).willReturn(mockSuccessResponse())
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeNoOpCookieProvider())
+        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeBrowserWithNoCookies())
 
         let snapshot = try await probe.probe()
         #expect(snapshot.quotas.count == 3)
@@ -217,7 +239,8 @@ struct AlibabaUsageProbeTests {
         let mockNetwork = MockNetworkClient()
         given(mockNetwork).request(.any).willReturn(mockSuccessResponse())
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeNoOpCookieProvider())
+        // Manual cookie path — cookie provider not used
+        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeBrowserWithNoCookies())
 
         let snapshot = try await probe.probe()
         #expect(snapshot.providerId == "alibaba")
@@ -234,7 +257,7 @@ struct AlibabaUsageProbeTests {
         let response = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 403, httpVersion: nil, headerFields: nil)!
         given(mockNetwork).request(.any).willReturn((Data(), response))
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeNoOpCookieProvider())
+        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeBrowserWithNoCookies())
 
         do {
             _ = try await probe.probe()
@@ -248,8 +271,41 @@ struct AlibabaUsageProbeTests {
     func `probe with empty manual cookie throws authenticationRequired`() async throws {
         let repo = makeSettingsRepository()
         repo.setAlibabaCookieSource(.manual)
+        // No cookie saved — empty
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeNoOpCookieProvider())
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeBrowserWithNoCookies())
+
+        do {
+            _ = try await probe.probe()
+            Issue.record("Expected authenticationRequired error")
+        } catch {
+            #expect(error as? ProbeError == .authenticationRequired)
+        }
+    }
+
+    // MARK: - probe() with auto cookie
+
+    @Test
+    func `probe with auto cookie uses browser cookies on success`() async throws {
+        let repo = makeSettingsRepository()
+        repo.setAlibabaCookieSource(.auto)
+
+        let mockNetwork = MockNetworkClient()
+        given(mockNetwork).request(.any).willReturn(mockSuccessResponse())
+
+        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeBrowserWithCookies())
+
+        let snapshot = try await probe.probe()
+        #expect(snapshot.providerId == "alibaba")
+        #expect(snapshot.quotas.count == 3)
+    }
+
+    @Test
+    func `probe with auto cookie throws authenticationRequired when browser has no cookies`() async throws {
+        let repo = makeSettingsRepository()
+        repo.setAlibabaCookieSource(.auto)
+
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeBrowserWithNoCookies())
 
         do {
             _ = try await probe.probe()
@@ -260,11 +316,14 @@ struct AlibabaUsageProbeTests {
     }
 
     @Test
-    func `probe with auto cookie source throws authenticationRequired`() async throws {
+    func `probe with auto cookie throws authenticationRequired when browser returns empty string`() async throws {
         let repo = makeSettingsRepository()
         repo.setAlibabaCookieSource(.auto)
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: makeNoOpCookieProvider())
+        let mockCookieProvider = MockAlibabaCookieProviding()
+        given(mockCookieProvider).extractBrowserCookies().willReturn("")
+
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: mockCookieProvider)
 
         do {
             _ = try await probe.probe()
@@ -272,6 +331,22 @@ struct AlibabaUsageProbeTests {
         } catch {
             #expect(error as? ProbeError == .authenticationRequired)
         }
+    }
+
+    @Test
+    func `probe prefers API key over auto browser cookie`() async throws {
+        let repo = makeSettingsRepository()
+        repo.setAlibabaCookieSource(.auto)
+        repo.saveAlibabaApiKey("sk-test-key")
+
+        let mockNetwork = MockNetworkClient()
+        given(mockNetwork).request(.any).willReturn(mockSuccessResponse())
+
+        // Both API key and browser cookies available — API key wins
+        let probe = AlibabaUsageProbe(settingsRepository: repo, networkClient: mockNetwork, cookieProvider: makeBrowserWithCookies())
+
+        let snapshot = try await probe.probe()
+        #expect(snapshot.providerId == "alibaba")
     }
 
     // MARK: - URL Construction
