@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Alibaba Coding Plan Provider**: Monitor your Alibaba Coding Plan usage quotas directly from the menu bar. Supports three quota windows — 5-hour session, weekly, and monthly — with reset times and progress tracking. Authenticate via API key or browser cookies (auto-extract with SweetCookieKit or paste manually). Supports both International (`modelstudio.console.alibabacloud.com`) and China Mainland (`bailian.console.aliyun.com`) regions.
+
 ---
 
 ## [0.4.45] - 2026-03-12
@@ -29,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `showDailyUsageCards` setting end-to-end (toggle → AppSettings → JSONSettingsRepository → settings.json)
 - 87+ new settings tests (JSONSettingsStore: 18, JSONSettingsRepository app: 20, provider: 29)
 - Reorganized provider tests into subfolder structure (`Tests/DomainTests/Provider/Claude/`, `Copilot/`, etc.)
+- Added `AlibabaUsageProbe` with console RPC and API key fetch strategies, resilient DataV2 envelope parsing
+- Added `AlibabaProvider`, `AlibabaRegion`, `AlibabaCookieSource` domain models
+- Added `AlibabaSettingsRepository` sub-protocol (ISP) for region, cookie source, and credentials
+- 20 new Alibaba provider tests (17 parsing + 3 probe behavior)
 
 ---
 
