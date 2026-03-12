@@ -137,7 +137,9 @@ struct MenuContentView: View {
 
             // Check for updates when menu opens (no UI unless update found)
             #if ENABLE_SPARKLE
-            sparkleUpdater?.checkForUpdatesInBackground()
+            if sparkleUpdater?.automaticallyChecksForUpdates == true {
+                sparkleUpdater?.checkForUpdatesInBackground()
+            }
             #endif
         }
         .onChange(of: selectedProviderId) { _, newProviderId in
