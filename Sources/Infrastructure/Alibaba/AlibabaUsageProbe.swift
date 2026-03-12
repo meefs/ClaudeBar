@@ -10,12 +10,12 @@ public struct AlibabaUsageProbe: UsageProbe {
     public init(
         settingsRepository: any AlibabaSettingsRepository,
         networkClient: (any NetworkClient)? = nil,
-        cookieProvider: (any AlibabaCookieProviding)? = nil,
+        cookieProvider: any AlibabaCookieProviding,
         timeout: TimeInterval = 15.0
     ) {
         self.settingsRepository = settingsRepository
         self.networkClient = networkClient ?? URLSession.shared
-        self.cookieProvider = cookieProvider ?? AlibabaBrowserCookieProvider()
+        self.cookieProvider = cookieProvider
         self.timeout = timeout
     }
 

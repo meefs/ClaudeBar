@@ -92,7 +92,9 @@ struct AlibabaUsageProbeTests {
         let repo = makeSettingsRepository()
         repo.setAlibabaCookieSource(.auto)
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo)
+        let mockCookieProvider = MockAlibabaCookieProviding()
+        given(mockCookieProvider).extractBrowserCookies().willReturn(nil)
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: mockCookieProvider)
 
         let available = await probe.isAvailable()
         #expect(available == false)
@@ -258,7 +260,9 @@ struct AlibabaUsageProbeTests {
         let repo = makeSettingsRepository()
         repo.setAlibabaCookieSource(.auto)
 
-        let probe = AlibabaUsageProbe(settingsRepository: repo)
+        let mockCookieProvider = MockAlibabaCookieProviding()
+        given(mockCookieProvider).extractBrowserCookies().willReturn(nil)
+        let probe = AlibabaUsageProbe(settingsRepository: repo, cookieProvider: mockCookieProvider)
 
         do {
             _ = try await probe.probe()
