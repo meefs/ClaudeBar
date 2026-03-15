@@ -30,11 +30,8 @@ jobs:
       - name: Install Dependencies
         run: tuist install
 
-      - name: Generate Xcode Project
-        run: tuist generate
-
       - name: Build Debug
-        run: xcodebuild build -scheme ClaudeBar-Workspace -workspace ClaudeBar.xcworkspace -destination 'platform=macOS,arch=arm64'
+        run: tuist build
 
       - name: Build Release
-        run: xcodebuild build -scheme ClaudeBar -workspace ClaudeBar.xcworkspace -destination 'platform=macOS,arch=arm64' -configuration Release
+        run: tuist build ClaudeBar -- -configuration Release
