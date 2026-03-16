@@ -10,11 +10,12 @@ let packageSettings = PackageSettings(
     // Default is .staticFramework
     // productTypes: ["Alamofire": .framework,]
     productTypes: [
-        "SwiftTerm": .framework,
+        "SwiftTerm": .staticFramework,
     ],
     targetSettings: [
         "IssueReporting": ["SWIFT_PACKAGE_NAME": "xctest-dynamic-overlay"],
         "IssueReportingPackageSupport": ["SWIFT_PACKAGE_NAME": "xctest-dynamic-overlay"],
+        "SwiftTerm": ["EXCLUDED_SOURCE_FILE_NAMES": "Shaders.metal"],
     ]
 )
 #endif
