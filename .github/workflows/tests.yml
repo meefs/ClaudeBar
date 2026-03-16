@@ -20,16 +20,25 @@ jobs:
         run: swift --version
 
       - name: Install Tuist
-        run: |
-          curl -Ls https://github.com/tuist/tuist/releases/download/4.130.2/tuist.zip -o /tmp/tuist.zip
-          unzip -o /tmp/tuist.zip -d /usr/local/bin/
-          tuist version
+        run: brew install --cask tuist
 
       - name: Install Dependencies
         run: tuist install
 
+      - name: Generate Project
+        run: |
+          tuist generate --no-open
+          ./scripts/fix-swiftterm-metal.sh
+
       - name: Run Tests with Coverage
-        run: tuist test --result-bundle-path TestResults.xcresult -- -enableCodeCoverage YES -skipMacroValidation
+        run: |
+          xcodebuild test \
+            -scheme ClaudeBar \
+            -workspace ClaudeBar.xcworkspace \
+            -destination 'platform=macOS,arch=arm64' \
+            -enableCodeCoverage YES \
+            -skipMacroValidation \
+            -resultBundlePath TestResults.xcresult
 
       - name: Generate Coverage Report
         run: |

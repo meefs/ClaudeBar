@@ -25,16 +25,18 @@ jobs:
           swift-version: ${{ env.SWIFT_VERSION }}
 
       - name: Install Tuist
-        run: |
-          curl -Ls https://github.com/tuist/tuist/releases/download/4.130.2/tuist.zip -o /tmp/tuist.zip
-          unzip -o /tmp/tuist.zip -d /usr/local/bin/
-          tuist version
+        run: brew install --cask tuist
 
       - name: Install Dependencies
         run: tuist install
 
+      - name: Generate Project
+        run: |
+          tuist generate --no-open
+          ./scripts/fix-swiftterm-metal.sh
+
       - name: Build Debug
-        run: tuist build
+        run: xcodebuild build -scheme ClaudeBar -workspace ClaudeBar.xcworkspace -destination 'platform=macOS,arch=arm64'
 
       - name: Build Release
-        run: tuist build ClaudeBar -- -configuration Release
+        run: xcodebuild build -scheme ClaudeBar -workspace ClaudeBar.xcworkspace -destination 'platform=macOS,arch=arm64' -configuration Release
