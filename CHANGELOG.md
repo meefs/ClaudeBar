@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.4.50] - 2026-03-17
+
 ### Added
 - **Extensions System**: Raycast-style user extensions for custom provider monitoring. Drop a folder with a `manifest.json` and probe scripts into `~/.claudebar/extensions/` to add your own provider. Each extension defines composable sections (`quotaGrid`, `metricsRow`, `dailyUsage`, `costUsage`, `statusBanner`) with per-section probe commands and independent refresh intervals. Probe scripts can be any language (bash, python, swift) — just output JSON to stdout. Extensions auto-register as providers with custom branding (icon, colors) and appear in the provider pills alongside built-in providers. See `docs/features/extensions.md` for the full spec and example.
 
@@ -626,7 +630,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.49...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.50...HEAD
+[0.4.50]: https://github.com/tddworks/ClaudeBar/compare/v0.4.49...v0.4.50
 [0.4.49]: https://github.com/tddworks/ClaudeBar/compare/v0.4.48...v0.4.49
 [0.4.48]: https://github.com/tddworks/ClaudeBar/compare/v0.4.47...v0.4.48
 [0.4.47]: https://github.com/tddworks/ClaudeBar/compare/v0.4.46...v0.4.47
