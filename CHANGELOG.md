@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Custom Web Card per Provider**: Configure a custom URL for any provider to display an embedded web page as an additional card below the quota cards. Useful for third-party dashboards like [claude.owo.nz](https://claude.owo.nz/). Set via Settings → Providers → Custom Card URL field. The page is rendered inline with WKWebView, scaled to fit the card, with an "open in browser" button.
+
+### Fixed
+- **SwiftTerm Metal duplicate build error**: Resolved the `Unexpected duplicate tasks: MetalLink` build failure caused by Tuist adding `Shaders.metal` to both Sources and Resources build phases. Fixed via `EXCLUDED_SOURCE_FILE_NAMES` in Tuist package settings, eliminating the need for the post-generation fix script.
+
 ---
 
 ## [0.4.48] - 2026-03-16
