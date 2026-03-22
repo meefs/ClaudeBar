@@ -37,14 +37,14 @@ struct VibeSessionLogAnalyzerTests {
 
     private func writeMetadata(
         to dir: URL,
-        promptTokens: Int,
-        completionTokens: Int
+        totalTokens: Int,
+        cost: String = "0.00"
     ) {
         let json = """
         {
             "stats": {
-                "session_prompt_tokens": \(promptTokens),
-                "session_completion_tokens": \(completionTokens)
+                "session_total_llm_tokens": \(totalTokens),
+                "session_cost": \(cost)
             }
         }
         """
@@ -60,7 +60,7 @@ struct VibeSessionLogAnalyzerTests {
         defer { cleanup(tempDir) }
 
         let sessionDir = makeSessionDir(in: tempDir)
-        writeMetadata(to: sessionDir, promptTokens: 1000, completionTokens: 500)
+        writeMetadata(to: sessionDir, totalTokens: 1500)
 
         let analyzer = VibeSessionLogAnalyzer(
             vibeSessionsDir: tempDir,
@@ -78,12 +78,12 @@ struct VibeSessionLogAnalyzerTests {
 
         // Today's session
         let todayDir = makeSessionDir(in: tempDir, date: Date(), suffix: "today")
-        writeMetadata(to: todayDir, promptTokens: 1000, completionTokens: 500)
+        writeMetadata(to: todayDir, totalTokens: 1500)
 
         // Yesterday's session
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
         let yesterdayDir = makeSessionDir(in: tempDir, date: yesterday, suffix: "yesterday")
-        writeMetadata(to: yesterdayDir, promptTokens: 2000, completionTokens: 1000)
+        writeMetadata(to: yesterdayDir, totalTokens: 3000)
 
         let analyzer = VibeSessionLogAnalyzer(
             vibeSessionsDir: tempDir,
@@ -101,10 +101,10 @@ struct VibeSessionLogAnalyzerTests {
         defer { cleanup(tempDir) }
 
         let session1 = makeSessionDir(in: tempDir, suffix: "sess1")
-        writeMetadata(to: session1, promptTokens: 1000, completionTokens: 500)
+        writeMetadata(to: session1, totalTokens: 1500)
 
         let session2 = makeSessionDir(in: tempDir, suffix: "sess2")
-        writeMetadata(to: session2, promptTokens: 2000, completionTokens: 1000)
+        writeMetadata(to: session2, totalTokens: 3000)
 
         let analyzer = VibeSessionLogAnalyzer(
             vibeSessionsDir: tempDir,
@@ -138,11 +138,11 @@ struct VibeSessionLogAnalyzerTests {
 
         // Valid session
         let goodDir = makeSessionDir(in: tempDir, suffix: "good")
-        writeMetadata(to: goodDir, promptTokens: 1000, completionTokens: 500)
+        writeMetadata(to: goodDir, totalTokens: 1500)
 
         // Malformed session
         let badDir = makeSessionDir(in: tempDir, suffix: "bad")
-        let badMetadata = badDir.appendingPathComponent("metadata.json")
+        let badMetadata = badDir.appendingPathComponent("meta.json")
         try? "{ not valid json !! }".data(using: .utf8)!.write(to: badMetadata)
 
         let analyzer = VibeSessionLogAnalyzer(
@@ -155,13 +155,12 @@ struct VibeSessionLogAnalyzerTests {
         #expect(report.today.totalTokens == 1500)
     }
 
-    @Test func `computes cost with correct Devstral pricing`() async throws {
+    @Test func `passes session_cost through directly`() async throws {
         let tempDir = makeTempDir()
         defer { cleanup(tempDir) }
 
         let sessionDir = makeSessionDir(in: tempDir)
-        // 1M prompt tokens at $0.40/M + 1M completion tokens at $2.00/M = $2.40
-        writeMetadata(to: sessionDir, promptTokens: 1_000_000, completionTokens: 1_000_000)
+        writeMetadata(to: sessionDir, totalTokens: 50_000, cost: "2.40")
 
         let analyzer = VibeSessionLogAnalyzer(
             vibeSessionsDir: tempDir,
@@ -170,7 +169,6 @@ struct VibeSessionLogAnalyzerTests {
 
         let report = try await analyzer.analyzeToday()
 
-        // $0.40 + $2.00 = $2.40
         #expect(report.today.totalCost == Decimal(string: "2.40")!)
     }
 

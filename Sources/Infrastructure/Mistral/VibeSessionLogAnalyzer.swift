@@ -8,11 +8,6 @@ public struct VibeSessionLogAnalyzer: DailyUsageAnalyzing, Sendable {
     private let calendar: Calendar
     private let now: @Sendable () -> Date
 
-    /// Devstral pricing: $0.40 per million input tokens
-    private static let inputPricePerMToken: Decimal = 0.40
-    /// Devstral pricing: $2.00 per million output tokens
-    private static let outputPricePerMToken: Decimal = 2.00
-
     public init(
         vibeSessionsDir: URL = URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent(".vibe/logs/session"),
@@ -51,8 +46,8 @@ public struct VibeSessionLogAnalyzer: DailyUsageAnalyzing, Sendable {
 
     private struct ParsedSession {
         let date: Date
-        let promptTokens: Int
-        let completionTokens: Int
+        let totalTokens: Int
+        let cost: Decimal
     }
 
     private func loadSessions() -> [ParsedSession] {
@@ -98,8 +93,8 @@ public struct VibeSessionLogAnalyzer: DailyUsageAnalyzing, Sendable {
 
             sessions.append(ParsedSession(
                 date: sessionDate,
-                promptTokens: metadata.stats.sessionPromptTokens,
-                completionTokens: metadata.stats.sessionCompletionTokens
+                totalTokens: metadata.stats.sessionTotalLlmTokens,
+                cost: metadata.stats.sessionCost
             ))
         }
 
@@ -121,10 +116,8 @@ public struct VibeSessionLogAnalyzer: DailyUsageAnalyzing, Sendable {
         var totalTokens = 0
 
         for session in sessions {
-            let promptCost = Decimal(session.promptTokens) * Self.inputPricePerMToken / 1_000_000
-            let completionCost = Decimal(session.completionTokens) * Self.outputPricePerMToken / 1_000_000
-            totalCost += promptCost + completionCost
-            totalTokens += session.promptTokens + session.completionTokens
+            totalCost += session.cost
+            totalTokens += session.totalTokens
         }
 
         return DailyUsageStat(
@@ -144,6 +137,6 @@ private struct VibeSessionMetadata: Decodable {
 }
 
 private struct VibeSessionStats: Decodable {
-    let sessionPromptTokens: Int
-    let sessionCompletionTokens: Int
+    let sessionTotalLlmTokens: Int
+    let sessionCost: Decimal
 }
