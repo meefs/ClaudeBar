@@ -12,6 +12,7 @@ struct ClaudeConfigCard: View {
     @State private var claudeConfigExpanded: Bool = false
     @State private var claudeBudgetExpanded: Bool = false
     @State private var claudeProbeMode: ClaudeProbeMode = .cli
+    @State private var claudeCliFallbackEnabled: Bool = true
     @State private var budgetInput: String = ""
 
     var body: some View {
@@ -21,6 +22,7 @@ struct ClaudeConfigCard: View {
         }
         .onAppear {
             claudeProbeMode = settings.claude.claudeProbeMode()
+            claudeCliFallbackEnabled = settings.claude.claudeCliFallbackEnabled()
             if settings.claudeApiBudget > 0 {
                 budgetInput = String(describing: settings.claudeApiBudget)
             }
@@ -176,6 +178,22 @@ struct ClaudeConfigCard: View {
                     Text("Run `claude` in terminal to authenticate, then credentials will be available.")
                         .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
                         .foregroundStyle(theme.textTertiary)
+                }
+
+                Toggle(isOn: $claudeCliFallbackEnabled) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("CLI fallback")
+                            .font(.system(size: 10, weight: .semibold, design: theme.fontDesign))
+                            .foregroundStyle(theme.textPrimary)
+                        Text("Fall back to `claude /usage` if OAuth API is unavailable.")
+                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textTertiary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(theme.accentPrimary)
+                .onChange(of: claudeCliFallbackEnabled) { _, newValue in
+                    settings.claude.setClaudeCliFallbackEnabled(newValue)
                 }
             }
         }

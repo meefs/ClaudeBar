@@ -130,6 +130,23 @@ struct JSONSettingsRepositoryProviderTests {
         #expect(repo.claudeProbeMode() == .api)
     }
 
+    @Test
+    func `claudeCliFallbackEnabled defaults to true`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.claudeCliFallbackEnabled() == true)
+    }
+
+    @Test
+    func `setClaudeCliFallbackEnabled persists value`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setClaudeCliFallbackEnabled(false)
+        #expect(repo.claudeCliFallbackEnabled() == false)
+    }
+
     // MARK: - Codex Settings
 
     @Test

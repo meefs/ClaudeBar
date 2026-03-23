@@ -170,6 +170,13 @@ public protocol ClaudeSettingsRepository: ProviderSettingsRepository {
 
     /// Sets the probe mode for Claude
     func setClaudeProbeMode(_ mode: ClaudeProbeMode)
+
+    /// Whether to fall back to the CLI probe when the OAuth API probe is unavailable.
+    /// Defaults to true. Disable to prevent `claude /usage` from running in API mode.
+    func claudeCliFallbackEnabled() -> Bool
+
+    /// Sets whether CLI fallback is enabled in API mode
+    func setClaudeCliFallbackEnabled(_ enabled: Bool)
 }
 
 /// Codex-specific settings repository, extending base ProviderSettingsRepository.

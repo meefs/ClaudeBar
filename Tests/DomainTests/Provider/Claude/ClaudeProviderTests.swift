@@ -89,6 +89,30 @@ struct ClaudeProviderTests {
     }
 
     @Test
+    func `isAvailable returns false in API mode when API unavailable and CLI fallback disabled`() async {
+        let settings = FakeClaudeSettings(probeMode: .api, cliFallbackEnabled: false)
+        let cliProbe = MockUsageProbe()
+        given(cliProbe).isAvailable().willReturn(true)
+        let apiProbe = MockUsageProbe()
+        given(apiProbe).isAvailable().willReturn(false)
+        let claude = ClaudeProvider(cliProbe: cliProbe, apiProbe: apiProbe, settingsRepository: settings)
+
+        #expect(await claude.isAvailable() == false)
+    }
+
+    @Test
+    func `isAvailable returns true in API mode when API unavailable but CLI fallback enabled`() async {
+        let settings = FakeClaudeSettings(probeMode: .api, cliFallbackEnabled: true)
+        let cliProbe = MockUsageProbe()
+        given(cliProbe).isAvailable().willReturn(true)
+        let apiProbe = MockUsageProbe()
+        given(apiProbe).isAvailable().willReturn(false)
+        let claude = ClaudeProvider(cliProbe: cliProbe, apiProbe: apiProbe, settingsRepository: settings)
+
+        #expect(await claude.isAvailable() == true)
+    }
+
+    @Test
     func `claude provider delegates refresh to probe`() async throws {
         let settings = makeSettingsRepository()
         let expectedSnapshot = UsageSnapshot(providerId: "claude", quotas: [], capturedAt: Date())
@@ -161,4 +185,26 @@ struct ClaudeProviderTests {
         let provider2 = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
         #expect(provider1.id == provider2.id)
     }
+}
+
+// MARK: - Test Helpers
+
+private final class FakeClaudeSettings: ClaudeSettingsRepository, @unchecked Sendable {
+    var probeMode: ClaudeProbeMode
+    var cliFallbackEnabled: Bool
+
+    init(probeMode: ClaudeProbeMode = .cli, cliFallbackEnabled: Bool = true) {
+        self.probeMode = probeMode
+        self.cliFallbackEnabled = cliFallbackEnabled
+    }
+
+    func isEnabled(forProvider id: String) -> Bool { true }
+    func isEnabled(forProvider id: String, defaultValue: Bool) -> Bool { true }
+    func setEnabled(_ enabled: Bool, forProvider id: String) {}
+    func customCardURL(forProvider id: String) -> String? { nil }
+    func setCustomCardURL(_ url: String?, forProvider id: String) {}
+    func claudeProbeMode() -> ClaudeProbeMode { probeMode }
+    func setClaudeProbeMode(_ mode: ClaudeProbeMode) { probeMode = mode }
+    func claudeCliFallbackEnabled() -> Bool { cliFallbackEnabled }
+    func setClaudeCliFallbackEnabled(_ enabled: Bool) { cliFallbackEnabled = enabled }
 }

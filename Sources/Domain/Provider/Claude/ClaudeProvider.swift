@@ -150,6 +150,7 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
             if let apiProbe, await apiProbe.isAvailable() {
                 return true
             }
+            guard cliFallbackEnabled else { return false }
             return await cliProbe.isAvailable()
         }
     }
@@ -215,6 +216,11 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
         }
     }
 
+    private var cliFallbackEnabled: Bool {
+        (settingsRepository as? ClaudeSettingsRepository)?
+            .claudeCliFallbackEnabled() ?? true
+    }
+
     private func fallbackProbe() async -> (any UsageProbe)? {
         switch probeMode {
         case .cli:
@@ -223,6 +229,7 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
             }
             return apiProbe
         case .api:
+            guard cliFallbackEnabled else { return nil }
             return await cliProbe.isAvailable() ? cliProbe : nil
         }
     }

@@ -164,6 +164,14 @@ public final class JSONSettingsRepository:
         store.write(value: mode.rawValue, key: "claude.probeMode")
     }
 
+    public func claudeCliFallbackEnabled() -> Bool {
+        store.read(key: "claude.cliFallbackEnabled") ?? true
+    }
+
+    public func setClaudeCliFallbackEnabled(_ enabled: Bool) {
+        store.write(value: enabled, key: "claude.cliFallbackEnabled")
+    }
+
     // MARK: - CodexSettingsRepository
 
     public func codexProbeMode() -> CodexProbeMode {

@@ -132,6 +132,48 @@ struct ClaudeConfigSpec {
         }
 
         @Test
+        func `api mode does not fall back to CLI when cli fallback is disabled`() async throws {
+            let suiteName = "com.claudebar.test.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            let settings = UserDefaultsProviderSettingsRepository(userDefaults: defaults)
+            settings.setEnabled(true, forProvider: "claude")
+            settings.setClaudeProbeMode(.api)
+            settings.setClaudeCliFallbackEnabled(false)
+
+            let cliProbe = MockUsageProbe()
+            // CLI probe must not be consulted — if it is, probe() would succeed
+            // and we'd get snapshot data, which would fail the assertion below
+            given(cliProbe).isAvailable().willReturn(true)
+            given(cliProbe).probe().willReturn(UsageSnapshot(
+                providerId: "claude",
+                quotas: [UsageQuota(percentRemaining: 99, quotaType: .session, providerId: "claude")],
+                capturedAt: Date()
+            ))
+
+            let apiProbe = MockUsageProbe()
+            // API probe is available but fails — fallback to CLI must not happen
+            given(apiProbe).isAvailable().willReturn(true)
+            given(apiProbe).probe().willThrow(ProbeError.authenticationRequired)
+
+            let claude = ClaudeProvider(
+                cliProbe: cliProbe,
+                apiProbe: apiProbe,
+                settingsRepository: settings
+            )
+
+            let monitor = QuotaMonitor(
+                providers: AIProviders(providers: [claude]),
+                clock: TestClock()
+            )
+
+            await monitor.refresh(providerId: "claude")
+
+            // Error propagated — CLI fallback was not used
+            #expect(claude.lastError != nil)
+            #expect(claude.snapshot == nil)
+        }
+
+        @Test
         func `cli mode falls back to API when CLI parsing fails and OAuth is available`() async throws {
             let suiteName = "com.claudebar.test.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suiteName)!

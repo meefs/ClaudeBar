@@ -202,6 +202,14 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         userDefaults.set(mode.rawValue, forKey: Keys.claudeProbeMode)
     }
 
+    public func claudeCliFallbackEnabled() -> Bool {
+        userDefaults.object(forKey: Keys.claudeCliFallbackEnabled) as? Bool ?? true
+    }
+
+    public func setClaudeCliFallbackEnabled(_ enabled: Bool) {
+        userDefaults.set(enabled, forKey: Keys.claudeCliFallbackEnabled)
+    }
+
     // MARK: - CodexSettingsRepository
 
     public func codexProbeMode() -> CodexProbeMode {
@@ -378,6 +386,7 @@ public final class UserDefaultsProviderSettingsRepository: ZaiSettingsRepository
         static let hookPort = "hookConfig.port"
         // Claude settings
         static let claudeProbeMode = "providerConfig.claudeProbeMode"
+        static let claudeCliFallbackEnabled = "providerConfig.claudeCliFallbackEnabled"
         // Codex settings
         static let codexProbeMode = "providerConfig.codexProbeMode"
         // Kimi settings
