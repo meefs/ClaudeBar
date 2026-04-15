@@ -704,6 +704,12 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         // Using the *last* occurrence handles both start-of-line "Resets Jan 1, 2026"
         // and mid-line "$5.41 ... · Resets Jan 1, 2026 (America/New_York)".
         var cleaned = text
+
+        // Strip trailing "NN% used" or "NN% left" — in newer CLI formats the reset text
+        // and percentage share the same line (e.g., "Resets 3pm (Europe/Amsterdam)  27% used")
+        cleaned = cleaned
+            .replacingOccurrences(of: #"\s+\d{1,3}%\s*(?:used|left)\s*$"#, with: "", options: .regularExpression)
+
         if let lastResets = cleaned.range(of: "resets", options: [.caseInsensitive, .backwards]) {
             cleaned = String(cleaned[lastResets.upperBound...])
         }

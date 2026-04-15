@@ -294,6 +294,47 @@ struct ClaudeUsageProbeParsingTests {
         #expect(snapshot.weeklyQuota?.resetsAt != nil, "Weekly resetsAt should be populated for 'Resets Feb 12 at 4pm (TZ)' format")
     }
 
+    // MARK: - Reset on Same Line as Percentage (CLI v2.1.109+ format)
+
+    // Real output from Claude CLI where reset text and percentage share the same line
+    // (no separate progress bar line, no separate reset line)
+    static let resetOnSameLineOutput = """
+    Current session
+      Resets 3pm (Europe/Amsterdam)                      27% used
+
+
+      Current week (all models)
+      Resets Apr 16 at 4:59pm (Europe/Amsterdam)         40% used
+
+      Current week (Sonnet only)
+      Resets Apr 17 at 11:59am (Europe/Amsterdam)        0% used
+    """
+
+    @Test
+    func `parses percentages when reset and percent share same line`() throws {
+        // When
+        let snapshot = try simulateParse(text: Self.resetOnSameLineOutput)
+
+        // Then
+        #expect(snapshot.sessionQuota?.percentRemaining == 73) // 27% used = 73% remaining
+        #expect(snapshot.weeklyQuota?.percentRemaining == 60)  // 40% used = 60% remaining
+        #expect(snapshot.quota(for: .modelSpecific("sonnet"))?.percentRemaining == 100) // 0% used
+    }
+
+    @Test
+    func `parses resetsAt when reset and percent share same line`() throws {
+        // When
+        let snapshot = try ClaudeUsageProbe.parse(Self.resetOnSameLineOutput)
+
+        // Then — all quotas should have resetsAt populated (enables pace triangle)
+        #expect(snapshot.sessionQuota?.resetsAt != nil,
+                "Session resetsAt should be populated for 'Resets 3pm (TZ) ... 27% used' format")
+        #expect(snapshot.weeklyQuota?.resetsAt != nil,
+                "Weekly resetsAt should be populated for 'Resets Apr 16 at 4:59pm (TZ) ... 40% used' format")
+        #expect(snapshot.quota(for: .modelSpecific("sonnet"))?.resetsAt != nil,
+                "Sonnet resetsAt should be populated for 'Resets Apr 17 at 11:59am (TZ) ... 0% used' format")
+    }
+
     // MARK: - ANSI Code Handling
 
     static let ansiColoredOutput = """
