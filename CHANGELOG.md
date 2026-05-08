@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Optional menu bar quota percentage**: A new setting shows the active provider's quota percentage directly in the menu bar next to the icon, so you can see usage at a glance without opening the popover. Configurable in Settings, with optional pace-aware status coloring driven by `burnRateThreshold`.
+
+### Fixed
+- **Z.ai weekly/monthly token quotas no longer collide with session quota**: Z.ai's GLM Coding Plan API returns multiple `TOKENS_LIMIT` entries distinguished only by an integer `unit` field. The previous parser mapped every entry to `.session`, causing the weekly token cap — the most important number on the GLM Coding Plan — to silently overwrite (or be overwritten by) the 5-hour session quota. Entries are now disambiguated by `unit`, so session, weekly, and monthly token limits are tracked independently.
+
 ---
 
 ## [0.4.60] - 2026-05-02
