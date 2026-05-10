@@ -171,8 +171,16 @@ internal struct GeminiAPIProbe {
             }
         }
 
+        // Sort by remaining fraction ascending (most-used models first), with
+        // model ID as a stable tiebreaker so the order doesn't shuffle between
+        // probes when multiple models share a quota (e.g. several at 100%).
         let quotas: [UsageQuota] = modelQuotaMap
-            .sorted { $0.key < $1.key }
+            .sorted { lhs, rhs in
+                if lhs.value.fraction != rhs.value.fraction {
+                    return lhs.value.fraction < rhs.value.fraction
+                }
+                return lhs.key < rhs.key
+            }
             .map { modelId, data in
                 let resetsAt = data.resetTime.flatMap { parseResetTime($0) }
                 return UsageQuota(

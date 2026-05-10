@@ -116,7 +116,65 @@ struct GeminiAPIProbeTests {
             })
             .called(1)
     }
-    
+
+    @Test
+    func `probe sorts quotas by remaining fraction ascending`() async throws {
+        // Ensures the most-used models bubble to the top so a glance at the
+        // menu surfaces what's actually under pressure. Tiebreaker is model ID.
+        let homeDir = try makeTemporaryHomeDirectory()
+        try createCredentialsFile(in: homeDir)
+        let mockService = MockNetworkClient()
+
+        let projectsResponse = """
+        { "cloudaicompanionProject": "alien-superstate-rq4hk" }
+        """.data(using: .utf8)!
+
+        // API returns models in alphabetical order; the probe must reorder by usage.
+        let quotaResponse = """
+        {
+            "buckets": [
+                { "modelId": "gemini-2.5-flash",      "remainingFraction": 0.99,  "resetTime": "2026-05-11T14:56:33Z" },
+                { "modelId": "gemini-2.5-flash-lite", "remainingFraction": 1.0,   "resetTime": "2026-05-11T14:56:33Z" },
+                { "modelId": "gemini-2.5-pro",        "remainingFraction": 0.05,  "resetTime": "2026-05-10T17:28:41Z" },
+                { "modelId": "gemini-3-pro-preview",  "remainingFraction": 0.4,   "resetTime": "2026-05-10T17:28:41Z" },
+                { "modelId": "gemini-other",          "remainingFraction": 1.0,   "resetTime": "2026-05-11T14:56:33Z" }
+            ]
+        }
+        """.data(using: .utf8)!
+
+        given(mockService)
+            .request(.any)
+            .willProduce { request in
+                let url = request.url?.absoluteString ?? ""
+                if url.contains("loadCodeAssist") {
+                    return (projectsResponse, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+                } else {
+                    return (quotaResponse, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+                }
+            }
+
+        let probe = GeminiAPIProbe(
+            homeDirectory: homeDir.path,
+            timeout: 1.0,
+            networkClient: mockService,
+            maxRetries: 1
+        )
+
+        let snapshot = try await probe.probe()
+
+        let modelIds: [String] = snapshot.quotas.compactMap {
+            if case let .modelSpecific(id) = $0.quotaType { return id }
+            return nil
+        }
+        #expect(modelIds == [
+            "gemini-2.5-pro",          // 5%
+            "gemini-3-pro-preview",    // 40%
+            "gemini-2.5-flash",        // 99%
+            "gemini-2.5-flash-lite",   // 100% (tiebreaker: alphabetical)
+            "gemini-other"             // 100%
+        ])
+    }
+
     @Test
     func `probe parses reset time into Date and human readable text`() async throws {
         let homeDir = try makeTemporaryHomeDirectory()
