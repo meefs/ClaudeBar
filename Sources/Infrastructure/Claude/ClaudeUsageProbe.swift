@@ -387,10 +387,18 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
             return .claudeMax
         }
 
-        // Check for API Usage Billing in header (e.g., "Sonnet 4.5 · API Usage Billing")
-        // This is the ONLY case that should return .claudeApi (pay-as-you-go without quotas)
-        if lower.contains("api usage billing") {
-            AppLog.probes.info("Detected API Usage Billing account from header")
+        // Only classify as API Usage Billing (pay-as-you-go) when BOTH conditions hold:
+        //   1. Header is NOT a Pro/Max subscription header, AND
+        //   2. The CLI explicitly says /usage is unavailable for this account.
+        // This prevents subscription accounts with Extra Usage credits — whose header
+        // contains "API Usage Billing" but which still receive valid quota bars — from
+        // being misclassified and losing their quota display.
+        let mentionsApiUsageBilling = lower.contains("api usage billing")
+        let mentionsPro = lower.contains("· claude pro") || lower.contains("·claude pro")
+        let mentionsMax = lower.contains("· claude max") || lower.contains("·claude max")
+        let usageOnlyForSubscriptions = lower.contains("/usage is only available for subscription plans")
+        if mentionsApiUsageBilling && !mentionsPro && !mentionsMax && usageOnlyForSubscriptions {
+            AppLog.probes.info("Detected API Usage Billing account (header + subscription-only error)")
             return .claudeApi
         }
 
@@ -857,6 +865,11 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         if lower.contains("update required") || lower.contains("please update") {
             AppLog.probes.error("Claude probe failed: CLI update required")
             return .updateRequired
+        }
+
+        if lower.contains("/usage is only available for subscription plans") {
+            AppLog.probes.info("Claude /usage unavailable for this account: subscription required")
+            return .subscriptionRequired
         }
 
         // Check for rate limit errors, but exclude promotional messages like "rate limits are 2x higher"
