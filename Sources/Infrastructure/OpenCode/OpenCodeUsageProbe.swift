@@ -1,17 +1,9 @@
 import Foundation
 import Domain
 
-/// Probes local OpenCode database for Go usage quotas.
-///
-/// Tracks 3 Go usage windows (against $12/$30/$60 limits):
-/// - 5-hour ($12) — mapped to `.session` quota type
-/// - Weekly ($30) — mapped to `.weekly` quota type
-/// - Monthly ($60) — mapped to `.timeLimit("Monthly")` quota type
-///
-/// Queries the OpenCode SQLite DB via `opencode db` with JSON output.
+/// Queries local opencode DB for Go usage quotas — 5h/$12, weekly/$30, monthly/$60.
 public struct OpenCodeUsageProbe: UsageProbe {
 
-    // OpenCode Go usage limits
     static let fiveHourLimit: Double = 12.0
     static let weeklyLimit: Double = 30.0
     static let monthlyLimit: Double = 60.0
@@ -56,10 +48,7 @@ public struct OpenCodeUsageProbe: UsageProbe {
     }
 
     public func probe() async throws -> UsageSnapshot {
-        AppLog.probes.info("Starting OpenCode probe...")
-
         guard cliExecutor.locate("opencode") != nil else {
-            AppLog.probes.error("OpenCode probe failed: opencode binary not found")
             throw ProbeError.cliNotFound("opencode")
         }
 
@@ -103,17 +92,13 @@ public struct OpenCodeUsageProbe: UsageProbe {
 
     // MARK: - DB Query
 
-    /// Runs a single query returning cost for 5-hour, weekly, and monthly windows.
     private func runCombinedWindowQuery() async throws -> Data {
         let now = Date()
         let fiveHourMs = Self.millisSinceEpoch(now.addingTimeInterval(-5 * 3600))
         let weekStartMs = Self.millisSinceEpoch(Self.startOfWeek(from: now))
         let monthStartMs = Self.millisSinceEpoch(Self.startOfMonth(from: now))
-        // Use earliest cutoff so 5-hour and weekly windows still work when
-        // they cross a month boundary (e.g., now is May 1 at 2am, weekStart is April 28).
-        let earliestCutoffMs = min(fiveHourMs, weekStartMs, monthStartMs)
+        let earliestCutoffMs = min(fiveHourMs, weekStartMs, monthStartMs) // handles window boundary crosses
 
-        // Count only messages routed through OpenCode Go; API-key traffic does not use Go quota.
         let sql = """
         SELECT
           COALESCE(SUM(CASE WHEN time_created >= \(fiveHourMs) THEN CAST(json_extract(data, '$.cost') AS REAL) ELSE 0 END), 0) as five_hour_cost,
@@ -153,7 +138,6 @@ public struct OpenCodeUsageProbe: UsageProbe {
 
     // MARK: - Static Helpers (testable)
 
-    /// Parses window costs from the combined window query result.
     static func parseWindowCosts(_ data: Data) throws -> WindowCosts {
         let rows = try JSONDecoder().decode([WindowRow].self, from: data)
         guard let row = rows.first else {
@@ -167,8 +151,7 @@ public struct OpenCodeUsageProbe: UsageProbe {
         )
     }
 
-    /// Returns percentage remaining, clamped to [0, 100].
-    /// Over-limit usage clamps to 0%, which maps to `.depleted`.
+    /// Returns percentage remaining, clamped to [0, 100]. Over-limit → 0% → .depleted.
     static func percentRemaining(used: Double, limit: Double) -> Double {
         guard limit > 0 else { return 100 }
         return max(0, min(100, (limit - used) / limit * 100))
@@ -221,7 +204,6 @@ private struct WindowRow: Decodable {
     let five_hour_oldest_ms: Int64?
 }
 
-/// Parsed window costs for Go quota tracking.
 public struct WindowCosts: Sendable {
     public let fiveHourCost: Double
     public let weeklyCost: Double
