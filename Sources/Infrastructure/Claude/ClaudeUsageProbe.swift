@@ -283,11 +283,9 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         // CLI /usage tab no longer includes account details since v2.1.79+
         let accountInfo = accountInfoResolver.resolve()
 
-        // API Usage Billing accounts don't have quota data - fall back to /cost
-        if accountTier == .claudeApi {
-            AppLog.probes.info("Detected API Usage Billing account, falling back to /cost")
-            throw ProbeError.subscriptionRequired
-        }
+        // Note: pay-as-you-go API accounts are caught earlier by extractUsageError()
+        // via the "/usage is only available for subscription plans" message and routed
+        // to /cost. detectAccountType() classifies by header/quota only.
 
         // Extract percentages
         let sessionPct = extractPercent(labelSubstring: "Current session", text: clean)
@@ -387,24 +385,12 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
             return .claudeMax
         }
 
-        // Only classify as API Usage Billing (pay-as-you-go) when BOTH conditions hold:
-        //   1. Header is NOT a Pro/Max subscription header, AND
-        //   2. The CLI explicitly says /usage is unavailable for this account.
-        // This prevents subscription accounts with Extra Usage credits — whose header
-        // contains "API Usage Billing" but which still receive valid quota bars — from
-        // being misclassified and losing their quota display.
-        let mentionsApiUsageBilling = lower.contains("api usage billing")
-        let mentionsPro = lower.contains("· claude pro") || lower.contains("·claude pro")
-        let mentionsMax = lower.contains("· claude max") || lower.contains("·claude max")
-        let usageOnlyForSubscriptions = lower.contains("/usage is only available for subscription plans")
-        if mentionsApiUsageBilling && !mentionsPro && !mentionsMax && usageOnlyForSubscriptions {
-            AppLog.probes.info("Detected API Usage Billing account (header + subscription-only error)")
-            return .claudeApi
-        }
-
-        // Note: "Claude API" accounts (e.g., "Sonnet 4.5 · Claude API") are subscription
-        // accounts with quotas, so we should NOT treat them as .claudeApi here.
-        // They will fall through to the quota-based detection below.
+        // Pay-as-you-go API accounts are detected by extractUsageError() via the
+        // "/usage is only available for subscription plans" message — not here.
+        // The "API Usage Billing" header substring is NOT a reliable classifier on its
+        // own: subscription accounts with Extra Usage credits show the same substring
+        // alongside valid quota bars. We classify only by Pro/Max header and quota
+        // presence, defaulting to .claudeMax for any subscription-like output.
 
         // Fallback: Check for presence of quota data (subscription accounts have quotas)
         let hasSessionQuota = lower.contains("current session") && (lower.contains("% left") || lower.contains("% used"))

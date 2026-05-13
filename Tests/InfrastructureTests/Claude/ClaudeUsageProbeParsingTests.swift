@@ -690,23 +690,6 @@ struct ClaudeUsageProbeParsingTests {
     """
 
     @Test
-    func `detects API Usage Billing account from header`() throws {
-        // Given — pure pay-as-you-go account: header substring AND the explicit
-        // "/usage is only available for subscription plans" error must both be present.
-        let probe = ClaudeUsageProbe()
-        let output = """
-        Sonnet 4.5 · API Usage Billing · dzienisz
-        /usage is only available for subscription plans.
-        """
-
-        // When
-        let accountType = probe.detectAccountType(output)
-
-        // Then
-        #expect(accountType == .claudeApi)
-    }
-
-    @Test
     func `treats API Usage Billing with quotas as subscription account`() throws {
         // Given — header has "API Usage Billing" but no subscription-only error,
         // and the output contains real quota bars (subscription with Extra Usage credits).
