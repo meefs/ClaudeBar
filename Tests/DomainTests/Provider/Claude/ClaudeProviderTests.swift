@@ -189,6 +189,38 @@ struct ClaudeProviderTests {
     // MARK: - Error Propagation When Both Probes Fail
 
     @Test
+    func `refresh does not invoke CLI fallback when API returns rateLimited`() async {
+        // When the API probe is rate-limited, the CLI probe talks to the
+        // same Anthropic backend (subject to the same per-token throttle)
+        // AND it's currently broken in the field. The rate-limit error
+        // should surface immediately without the CLI probe being touched.
+        let settings = FakeClaudeSettings(probeMode: .api, cliFallbackEnabled: true)
+
+        let retryAt = Date().addingTimeInterval(300)
+        let apiProbe = MockUsageProbe()
+        given(apiProbe).isAvailable().willReturn(true)
+        given(apiProbe).probe().willThrow(ProbeError.rateLimited(retryAt: retryAt))
+
+        let cliProbe = MockUsageProbe()
+        given(cliProbe).isAvailable().willReturn(true)
+
+        let claude = ClaudeProvider(cliProbe: cliProbe, apiProbe: apiProbe, settingsRepository: settings)
+
+        do {
+            _ = try await claude.refresh()
+            Issue.record("Expected refresh to throw")
+        } catch let error as ProbeError {
+            #expect(error == .rateLimited(retryAt: retryAt))
+        } catch {
+            Issue.record("Expected ProbeError, got \(error)")
+        }
+
+        // The CLI probe must never be invoked when the primary error is
+        // an upstream rate-limit; fallback would amplify the throttle.
+        verify(cliProbe).probe().called(0)
+    }
+
+    @Test
     func `refresh surfaces primary API error when CLI fallback also fails`() async {
         // API mode with CLI fallback enabled: API probe throws .rateLimited
         // (the real root cause), CLI fallback throws .parseFailed (a red

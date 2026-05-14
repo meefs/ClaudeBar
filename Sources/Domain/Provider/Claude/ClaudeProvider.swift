@@ -169,7 +169,8 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
             lastError = nil
             return snapshot!
         } catch let primaryError {
-            if let fallback = await fallbackProbe() {
+            if Self.shouldAttemptFallback(after: primaryError),
+               let fallback = await fallbackProbe() {
                 do {
                     let newSnapshot = try await fallback.probe()
                     snapshot = await attachDailyReport(to: newSnapshot)
@@ -188,6 +189,18 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
             lastError = primaryError
             throw primaryError
         }
+    }
+
+    /// Decides whether the fallback probe should run after the primary fails.
+    /// Rate-limit failures are an upstream per-token throttle: the CLI talks
+    /// to the same Anthropic backend, so the fallback can't help and would
+    /// just amplify the problem. Surface the rate-limit error immediately so
+    /// the backoff window does its job. All other failure modes (auth,
+    /// parse, network, etc.) still try the fallback — those can legitimately
+    /// be recovered by the alternate probe path.
+    private static func shouldAttemptFallback(after error: Error) -> Bool {
+        if case ProbeError.rateLimited = error { return false }
+        return true
     }
 
     /// Attaches daily usage report to snapshot if analyzer is available.
