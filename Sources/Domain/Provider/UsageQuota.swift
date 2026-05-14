@@ -181,6 +181,18 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         return max(0, resetsAt.timeIntervalSinceNow)
     }
 
+    /// Compact reset duration for the menu bar label (e.g., "1d", "3h", "45m").
+    /// Returns the largest non-zero unit; "soon" when under a minute;
+    /// nil when reset time is unknown.
+    public var compactResetTime: String? {
+        guard let timeUntilReset else { return nil }
+        let s = Int(timeUntilReset)
+        if s / 86400 > 0 { return "\(s / 86400)d" }
+        if s / 3600 > 0  { return "\(s / 3600)h" }
+        if s / 60 > 0    { return "\(s / 60)m" }
+        return "soon"
+    }
+
     /// Human-readable reset countdown with all components (e.g., "Resets in 2d 5h 30m")
     public var resetTimestampDescription: String? {
         guard let timeUntilReset else { return nil }

@@ -237,7 +237,8 @@ struct SettingsContentView: View {
             displayModeHeader
             displayModeToggle
             menuBarPercentageToggle
-            if settings.menuBarPercentageEnabled {
+            menuBarDurationToggle
+            if settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled {
                 menuBarPercentageControls
             }
             dailyUsageCardsToggle
@@ -310,7 +311,7 @@ struct SettingsContentView: View {
 
     private var menuBarPercentageToggle: some View {
         HStack {
-            Text("Menu Bar Percentage")
+            Text("Show Percentage in Menu Bar")
                 .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
                 .foregroundStyle(theme.textSecondary)
 
@@ -320,6 +321,30 @@ struct SettingsContentView: View {
                 get: { settings.menuBarPercentageEnabled },
                 set: { enabled in
                     settings.menuBarPercentageEnabled = enabled
+                    if enabled {
+                        normalizeMenuBarPercentageSelection()
+                    }
+                }
+            ))
+            .toggleStyle(.switch)
+            .tint(theme.accentPrimary)
+            .scaleEffect(0.8)
+            .labelsHidden()
+        }
+    }
+
+    private var menuBarDurationToggle: some View {
+        HStack {
+            Text("Show Duration in Menu Bar")
+                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                .foregroundStyle(theme.textSecondary)
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { settings.menuBarDurationEnabled },
+                set: { enabled in
+                    settings.menuBarDurationEnabled = enabled
                     if enabled {
                         normalizeMenuBarPercentageSelection()
                     }

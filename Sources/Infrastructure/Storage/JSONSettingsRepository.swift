@@ -65,6 +65,14 @@ public final class JSONSettingsRepository:
         store.write(value: enabled, key: "app.menuBarPercentageEnabled")
     }
 
+    public func menuBarDurationEnabled() -> Bool {
+        store.read(key: "app.menuBarDurationEnabled") ?? false
+    }
+
+    public func setMenuBarDurationEnabled(_ enabled: Bool) {
+        store.write(value: enabled, key: "app.menuBarDurationEnabled")
+    }
+
     public func menuBarPercentageProviderId() -> String {
         store.read(key: "app.menuBarPercentageProviderId") ?? "claude"
     }

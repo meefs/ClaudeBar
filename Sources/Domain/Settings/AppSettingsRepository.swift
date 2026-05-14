@@ -24,6 +24,9 @@ public protocol AppSettingsRepository: Sendable {
     func menuBarPercentageEnabled() -> Bool
     func setMenuBarPercentageEnabled(_ enabled: Bool)
 
+    func menuBarDurationEnabled() -> Bool
+    func setMenuBarDurationEnabled(_ enabled: Bool)
+
     func menuBarPercentageProviderId() -> String
     func setMenuBarPercentageProviderId(_ providerId: String)
 

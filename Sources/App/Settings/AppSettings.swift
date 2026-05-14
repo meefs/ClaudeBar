@@ -49,6 +49,15 @@ public final class AppSettings {
         }
     }
 
+    /// Whether the menu bar label should show the compact reset duration for the
+    /// selected quota. Independent of `menuBarPercentageEnabled`; both can be on
+    /// simultaneously (in which case they are joined by " · ").
+    public var menuBarDurationEnabled: Bool {
+        didSet {
+            repository.setMenuBarDurationEnabled(menuBarDurationEnabled)
+        }
+    }
+
     /// Provider used for the menu bar percentage label.
     public var menuBarPercentageProviderId: String {
         didSet {
@@ -177,6 +186,7 @@ public final class AppSettings {
         self.backgroundSyncEnabled = repository.backgroundSyncEnabled()
         self.backgroundSyncInterval = repository.backgroundSyncInterval()
         self.menuBarPercentageEnabled = repository.menuBarPercentageEnabled()
+        self.menuBarDurationEnabled = repository.menuBarDurationEnabled()
         self.menuBarPercentageProviderId = repository.menuBarPercentageProviderId()
         self.menuBarPercentageQuotaKey = repository.menuBarPercentageQuotaKey()
 
