@@ -237,8 +237,9 @@ struct SettingsContentView: View {
             displayModeHeader
             displayModeToggle
             menuBarPercentageToggle
-            if settings.menuBarPercentageEnabled {
-                menuBarPercentageControls
+            menuBarDurationToggle
+            if settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled {
+                menuBarControls
             }
             dailyUsageCardsToggle
         }
@@ -294,23 +295,23 @@ struct SettingsContentView: View {
         }
     }
 
-    private var menuBarPercentageProviders: [any AIProvider] {
+    private var menuBarProviders: [any AIProvider] {
         monitor.enabledProviders
     }
 
-    private var selectedMenuBarPercentageProvider: (any AIProvider)? {
-        menuBarPercentageProviders.first { $0.id == settings.menuBarPercentageProviderId }
+    private var selectedMenuBarProvider: (any AIProvider)? {
+        menuBarProviders.first { $0.id == settings.menuBarPercentageProviderId }
             ?? monitor.selectedProvider
-            ?? menuBarPercentageProviders.first
+            ?? menuBarProviders.first
     }
 
-    private var menuBarPercentageQuotaOptions: [UsageQuota] {
-        selectedMenuBarPercentageProvider?.snapshot?.quotas ?? []
+    private var menuBarQuotaOptions: [UsageQuota] {
+        selectedMenuBarProvider?.snapshot?.quotas ?? []
     }
 
     private var menuBarPercentageToggle: some View {
         HStack {
-            Text("Menu Bar Percentage")
+            Text("Show Percentage in Menu Bar")
                 .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
                 .foregroundStyle(theme.textSecondary)
 
@@ -321,7 +322,7 @@ struct SettingsContentView: View {
                 set: { enabled in
                     settings.menuBarPercentageEnabled = enabled
                     if enabled {
-                        normalizeMenuBarPercentageSelection()
+                        normalizeMenuBarSelection()
                     }
                 }
             ))
@@ -332,7 +333,31 @@ struct SettingsContentView: View {
         }
     }
 
-    private var menuBarPercentageControls: some View {
+    private var menuBarDurationToggle: some View {
+        HStack {
+            Text("Show Duration in Menu Bar")
+                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                .foregroundStyle(theme.textSecondary)
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { settings.menuBarDurationEnabled },
+                set: { enabled in
+                    settings.menuBarDurationEnabled = enabled
+                    if enabled {
+                        normalizeMenuBarSelection()
+                    }
+                }
+            ))
+            .toggleStyle(.switch)
+            .tint(theme.accentPrimary)
+            .scaleEffect(0.8)
+            .labelsHidden()
+        }
+    }
+
+    private var menuBarControls: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("PROVIDER")
@@ -342,19 +367,19 @@ struct SettingsContentView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(menuBarPercentageProviders, id: \.id) { provider in
+                        ForEach(menuBarProviders, id: \.id) { provider in
                             MenuBarProviderChoiceButton(
                                 providerId: provider.id,
                                 providerName: provider.name,
                                 isSelected: settings.menuBarPercentageProviderId == provider.id
                             ) {
                                 settings.menuBarPercentageProviderId = provider.id
-                                selectFirstMenuBarPercentageQuotaIfNeeded(force: true)
+                                selectFirstMenuBarQuotaIfNeeded(force: true)
                             }
                         }
                     }
                 }
-                .disabled(menuBarPercentageProviders.isEmpty)
+                .disabled(menuBarProviders.isEmpty)
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -363,7 +388,7 @@ struct SettingsContentView: View {
                     .foregroundStyle(theme.textSecondary)
                     .tracking(0.5)
 
-                if menuBarPercentageQuotaOptions.isEmpty {
+                if menuBarQuotaOptions.isEmpty {
                     Text("No quota data")
                         .font(.system(size: 11, weight: .medium, design: theme.fontDesign))
                         .foregroundStyle(theme.textTertiary)
@@ -381,7 +406,7 @@ struct SettingsContentView: View {
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(menuBarPercentageQuotaOptions, id: \.quotaType.quotaKey) { quota in
+                            ForEach(menuBarQuotaOptions, id: \.quotaType.quotaKey) { quota in
                                 MenuBarQuotaChoiceButton(
                                     title: quota.quotaType.displayName,
                                     isSelected: settings.menuBarPercentageQuotaKey == quota.quotaType.quotaKey
@@ -395,21 +420,21 @@ struct SettingsContentView: View {
             }
         }
         .onAppear {
-            normalizeMenuBarPercentageSelection()
+            normalizeMenuBarSelection()
         }
     }
 
-    private func normalizeMenuBarPercentageSelection() {
-        if let provider = selectedMenuBarPercentageProvider,
+    private func normalizeMenuBarSelection() {
+        if let provider = selectedMenuBarProvider,
            settings.menuBarPercentageProviderId != provider.id {
             settings.menuBarPercentageProviderId = provider.id
         }
-        selectFirstMenuBarPercentageQuotaIfNeeded(force: false)
+        selectFirstMenuBarQuotaIfNeeded(force: false)
     }
 
-    private func selectFirstMenuBarPercentageQuotaIfNeeded(force: Bool) {
-        guard let firstQuota = menuBarPercentageQuotaOptions.first else { return }
-        let currentQuotaExists = menuBarPercentageQuotaOptions.contains {
+    private func selectFirstMenuBarQuotaIfNeeded(force: Bool) {
+        guard let firstQuota = menuBarQuotaOptions.first else { return }
+        let currentQuotaExists = menuBarQuotaOptions.contains {
             $0.quotaType.quotaKey == settings.menuBarPercentageQuotaKey
         }
 

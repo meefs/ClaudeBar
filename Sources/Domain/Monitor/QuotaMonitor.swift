@@ -195,6 +195,25 @@ public final class QuotaMonitor: @unchecked Sendable {
         )
     }
 
+    /// Returns the menu bar duration display for a provider/quota selection.
+    /// Sibling to `menuBarPercentageDisplay`; both use the same selectors.
+    public func menuBarDurationDisplay(
+        providerId: String,
+        quotaKey: String,
+        burnRateWarningEnabled: Bool = false,
+        burnRateThreshold: Double = 1.5
+    ) -> MenuBarDurationDisplay? {
+        guard let quota = quota(providerId: providerId, quotaKey: quotaKey) else {
+            return nil
+        }
+
+        return MenuBarDurationDisplay(
+            quota: quota,
+            burnRateWarningEnabled: burnRateWarningEnabled,
+            burnRateThreshold: burnRateThreshold
+        )
+    }
+
     /// Returns the overall status across enabled providers (worst status wins)
     public var overallStatus: QuotaStatus {
         providers.enabled

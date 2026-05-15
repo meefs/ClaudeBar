@@ -165,6 +165,56 @@ struct QuotaMonitorTests {
     }
 
     @Test
+    func `menu bar duration display returns compact reset time for selected quota`() async {
+        // Given - claude session quota with reset ~3h away
+        let settings = makeSettingsRepository()
+        let probe = MockUsageProbe()
+        given(probe).isAvailable().willReturn(true)
+        given(probe).probe().willReturn(UsageSnapshot(
+            providerId: "claude",
+            quotas: [
+                UsageQuota(
+                    percentRemaining: 75,
+                    quotaType: .session,
+                    providerId: "claude",
+                    resetsAt: Date().addingTimeInterval(3.0 * 3600 + 30)
+                ),
+            ],
+            capturedAt: Date()
+        ))
+        let provider = ClaudeProvider(probe: probe, settingsRepository: settings)
+        let monitor = makeMonitor(providers: AIProviders(providers: [provider]))
+
+        // When
+        await monitor.refresh(providerId: "claude")
+        let display = monitor.menuBarDurationDisplay(
+            providerId: "claude",
+            quotaKey: "session"
+        )
+
+        // Then
+        #expect(display?.text == "3h")
+        #expect(display?.status == .healthy)
+    }
+
+    @Test
+    func `menu bar duration display is nil when quota data is missing`() {
+        // Given
+        let settings = makeSettingsRepository()
+        let provider = ClaudeProvider(probe: MockUsageProbe(), settingsRepository: settings)
+        let monitor = makeMonitor(providers: AIProviders(providers: [provider]))
+
+        // When
+        let display = monitor.menuBarDurationDisplay(
+            providerId: "claude",
+            quotaKey: "session"
+        )
+
+        // Then
+        #expect(display == nil)
+    }
+
+    @Test
     func `monitor skips unavailable providers`() async {
         // Given
         let settings = makeSettingsRepository()

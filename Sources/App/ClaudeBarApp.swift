@@ -158,6 +158,30 @@ struct ClaudeBarApp: App {
         )
     }
 
+    private var menuBarDurationDisplay: MenuBarDurationDisplay? {
+        guard settings.menuBarDurationEnabled else { return nil }
+
+        return monitor.menuBarDurationDisplay(
+            providerId: settings.menuBarPercentageProviderId,
+            quotaKey: settings.menuBarPercentageQuotaKey,
+            burnRateWarningEnabled: settings.burnRateWarningEnabled,
+            burnRateThreshold: settings.burnRateThreshold
+        )
+    }
+
+    private var menuBarLabelText: (text: String, status: QuotaStatus)? {
+        switch (menuBarPercentageDisplay, menuBarDurationDisplay) {
+        case let (.some(perc), .some(dur)):
+            return ("\(perc.text) · \(dur.text)", perc.status)
+        case let (.some(perc), .none):
+            return (perc.text, perc.status)
+        case let (.none, .some(dur)):
+            return (dur.text, dur.status)
+        case (.none, .none):
+            return nil
+        }
+    }
+
     /// Current theme mode from settings
     private var currentThemeMode: ThemeMode {
         ThemeMode(rawValue: settings.themeMode) ?? .system
@@ -234,9 +258,13 @@ struct ClaudeBarApp: App {
             #endif
         } label: {
             // Show overall status + active session indicator in menu bar
-            if let display = menuBarPercentageDisplay {
-                StatusBarPercentageLabel(display: display, activeSession: sessionMonitor.activeSession)
-                    .appThemeProvider(themeModeId: settings.themeMode)
+            if let label = menuBarLabelText {
+                StatusBarPercentageLabel(
+                    text: label.text,
+                    status: label.status,
+                    activeSession: sessionMonitor.activeSession
+                )
+                .appThemeProvider(themeModeId: settings.themeMode)
             } else {
                 StatusBarIcon(status: effectiveSelectedProviderStatus, activeSession: sessionMonitor.activeSession)
                     .appThemeProvider(themeModeId: settings.themeMode)
@@ -299,15 +327,18 @@ struct StatusBarIcon: View {
     }
 }
 
-/// The menu bar percentage label for an opt-in provider/quota selection.
+/// The menu bar text label for an opt-in provider/quota selection.
+/// Renders one composed string (percentage, duration, or both joined by " · ")
+/// driven by the user's independent menu-bar toggles.
 struct StatusBarPercentageLabel: View {
-    let display: MenuBarPercentageDisplay
+    let text: String
+    let status: QuotaStatus
     var activeSession: ClaudeSession? = nil
 
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        let statusColor = theme.statusColor(for: display.status)
+        let statusColor = theme.statusColor(for: status)
 
         HStack(spacing: 3) {
             if let session = activeSession {
@@ -317,11 +348,11 @@ struct StatusBarPercentageLabel: View {
             }
 
             Image(nsImage: StatusBarPercentageImageRenderer.image(
-                text: display.text,
+                text: text,
                 color: statusColor
             ))
             .renderingMode(.original)
-            .accessibilityLabel(display.text)
+            .accessibilityLabel(text)
         }
     }
 

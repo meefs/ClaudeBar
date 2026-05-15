@@ -108,6 +108,42 @@ struct UsageQuotaTests {
         #expect(quota.resetTimestampDescription == nil)
     }
 
+    // MARK: - Compact Reset Time
+
+    @Test
+    func `compactResetTime shows days when over a day remains`() {
+        let resetDate = Date().addingTimeInterval(2.0 * 86400 + 5.0 * 3600 + 30)
+        let quota = UsageQuota(percentRemaining: 35, quotaType: .weekly, providerId: "claude", resetsAt: resetDate)
+        #expect(quota.compactResetTime == "2d")
+    }
+
+    @Test
+    func `compactResetTime shows hours when under a day`() {
+        let resetDate = Date().addingTimeInterval(3.0 * 3600 + 15.0 * 60 + 30)
+        let quota = UsageQuota(percentRemaining: 35, quotaType: .weekly, providerId: "claude", resetsAt: resetDate)
+        #expect(quota.compactResetTime == "3h")
+    }
+
+    @Test
+    func `compactResetTime shows minutes when under an hour`() {
+        let resetDate = Date().addingTimeInterval(45.0 * 60 + 30)
+        let quota = UsageQuota(percentRemaining: 35, quotaType: .weekly, providerId: "claude", resetsAt: resetDate)
+        #expect(quota.compactResetTime == "45m")
+    }
+
+    @Test
+    func `compactResetTime shows soon when under a minute`() {
+        let resetDate = Date().addingTimeInterval(30)
+        let quota = UsageQuota(percentRemaining: 35, quotaType: .weekly, providerId: "claude", resetsAt: resetDate)
+        #expect(quota.compactResetTime == "soon")
+    }
+
+    @Test
+    func `compactResetTime is nil without reset date`() {
+        let quota = UsageQuota(percentRemaining: 35, quotaType: .weekly, providerId: "claude")
+        #expect(quota.compactResetTime == nil)
+    }
+
     // MARK: - Quota Types
 
     @Test

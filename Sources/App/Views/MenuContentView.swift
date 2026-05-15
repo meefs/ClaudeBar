@@ -147,7 +147,7 @@ struct MenuContentView: View {
             Task {
                 await refresh(providerId: newProviderId)
             }
-            if settings.backgroundSyncEnabled && settings.menuBarPercentageEnabled {
+            if settings.backgroundSyncEnabled && (settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled) {
                 restartBackgroundSync()
             }
         }
@@ -170,8 +170,13 @@ struct MenuContentView: View {
                 restartBackgroundSync()
             }
         }
+        .onChange(of: settings.menuBarDurationEnabled) { _, _ in
+            if settings.backgroundSyncEnabled {
+                restartBackgroundSync()
+            }
+        }
         .onChange(of: settings.menuBarPercentageProviderId) { _, _ in
-            if settings.backgroundSyncEnabled && settings.menuBarPercentageEnabled {
+            if settings.backgroundSyncEnabled && (settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled) {
                 restartBackgroundSync()
             }
         }
@@ -191,7 +196,7 @@ struct MenuContentView: View {
     }
 
     private var backgroundSyncProviderIds: [String]? {
-        guard settings.menuBarPercentageEnabled else { return nil }
+        guard settings.menuBarPercentageEnabled || settings.menuBarDurationEnabled else { return nil }
         return [
             selectedProviderId,
             settings.menuBarPercentageProviderId,
