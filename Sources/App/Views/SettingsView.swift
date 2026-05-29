@@ -418,9 +418,47 @@ struct SettingsContentView: View {
                     }
                 }
             }
+
+            if menuBarQuotaOptions.count > 1 {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("SECONDARY QUOTA")
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                        .tracking(0.5)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            MenuBarChoiceButton(
+                                iconName: "minus.circle",
+                                label: "None",
+                                isSelected: settings.menuBarSecondaryQuotaKey.isEmpty
+                            ) {
+                                settings.menuBarSecondaryQuotaKey = ""
+                            }
+
+                            ForEach(secondaryMenuBarQuotaOptions, id: \.quotaType.quotaKey) { quota in
+                                MenuBarQuotaChoiceButton(
+                                    title: quota.quotaType.displayName,
+                                    isSelected: settings.menuBarSecondaryQuotaKey == quota.quotaType.quotaKey
+                                ) {
+                                    settings.menuBarSecondaryQuotaKey = quota.quotaType.quotaKey
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         .onAppear {
             normalizeMenuBarSelection()
+        }
+    }
+
+    /// Quota options offered for the optional secondary menu bar window,
+    /// excluding the one already chosen as primary.
+    private var secondaryMenuBarQuotaOptions: [UsageQuota] {
+        menuBarQuotaOptions.filter {
+            $0.quotaType.quotaKey != settings.menuBarPercentageQuotaKey
         }
     }
 

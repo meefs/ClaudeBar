@@ -107,6 +107,23 @@ struct JSONSettingsRepositoryAppTests {
     }
 
     @Test
+    func `menuBarSecondaryQuotaKey defaults to empty`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.menuBarSecondaryQuotaKey() == "")
+    }
+
+    @Test
+    func `setMenuBarSecondaryQuotaKey persists value`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        repo.setMenuBarSecondaryQuotaKey("weekly")
+        #expect(repo.menuBarSecondaryQuotaKey() == "weekly")
+    }
+
+    @Test
     func `menuBarDurationEnabled defaults to false`() {
         let (repo, dir) = makeRepository()
         defer { cleanup(dir) }
