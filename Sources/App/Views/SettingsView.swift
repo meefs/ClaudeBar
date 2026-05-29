@@ -375,6 +375,7 @@ struct SettingsContentView: View {
                             ) {
                                 settings.menuBarPercentageProviderId = provider.id
                                 selectFirstMenuBarQuotaIfNeeded(force: true)
+                                normalizeSecondaryMenuBarSelection()
                             }
                         }
                     }
@@ -412,6 +413,7 @@ struct SettingsContentView: View {
                                     isSelected: settings.menuBarPercentageQuotaKey == quota.quotaType.quotaKey
                                 ) {
                                     settings.menuBarPercentageQuotaKey = quota.quotaType.quotaKey
+                                    normalizeSecondaryMenuBarSelection()
                                 }
                             }
                         }
@@ -451,6 +453,7 @@ struct SettingsContentView: View {
         }
         .onAppear {
             normalizeMenuBarSelection()
+            normalizeSecondaryMenuBarSelection()
         }
     }
 
@@ -459,6 +462,16 @@ struct SettingsContentView: View {
     private var secondaryMenuBarQuotaOptions: [UsageQuota] {
         menuBarQuotaOptions.filter {
             $0.quotaType.quotaKey != settings.menuBarPercentageQuotaKey
+        }
+    }
+
+    /// Clears a stored secondary quota key that is no longer offered — e.g. after it
+    /// becomes equal to the primary, or the chosen provider's quotas no longer include it.
+    private func normalizeSecondaryMenuBarSelection() {
+        guard !settings.menuBarSecondaryQuotaKey.isEmpty else { return }
+        let validKeys = Set(secondaryMenuBarQuotaOptions.map(\.quotaType.quotaKey))
+        if !validKeys.contains(settings.menuBarSecondaryQuotaKey) {
+            settings.menuBarSecondaryQuotaKey = ""
         }
     }
 
