@@ -315,11 +315,11 @@ struct CopilotInternalAPIProbeTests {
             settingsRepository: settings
         )
 
+        let now = Date()
         let snapshot = try await probe.probe()
         let quota = try #require(snapshot.quotas.first)
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = TimeZone(identifier: "UTC")!
-        let now = Date()
         let comps = utc.dateComponents([.year, .month], from: now)
         let start = try #require(utc.date(from: comps))
         let expected = try #require(utc.date(byAdding: .month, value: 1, to: start))
