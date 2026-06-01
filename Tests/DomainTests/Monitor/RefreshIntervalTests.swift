@@ -4,6 +4,7 @@ import Foundation
 
 @Suite
 struct RefreshIntervalTests {
+    /// Each cadence exposes its poll interval in seconds, and `.off` has none.
     @Test
     func `seconds maps each option onto its poll interval`() {
         #expect(RefreshInterval.off.seconds == nil)
@@ -12,6 +13,7 @@ struct RefreshIntervalTests {
         #expect(RefreshInterval.fifteenMinutes.seconds == 900)
     }
 
+    /// Only `.off` disables background refresh; every timed option enables it.
     @Test
     func `isEnabled is false only for off`() {
         #expect(RefreshInterval.off.isEnabled == false)
@@ -20,6 +22,7 @@ struct RefreshIntervalTests {
         #expect(RefreshInterval.fifteenMinutes.isEnabled == true)
     }
 
+    /// Each option's picker label matches the exact copy shown in Settings.
     @Test
     func `label matches the picker copy`() {
         #expect(RefreshInterval.off.label == "Off")
@@ -28,12 +31,16 @@ struct RefreshIntervalTests {
         #expect(RefreshInterval.fifteenMinutes.label == "15 min")
     }
 
+    /// A disabled legacy `backgroundSyncEnabled` flag migrates to `.off`
+    /// regardless of the stored interval.
     @Test
     func `migrating returns off when background sync is disabled`() {
         #expect(RefreshInterval.migrating(enabled: false, storedSeconds: 60) == .off)
         #expect(RefreshInterval.migrating(enabled: false, storedSeconds: 900) == .off)
     }
 
+    /// An enabled legacy interval snaps to the nearest supported option, with
+    /// retired and below-floor values rounding up to the 1-minute floor.
     @Test
     func `migrating snaps a stored interval to the nearest supported option`() {
         // Retired 30s / 2m options and below-floor values snap up to 1 minute.
@@ -44,6 +51,7 @@ struct RefreshIntervalTests {
         #expect(RefreshInterval.migrating(enabled: true, storedSeconds: 900) == .fifteenMinutes)
     }
 
+    /// `allCases` is ordered exactly as the segmented picker renders the options.
     @Test
     func `allCases lists the options in picker order`() {
         #expect(RefreshInterval.allCases == [.off, .oneMinute, .fiveMinutes, .fifteenMinutes])
