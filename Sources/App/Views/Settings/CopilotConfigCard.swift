@@ -340,7 +340,7 @@ struct CopilotConfigCard: View {
                         settings.copilot.setCopilotMonthlyLimit(newValue)
                     }
 
-                    Text("Note: This is for AI credits (Copilot Chat with advanced models), not code completions")
+                    Text("Note: This is for AI credits, not code completions")
                         .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
                         .foregroundStyle(theme.textTertiary)
                 }
