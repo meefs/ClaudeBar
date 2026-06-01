@@ -9,6 +9,15 @@ struct CopilotUsageProbeTests {
 
     // MARK: - Test Helpers
 
+    private func makeHTTPResponse(statusCode: Int) -> HTTPURLResponse {
+        HTTPURLResponse(
+            url: URL(string: "https://api.github.com")!,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+    }
+
     private func makeSettingsRepository(
         username: String = "",
         hasToken: Bool = false,
@@ -315,7 +324,7 @@ struct CopilotUsageProbeTests {
         let snapshot = try await probe.probe()
 
         let quota = snapshot.quotas.first!
-        // Should use default 50 (Free/Pro tier premium requests)
+        // Should use default 50 (Free/Pro tier AI credits)
         #expect(quota.resetsAt != nil)
         #expect(quota.percentRemaining == 50.0)
         #expect(quota.resetText == "25/50 AI credits")
@@ -924,12 +933,7 @@ struct CopilotUsageProbeTests {
         }
         """.data(using: .utf8)!
 
-        let response = HTTPURLResponse(
-            url: URL(string: "https://api.github.com")!,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        )!
+        let response = makeHTTPResponse(statusCode: 200)
 
         given(mockNetwork).request(.any).willReturn((responseJSON, response))
 
