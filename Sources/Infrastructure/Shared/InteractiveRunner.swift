@@ -1,4 +1,5 @@
 import Darwin
+import Domain
 import Foundation
 
 /// Runs CLI commands in an interactive terminal session.
@@ -212,6 +213,10 @@ public struct InteractiveRunner: Sendable {
         process.standardOutput = terminalHandle
         process.standardError = terminalHandle
         process.environment = Self.terminalEnvironment(excluding: options.environmentExclusions)
+        // Inherit the ambient probe QoS: the background monitoring loop binds
+        // `.utility` so the spawned CLI tree runs on efficiency cores / throttled,
+        // cutting idle heat (issue #204). Interactive runs stay `.default`.
+        process.qualityOfService = ProbeExecutionContext.qualityOfService
 
         if let workingDirectory = options.workingDirectory {
             process.currentDirectoryURL = workingDirectory

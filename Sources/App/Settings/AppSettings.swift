@@ -116,7 +116,7 @@ public final class AppSettings {
     /// picker-friendly value. Computed over the legacy `backgroundSyncEnabled`
     /// + `backgroundSyncInterval` pair so `settings.json` stays backward
     /// compatible — "Off" maps to `backgroundSyncEnabled == false`, the others
-    /// to enabled + 60/300/900s. Setting it persists both underlying keys.
+    /// to enabled + 60/300/600/900s. Setting it persists both underlying keys.
     public var refreshInterval: RefreshInterval {
         get {
             RefreshInterval.migrating(

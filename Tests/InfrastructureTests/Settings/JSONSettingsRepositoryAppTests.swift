@@ -199,11 +199,12 @@ struct JSONSettingsRepositoryAppTests {
     }
 
     @Test
-    func `backgroundSyncInterval defaults to 60`() {
+    func `backgroundSyncInterval defaults to 600`() {
         let (repo, dir) = makeRepository()
         defer { cleanup(dir) }
 
-        #expect(repo.backgroundSyncInterval() == 60)
+        // Power-conscious 10-minute default for background refresh (issue #204).
+        #expect(repo.backgroundSyncInterval() == 600)
     }
 
     @Test

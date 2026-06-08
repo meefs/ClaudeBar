@@ -3,13 +3,15 @@ import Foundation
 /// The user-facing cadence for refreshing the menu-bar number in the background.
 ///
 /// "Off" means no background refresh — the bar updates only when the dropdown
-/// opens (today's behaviour). The other cases map onto a 60 / 300 / 900-second
-/// poll. There is intentionally no sub-minute option: 1 minute is a hard floor
-/// to keep energy use low (issue #67).
+/// opens (today's behaviour). The other cases map onto a 60 / 300 / 600 /
+/// 900-second poll. There is intentionally no sub-minute option: 1 minute is a
+/// hard floor to keep energy use low (issue #67). 10 minutes is the default
+/// (issue #204): frequent enough to stay glanceable, cheap enough to stay cool.
 public enum RefreshInterval: String, Sendable, Equatable, CaseIterable {
     case off
     case oneMinute
     case fiveMinutes
+    case tenMinutes
     case fifteenMinutes
 
     /// The poll interval in seconds, or `nil` when refresh is off.
@@ -18,6 +20,7 @@ public enum RefreshInterval: String, Sendable, Equatable, CaseIterable {
         case .off: nil
         case .oneMinute: 60
         case .fiveMinutes: 300
+        case .tenMinutes: 600
         case .fifteenMinutes: 900
         }
     }
@@ -31,6 +34,7 @@ public enum RefreshInterval: String, Sendable, Equatable, CaseIterable {
         case .off: "Off"
         case .oneMinute: "1 min"
         case .fiveMinutes: "5 min"
+        case .tenMinutes: "10 min"
         case .fifteenMinutes: "15 min"
         }
     }
@@ -43,7 +47,7 @@ public enum RefreshInterval: String, Sendable, Equatable, CaseIterable {
     /// migrate cleanly: 30 → 1 min, 120 → 1 min, 300 → 5 min.
     public static func migrating(enabled: Bool, storedSeconds: TimeInterval) -> RefreshInterval {
         guard enabled else { return .off }
-        let options: [RefreshInterval] = [.oneMinute, .fiveMinutes, .fifteenMinutes]
+        let options: [RefreshInterval] = [.oneMinute, .fiveMinutes, .tenMinutes, .fifteenMinutes]
         return options.min { lhs, rhs in
             abs(Double(lhs.seconds ?? 0) - storedSeconds) < abs(Double(rhs.seconds ?? 0) - storedSeconds)
         } ?? .oneMinute
