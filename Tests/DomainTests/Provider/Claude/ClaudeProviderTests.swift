@@ -249,6 +249,34 @@ struct ClaudeProviderTests {
             Issue.record("Expected ProbeError, got \(error)")
         }
     }
+
+    // MARK: - Background Refresh Floor (issue #204)
+
+    @Test
+    func `background refresh floor is 15 minutes in API mode`() {
+        let settings = FakeClaudeSettings(probeMode: .api)
+        let claude = ClaudeProvider(
+            cliProbe: MockUsageProbe(),
+            apiProbe: MockUsageProbe(),
+            settingsRepository: settings
+        )
+
+        // API mode floors the background cadence to the API snapshot-cache TTL.
+        #expect(claude.backgroundRefreshFloor == .seconds(900))
+    }
+
+    @Test
+    func `background refresh floor is nil in CLI mode`() {
+        let settings = FakeClaudeSettings(probeMode: .cli)
+        let claude = ClaudeProvider(
+            cliProbe: MockUsageProbe(),
+            apiProbe: MockUsageProbe(),
+            settingsRepository: settings
+        )
+
+        // CLI mode imposes no floor — it keeps the user's chosen interval.
+        #expect(claude.backgroundRefreshFloor == nil)
+    }
 }
 
 // MARK: - Test Helpers

@@ -30,6 +30,11 @@ public final class QuotaMonitor {
     /// Clock for scheduling intervals (injectable for tests)
     private let clock: any Clock
 
+    /// Optional power-state source for energy-aware monitoring. `nil` disables
+    /// energy-awareness entirely (the plain timed loop), which is the default for
+    /// tests; the app injects a real provider via the convenience init.
+    private let powerStateProvider: (any PowerStateProvider)?
+
     /// Previous status for change detection
     private var previousStatuses: [String: QuotaStatus] = [:]
 
@@ -49,11 +54,13 @@ public final class QuotaMonitor {
     public init(
         providers: any AIProviderRepository,
         alerter: (any QuotaAlerter)? = nil,
-        clock: any Clock
+        clock: any Clock,
+        powerStateProvider: (any PowerStateProvider)? = nil
     ) {
         self.providers = providers
         self.alerter = alerter
         self.clock = clock
+        self.powerStateProvider = powerStateProvider
         selectFirstEnabledIfNeeded()
     }
 
@@ -72,14 +79,16 @@ public final class QuotaMonitor {
         }
     }
 
-    /// Refreshes a single provider
-    private func refreshProvider(_ provider: any AIProvider) async {
+    /// Refreshes a single provider.
+    /// `kind` defaults to `.interactive`; the background monitoring loop passes
+    /// `.background` so providers can skip non-glanceable work (issue #204).
+    private func refreshProvider(_ provider: any AIProvider, kind: RefreshKind = .interactive) async {
         guard await provider.isAvailable() else {
             return
         }
 
         do {
-            let snapshot = try await provider.refresh()
+            let snapshot = try await provider.refresh(kind)
             await handleSnapshotUpdate(provider: provider, snapshot: snapshot)
         } catch {
             // Provider stores error in lastError - no need for external observer
@@ -104,15 +113,15 @@ public final class QuotaMonitor {
     }
 
     /// Refreshes a single provider by its ID.
-    public func refresh(providerId: String) async {
+    public func refresh(providerId: String, kind: RefreshKind = .interactive) async {
         guard let provider = providers.provider(id: providerId) else {
             return
         }
-        await refreshProvider(provider)
+        await refreshProvider(provider, kind: kind)
     }
 
     /// Refreshes the given providers once, preserving order and removing duplicates.
-    public func refresh(providerIds: [String]) async {
+    public func refresh(providerIds: [String], kind: RefreshKind = .interactive) async {
         var seen = Set<String>()
         let uniqueProviderIds = providerIds.filter { providerId in
             seen.insert(providerId).inserted
@@ -121,7 +130,7 @@ public final class QuotaMonitor {
         await withTaskGroup(of: Void.self) { group in
             for providerId in uniqueProviderIds {
                 group.addTask {
-                    await self.refresh(providerId: providerId)
+                    await self.refresh(providerId: providerId, kind: kind)
                 }
             }
         }
@@ -352,22 +361,52 @@ public final class QuotaMonitor {
     /// never poll faster than once a minute (energy — issue #67).
     public static let minimumInterval: Duration = .seconds(60)
 
+    /// How much to stretch the background cadence while on battery, to reduce
+    /// drain when unplugged (issue #204). Applied on top of the effective
+    /// interval each tick, so plugging back in restores the normal cadence.
+    public static let batteryIntervalMultiplier: Int = 2
+
     /// Clamps a requested interval to the 1-minute floor. Exposed so the floor
     /// can be unit-tested directly and so every caller funnels through one rule.
     public static func clampedInterval(_ interval: Duration) -> Duration {
         max(interval, minimumInterval)
     }
 
+    /// The actual sleep interval for one background monitoring tick: the
+    /// requested interval clamped to the 1-minute floor, then raised to the
+    /// slowest provider-imposed `backgroundRefreshFloor` in the active set.
+    ///
+    /// The slowest floor wins for a multi-provider set (e.g. Claude in API mode
+    /// floors the loop at 15 min — issue #204), which is acceptable for a
+    /// background glance. Pure and static so it can be unit-tested directly.
+    public static func effectiveInterval(requested: Duration, floors: [Duration]) -> Duration {
+        max(clampedInterval(requested), floors.max() ?? .zero)
+    }
+
     /// Refreshes only the currently selected provider.
-    public func refreshSelected() async {
-        await refresh(providerId: selectedProviderId)
+    public func refreshSelected(kind: RefreshKind = .interactive) async {
+        await refresh(providerId: selectedProviderId, kind: kind)
+    }
+
+    /// The `backgroundRefreshFloor`s declared by the providers refreshed each
+    /// cycle — the supplied set, or the currently selected provider when none is
+    /// given (mirroring how `startMonitoring` chooses what to refresh).
+    ///
+    /// Resolved fresh each tick so a live probe-mode switch (CLI↔API) is honored
+    /// without restarting the loop: the menu-bar refresh key doesn't observe
+    /// `probeMode`, so the cadence would otherwise stay stale (issue #204).
+    private func backgroundRefreshFloors(for providerIds: [String]?) -> [Duration] {
+        let ids = providerIds ?? [selectedProviderId]
+        return ids.compactMap { providers.provider(id: $0)?.backgroundRefreshFloor }
     }
 
     /// Starts continuous monitoring at the specified interval.
     /// By default, refreshes the currently selected provider each cycle to minimize energy usage.
     /// When provider IDs are supplied, refreshes that de-duplicated provider set each cycle.
-    /// The interval is clamped to a 1-minute floor regardless of the value passed.
-    /// Returns an AsyncStream of monitoring events.
+    /// The effective cadence is the requested interval clamped to a 1-minute
+    /// floor, then raised to the slowest provider-imposed `backgroundRefreshFloor`
+    /// in the active set (recomputed each tick so a live probe-mode switch is
+    /// honored without restarting). Returns an AsyncStream of monitoring events.
     public func startMonitoring(
         interval: Duration = .seconds(60),
         providerIds: [String]? = nil
@@ -377,22 +416,57 @@ public final class QuotaMonitor {
 
         isMonitoring = true
 
-        // Enforce the 1-minute floor here too, so no caller or persisted value
-        // can drive a faster poll regardless of how startMonitoring is reached.
-        let effectiveInterval = Self.clampedInterval(interval)
-
         return AsyncStream { continuation in
             let task = Task {
+                // Iterator over power transitions; nil when energy-awareness is
+                // disabled (no power provider), so the loop below behaves exactly
+                // like the plain timed loop in that case.
+                var powerEvents = self.powerStateProvider?.events().makeAsyncIterator()
+
                 while !Task.isCancelled {
-                    if let providerIds {
-                        await self.refresh(providerIds: providerIds)
-                    } else {
-                        await self.refreshSelected()
+                    // Energy awareness: while the display/system is asleep, pause
+                    // — no refresh and no probe subprocess spawn — and wait for
+                    // the next wake event so we can refresh immediately when the
+                    // user returns (issue #204). A nil power provider skips this
+                    // entirely. `AsyncStream.next()` resumes with nil on task
+                    // cancellation, so `stopMonitoring()` unparks the loop.
+                    while let power = self.powerStateProvider,
+                          power.isDisplayAsleep,
+                          !Task.isCancelled {
+                        guard await powerEvents?.next() != nil else { break }
+                        // Re-check `isDisplayAsleep`: a `.didWake` clears it and
+                        // we fall through to an immediate refresh.
+                    }
+                    if Task.isCancelled { break }
+
+                    // The continuous loop is the background poll: refresh with
+                    // `.background` so providers skip non-glanceable work, and
+                    // bind a low (`.utility`) QoS so any CLI subprocess spawned
+                    // during the refresh runs on efficiency cores / throttled —
+                    // both keep idle energy use low (issue #204).
+                    await ProbeExecutionContext.$qualityOfService.withValue(.utility) {
+                        if let providerIds {
+                            await self.refresh(providerIds: providerIds, kind: .background)
+                        } else {
+                            await self.refreshSelected(kind: .background)
+                        }
                     }
                     continuation.yield(.refreshed)
 
+                    // Compute the sleep each tick: the requested interval clamped
+                    // to the 1-minute floor, then raised to any provider-imposed
+                    // background floor (e.g. Claude API → 15 min). Resolved per
+                    // tick so a live CLI↔API switch is honored without restarting.
+                    let floors = self.backgroundRefreshFloors(for: providerIds)
+                    var sleepInterval = Self.effectiveInterval(requested: interval, floors: floors)
+
+                    // Stretch the cadence while on battery to reduce drain (#204).
+                    if self.powerStateProvider?.isOnBattery == true {
+                        sleepInterval = sleepInterval * Self.batteryIntervalMultiplier
+                    }
+
                     do {
-                        try await clock.sleep(for: effectiveInterval)
+                        try await clock.sleep(for: sleepInterval)
                     } catch {
                         break
                     }

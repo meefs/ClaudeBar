@@ -122,7 +122,9 @@ public final class JSONSettingsRepository:
     }
 
     public func backgroundSyncInterval() -> TimeInterval {
-        store.read(key: "app.backgroundSyncInterval") ?? 60
+        // Default 10 min (issue #204): a power-conscious cadence for the
+        // background menu-bar refresh when no interval has been persisted yet.
+        store.read(key: "app.backgroundSyncInterval") ?? 600
     }
 
     public func setBackgroundSyncInterval(_ interval: TimeInterval) {

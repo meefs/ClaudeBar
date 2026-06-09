@@ -62,6 +62,18 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
         }
     }
 
+    /// Background poll cadence floor. In API mode, background refreshes are
+    /// floored at 15 min to match `ClaudeAPIUsageProbe`'s snapshot-cache TTL:
+    /// polling faster only re-serves the cache (or, once expired, risks 429s),
+    /// so there's no benefit to a tighter background cadence (issue #204). CLI
+    /// mode keeps the user's chosen interval (no floor).
+    public var backgroundRefreshFloor: Duration? {
+        switch probeMode {
+        case .api: return .seconds(900)
+        case .cli: return nil
+        }
+    }
+
     // MARK: - Internal
 
     /// The CLI probe for fetching usage data via `claude /usage`
@@ -156,16 +168,30 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
     }
 
     /// Refreshes the usage data and updates the snapshot.
-    /// Uses the active probe based on current probe mode.
-    /// Sets isSyncing during refresh and captures any errors.
+    /// Interactive refresh: delegates to the kind-aware implementation.
     @discardableResult
     public func refresh() async throws -> UsageSnapshot {
+        try await refresh(.interactive)
+    }
+
+    /// Refreshes the usage data and updates the snapshot.
+    /// Uses the active probe based on current probe mode.
+    /// Sets isSyncing during refresh and captures any errors.
+    ///
+    /// The probe and fallback behaviour are identical for both kinds — CLI stays
+    /// CLI, the rate-limit short-circuit still holds. The only difference is that
+    /// a `.background` refresh skips the daily-usage JSONL scan
+    /// (`attachDailyReport`), which the menu-bar label never shows; that scan
+    /// runs only when the dropdown is open, which always refreshes interactively
+    /// (issue #204).
+    @discardableResult
+    public func refresh(_ kind: RefreshKind) async throws -> UsageSnapshot {
         isSyncing = true
         defer { isSyncing = false }
 
         do {
             let newSnapshot = try await primaryProbe().probe()
-            snapshot = await attachDailyReport(to: newSnapshot)
+            snapshot = await report(for: newSnapshot, kind: kind)
             lastError = nil
             return snapshot!
         } catch let primaryError {
@@ -173,7 +199,7 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
                let fallback = await fallbackProbe() {
                 do {
                     let newSnapshot = try await fallback.probe()
-                    snapshot = await attachDailyReport(to: newSnapshot)
+                    snapshot = await report(for: newSnapshot, kind: kind)
                     lastError = nil
                     return snapshot!
                 } catch {
@@ -201,6 +227,19 @@ public final class ClaudeProvider: AIProvider, @unchecked Sendable {
     private static func shouldAttemptFallback(after error: Error) -> Bool {
         if case ProbeError.rateLimited = error { return false }
         return true
+    }
+
+    /// Attaches the daily-usage report for interactive refreshes only.
+    /// Background refreshes (the menu-bar poll) skip the JSONL scan to stay cheap
+    /// — the menu-bar label never renders the daily report, and the dropdown that
+    /// does always refreshes interactively (issue #204).
+    private func report(for snapshot: UsageSnapshot, kind: RefreshKind) async -> UsageSnapshot {
+        switch kind {
+        case .interactive:
+            return await attachDailyReport(to: snapshot)
+        case .background:
+            return snapshot
+        }
     }
 
     /// Attaches daily usage report to snapshot if analyzer is available.

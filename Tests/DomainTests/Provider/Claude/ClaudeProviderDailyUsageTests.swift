@@ -94,4 +94,61 @@ struct ClaudeProviderDailyUsageTests {
 
         #expect(snapshot.dailyUsageReport == nil)
     }
+
+    // MARK: - Background refresh skips the daily scan (issue #204)
+
+    /// A daily-usage analyzer that records how many times it ran, so a test can
+    /// assert the expensive JSONL scan was *skipped* (state), not just that its
+    /// result wasn't attached.
+    private final class CountingDailyUsageAnalyzer: DailyUsageAnalyzing, @unchecked Sendable {
+        private let lock = NSLock()
+        private var _calls = 0
+        private let report: DailyUsageReport
+
+        init(report: DailyUsageReport) { self.report = report }
+
+        var calls: Int { lock.withLock { _calls } }
+
+        func analyzeToday() async throws -> DailyUsageReport {
+            lock.withLock { _calls += 1 }
+            return report
+        }
+    }
+
+    private func makeTodayReport() -> DailyUsageReport {
+        DailyUsageReport(
+            today: DailyUsageStat(date: Date(), totalCost: 14.26, totalTokens: 19_498_439, workingTime: 3600, sessionCount: 3),
+            previous: DailyUsageStat.empty(for: Date().addingTimeInterval(-86400))
+        )
+    }
+
+    @Test
+    func `background refresh skips the daily usage scan entirely`() async throws {
+        let settings = makeSettingsRepository()
+        let mockProbe = MockUsageProbe()
+        given(mockProbe).probe().willReturn(makeSnapshot())
+        let analyzer = CountingDailyUsageAnalyzer(report: makeTodayReport())
+
+        let claude = ClaudeProvider(probe: mockProbe, settingsRepository: settings, dailyUsageAnalyzer: analyzer)
+        let snapshot = try await claude.refresh(.background)
+
+        // The menu-bar label never shows the daily report, so the background poll
+        // must avoid the JSONL scan altogether — the power win in #204.
+        #expect(analyzer.calls == 0)
+        #expect(snapshot.dailyUsageReport == nil)
+    }
+
+    @Test
+    func `interactive refresh runs the daily usage scan and attaches the report`() async throws {
+        let settings = makeSettingsRepository()
+        let mockProbe = MockUsageProbe()
+        given(mockProbe).probe().willReturn(makeSnapshot())
+        let analyzer = CountingDailyUsageAnalyzer(report: makeTodayReport())
+
+        let claude = ClaudeProvider(probe: mockProbe, settingsRepository: settings, dailyUsageAnalyzer: analyzer)
+        let snapshot = try await claude.refresh(.interactive)
+
+        #expect(analyzer.calls == 1)
+        #expect(snapshot.dailyUsageReport != nil)
+    }
 }

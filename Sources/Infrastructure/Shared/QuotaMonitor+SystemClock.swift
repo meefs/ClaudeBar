@@ -3,8 +3,14 @@ import Domain
 public extension QuotaMonitor {
     convenience init(
         providers: any AIProviderRepository,
-        alerter: (any QuotaAlerter)? = nil
+        alerter: (any QuotaAlerter)? = nil,
+        powerStateProvider: (any PowerStateProvider)? = SystemPowerStateProvider()
     ) {
-        self.init(providers: providers, alerter: alerter, clock: SystemClock())
+        self.init(
+            providers: providers,
+            alerter: alerter,
+            clock: SystemClock(),
+            powerStateProvider: powerStateProvider
+        )
     }
 }

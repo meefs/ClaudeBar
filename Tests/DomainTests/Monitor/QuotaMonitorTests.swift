@@ -789,6 +789,172 @@ struct QuotaMonitorTests {
         #expect(QuotaMonitor.clampedInterval(.seconds(900)) == .seconds(900))
     }
 
+    /// The background cadence is the requested interval clamped to the 1-minute
+    /// floor, then raised to the slowest provider-imposed floor in the active set
+    /// (Claude API → 15 min — issue #204).
+    @Test
+    func `effectiveInterval clamps then raises to the slowest provider floor`() {
+        // No provider floor → clamped requested.
+        #expect(QuotaMonitor.effectiveInterval(requested: .seconds(600), floors: []) == .seconds(600))
+        #expect(QuotaMonitor.effectiveInterval(requested: .seconds(5), floors: []) == .seconds(60))
+        // A floor below the requested cadence leaves it unchanged.
+        #expect(QuotaMonitor.effectiveInterval(requested: .seconds(600), floors: [.seconds(60)]) == .seconds(600))
+        // The Claude API floor lifts even the 1-minute option to 15 minutes.
+        #expect(QuotaMonitor.effectiveInterval(requested: .seconds(60), floors: [.seconds(900)]) == .seconds(900))
+        #expect(QuotaMonitor.effectiveInterval(requested: .seconds(600), floors: [.seconds(900)]) == .seconds(900))
+        // The slowest floor wins for a mixed set.
+        #expect(QuotaMonitor.effectiveInterval(requested: .seconds(60), floors: [.seconds(300), .seconds(900)]) == .seconds(900))
+    }
+
+    // MARK: - Energy Awareness (issue #204)
+
+    /// A controllable `PowerStateProvider` fake. `waitUntilParked()` lets a test
+    /// deterministically know the monitoring loop has reached the asleep gate
+    /// (and is about to park on the event stream), so a "no refresh while asleep"
+    /// assertion is race-free.
+    private final class FakePowerStateProvider: PowerStateProvider, @unchecked Sendable {
+        private let lock = NSLock()
+        private var asleep: Bool
+        private var battery: Bool
+        private var continuation: AsyncStream<PowerEvent>.Continuation?
+        private var asleepChecks = 0
+        private var awaitingCheck: CheckedContinuation<Void, Never>?
+
+        init(asleep: Bool = false, onBattery: Bool = false) {
+            self.asleep = asleep
+            self.battery = onBattery
+        }
+
+        var isDisplayAsleep: Bool {
+            lock.lock()
+            let value = asleep
+            var signal: CheckedContinuation<Void, Never>?
+            if value {
+                asleepChecks += 1
+                signal = awaitingCheck
+                awaitingCheck = nil
+            }
+            lock.unlock()
+            signal?.resume()
+            return value
+        }
+
+        var isOnBattery: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return battery
+        }
+
+        func events() -> AsyncStream<PowerEvent> {
+            AsyncStream { continuation in
+                self.lock.lock()
+                self.continuation = continuation
+                self.lock.unlock()
+            }
+        }
+
+        /// Resumes once the loop has read `isDisplayAsleep` while asleep.
+        func waitUntilParked() async {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                lock.lock()
+                if asleepChecks > 0 {
+                    lock.unlock()
+                    cont.resume()
+                } else {
+                    awaitingCheck = cont
+                    lock.unlock()
+                }
+            }
+        }
+
+        func wake() {
+            lock.lock()
+            asleep = false
+            let cont = continuation
+            lock.unlock()
+            cont?.yield(.didWake)
+        }
+    }
+
+    /// A clock that records each requested sleep duration, then ends the loop by
+    /// throwing — so a single monitoring tick runs deterministically and the
+    /// recorded cadence can be asserted.
+    private final class RecordingClock: Clock, @unchecked Sendable {
+        private let lock = NSLock()
+        private var _durations: [Duration] = []
+
+        var durations: [Duration] { lock.withLock { _durations } }
+
+        func sleep(for duration: Duration) async throws {
+            lock.withLock { _durations.append(duration) }
+            throw CancellationError()
+        }
+
+        func sleep(nanoseconds: UInt64) async throws {
+            try await sleep(for: .nanoseconds(Int64(nanoseconds)))
+        }
+    }
+
+    @Test
+    func `background loop pauses while display asleep and refreshes on wake`() async {
+        let settings = makeSettingsRepository()
+        let probe = CountingUsageProbe(providerId: "claude")
+        let provider = ClaudeProvider(probe: probe, settingsRepository: settings)
+        let power = FakePowerStateProvider(asleep: true)
+        let monitor = QuotaMonitor(
+            providers: AIProviders(providers: [provider]),
+            clock: RecordingClock(),
+            powerStateProvider: power
+        )
+
+        let stream = monitor.startMonitoring(interval: .seconds(60))
+
+        // The loop reaches the asleep gate and parks — no refresh while asleep.
+        await power.waitUntilParked()
+        #expect(await probe.counter.count() == 0)
+
+        // Waking lets exactly one refresh through, then the clock ends the loop.
+        power.wake()
+        for await _ in stream {}
+        #expect(await probe.counter.count() == 1)
+    }
+
+    @Test
+    func `background loop doubles the cadence while on battery`() async {
+        let settings = makeSettingsRepository()
+        let provider = ClaudeProvider(probe: CountingUsageProbe(providerId: "claude"), settingsRepository: settings)
+        let power = FakePowerStateProvider(asleep: false, onBattery: true)
+        let clock = RecordingClock()
+        let monitor = QuotaMonitor(
+            providers: AIProviders(providers: [provider]),
+            clock: clock,
+            powerStateProvider: power
+        )
+
+        let stream = monitor.startMonitoring(interval: .seconds(600))
+        for await _ in stream {}
+
+        // 600s → 1200s on battery (×2); CLI mode adds no provider floor.
+        #expect(clock.durations == [.seconds(1200)])
+    }
+
+    @Test
+    func `background loop keeps the normal cadence on AC power`() async {
+        let settings = makeSettingsRepository()
+        let provider = ClaudeProvider(probe: CountingUsageProbe(providerId: "claude"), settingsRepository: settings)
+        let power = FakePowerStateProvider(asleep: false, onBattery: false)
+        let clock = RecordingClock()
+        let monitor = QuotaMonitor(
+            providers: AIProviders(providers: [provider]),
+            clock: clock,
+            powerStateProvider: power
+        )
+
+        let stream = monitor.startMonitoring(interval: .seconds(600))
+        for await _ in stream {}
+
+        #expect(clock.durations == [.seconds(600)])
+    }
+
     // MARK: - Provider Collections
 
     @Test

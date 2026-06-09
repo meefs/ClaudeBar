@@ -118,6 +118,17 @@ struct ClaudeConfigCard: View {
                 .pickerStyle(.segmented)
                 .onChange(of: claudeProbeMode) { _, newValue in
                     settings.claude.setClaudeProbeMode(newValue)
+                    // In API mode ClaudeBar caches usage data for 15 min to stay
+                    // under Anthropic's API rate limits, so a faster background
+                    // cadence is wasted (calls just return the cache). Snap an
+                    // enabled sub-15-min interval up to 15 min (issue #204); leave
+                    // "Off" alone so switching mode never turns on sync the user
+                    // disabled.
+                    if newValue == .api,
+                       let seconds = settings.refreshInterval.seconds,
+                       seconds < 900 {
+                        settings.refreshInterval = .fifteenMinutes
+                    }
                     Task {
                         await monitor.refresh(providerId: "claude")
                     }
@@ -163,6 +174,17 @@ struct ClaudeConfigCard: View {
             if claudeProbeMode == .api {
                 let credentialLoader = ClaudeCredentialLoader()
                 let hasCredentials = credentialLoader.loadCredentials() != nil
+
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 10))
+                        .foregroundStyle(theme.textTertiary)
+                        .frame(width: 16)
+
+                    Text("Usage data is cached for 15 min to stay under Anthropic's API rate limits, so background refresh is capped at 15 min in this mode.")
+                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textTertiary)
+                }
 
                 HStack(spacing: 6) {
                     Image(systemName: hasCredentials ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
