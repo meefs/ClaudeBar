@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.4.68] - 2026-06-10
+
 ### Fixed
 - Daily Usage cost & token cards no longer overcount. Claude Code writes the same usage
   multiple times (streamed content blocks, parallel tool calls, resumed/branched sessions);
@@ -778,7 +782,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Menu bar interface with quota display
 - Automatic refresh every 5 minutes
 
-[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.67...HEAD
+[Unreleased]: https://github.com/tddworks/ClaudeBar/compare/v0.4.68...HEAD
+[0.4.68]: https://github.com/tddworks/ClaudeBar/compare/v0.4.67...v0.4.68
 [0.4.67]: https://github.com/tddworks/ClaudeBar/compare/v0.4.66...v0.4.67
 [0.4.66]: https://github.com/tddworks/ClaudeBar/compare/v0.4.65...v0.4.66
 [0.4.65]: https://github.com/tddworks/ClaudeBar/compare/v0.4.64...v0.4.65
