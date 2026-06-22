@@ -149,6 +149,14 @@ struct ClaudeBarApp: App {
 
         // Start hook server if hooks are enabled
         if settingsRepository.isHookEnabled() {
+            // Reconcile installed hooks so newly-added events (e.g.
+            // UserPromptSubmit, which revives a stopped session) register for
+            // existing users without re-toggling the setting. install() is
+            // idempotent — it replaces only ClaudeBar's own matcher entries
+            // per event and preserves hooks from other tools.
+            if HookInstaller.isInstalled() {
+                try? HookInstaller.install()
+            }
             startHookServer()
         }
 

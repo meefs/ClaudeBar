@@ -111,21 +111,37 @@ final class StatusItemLabelDriver {
     }
 
     private func currentLabelContent() -> LabelContent {
-        LabelContent(
-            label: monitor.menuBarLabel(
-                providerId: settings.menuBarPercentageProviderId,
-                primaryQuotaKey: settings.menuBarPercentageQuotaKey,
-                secondaryQuotaKey: settings.menuBarSecondaryQuotaKey,
-                showPercentage: settings.menuBarPercentageEnabled,
-                showDuration: settings.menuBarDurationEnabled,
-                mode: settings.usageDisplayMode,
-                burnRateWarningEnabled: settings.burnRateWarningEnabled,
-                burnRateThreshold: settings.burnRateThreshold
-            ),
+        let freshLabel = monitor.menuBarLabel(
+            providerId: settings.menuBarPercentageProviderId,
+            primaryQuotaKey: settings.menuBarPercentageQuotaKey,
+            secondaryQuotaKey: settings.menuBarSecondaryQuotaKey,
+            showPercentage: settings.menuBarPercentageEnabled,
+            showDuration: settings.menuBarDurationEnabled,
+            mode: settings.usageDisplayMode,
+            burnRateWarningEnabled: settings.burnRateWarningEnabled,
+            burnRateThreshold: settings.burnRateThreshold
+        )
+
+        return LabelContent(
+            label: freshLabel ?? lastKnownLabel(whenFreshIsMissing: freshLabel),
             fallbackStatus: effectiveSelectedProviderStatus,
             sessionPhase: sessionMonitor.activeSession?.phase,
             themeModeId: settings.themeMode
         )
+    }
+
+    /// Bridges a momentarily-missing menu-bar label. The configured quota window
+    /// can briefly vanish from a snapshot (cold start before the first success, a
+    /// parse gap), which would otherwise collapse the menu bar to a lone icon. As
+    /// long as the menu-bar provider is enabled and still holds a snapshot, keep
+    /// the last value we showed instead of blanking the number. Returns nil when
+    /// we have nothing to fall back to, so the normal "no data yet" icon shows.
+    private func lastKnownLabel(whenFreshIsMissing freshLabel: MenuBarLabel?) -> MenuBarLabel? {
+        guard freshLabel == nil, let previous = lastContent?.label else { return nil }
+        let providerHasSnapshot = monitor.enabledProviders.contains {
+            $0.id == settings.menuBarPercentageProviderId && $0.snapshot != nil
+        }
+        return providerHasSnapshot ? previous : nil
     }
 
     /// Status of the selected provider, considering the burn-rate setting.
@@ -167,7 +183,11 @@ final class StatusItemLabelDriver {
     static func compose(_ content: LabelContent, theme: any AppThemeProvider) -> NSImage {
         var parts: [NSImage] = []
 
-        if let phase = content.sessionPhase {
+        // Only surface the session glyph while Claude is actively working. A
+        // finished/idle (.stopped) or .ended session must not leave a lone
+        // orange glyph sitting in the menu bar — that reads as a frozen crash
+        // (the user's report) since `Stop` fires at the end of every turn.
+        if let phase = content.sessionPhase, phase == .active || phase == .subagentsWorking {
             parts.append(symbolImage("terminal.fill", color: NSColor(phase.color)))
         }
 
@@ -290,9 +310,14 @@ final class StatusItemLabelDriver {
             providerIds: key.providerIds
         )
         streamConsumer = Task {
-            // QuotaMonitor updates provider snapshots; the label sync re-renders
-            // from observable state — nothing to do per event.
-            for await _ in stream {}
+            // Each refresh tick imperatively forces a repaint. We can't rely on
+            // the @Observable chain alone: after long idle it can stop delivering
+            // invalidations (issue #192), freezing the menu-bar image even while
+            // probes keep succeeding. renderNow() dedupes inside render(), so this
+            // is cheap and only repaints when the composed image actually changed.
+            for await _ in stream {
+                self.labelSync?.renderNow()
+            }
         }
     }
 }

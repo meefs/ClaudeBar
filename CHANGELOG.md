@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   went dead until relaunch). The menu-bar pixels and the background-refresh lifecycle are
   now driven imperatively (AppKit `NSStatusItem` via MenuBarExtraAccess + observation
   tracking), independent of SwiftUI view invalidation. (#192)
+- Menu-bar status item no longer sticks on a lone colored session glyph with no usage
+  number after long idle. Even with the imperative driver, the label only repainted when
+  SwiftUI observation fired, which can go quiet after idle while probes keep succeeding.
+  The status item is now repainted on every background-refresh tick, the Claude Code
+  session glyph is shown only while a session is actively working (not on the end-of-turn
+  "stopped" state, which previously stuck forever), and the last-known number is kept when
+  a quota window is briefly unavailable. Claude Code sessions also recover from "stopped"
+  on the next prompt via a new `UserPromptSubmit` hook so the indicator tracks real activity.
 
 ---
 

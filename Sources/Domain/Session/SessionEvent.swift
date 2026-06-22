@@ -48,5 +48,9 @@ public struct SessionEvent: Sendable, Equatable, Codable {
         case subagentStart = "SubagentStart"
         case subagentStop = "SubagentStop"
         case stop = "Stop"
+        /// Fires at the start of every turn (before Claude processes the prompt).
+        /// Used to revive a session out of `.stopped` so the indicator tracks
+        /// real activity instead of sticking on the end-of-turn `Stop`.
+        case userPromptSubmit = "UserPromptSubmit"
     }
 }

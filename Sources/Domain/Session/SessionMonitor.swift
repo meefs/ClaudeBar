@@ -37,6 +37,8 @@ public final class SessionMonitor {
             handleSubagentStop(event)
         case .stop:
             handleStop(event)
+        case .userPromptSubmit:
+            handleUserPromptSubmit(event)
         }
     }
 
@@ -84,6 +86,11 @@ public final class SessionMonitor {
     private func handleStop(_ event: SessionEvent) {
         guard activeSession?.id == event.sessionId else { return }
         activeSession?.stop()
+    }
+
+    private func handleUserPromptSubmit(_ event: SessionEvent) {
+        guard activeSession?.id == event.sessionId else { return }
+        activeSession?.resume()
     }
 
     private func endCurrentSession(at date: Date) {

@@ -146,14 +146,46 @@ struct ClaudeSessionTests {
     // MARK: - Phase Guards
 
     @Test
-    func `subagentStarted is ignored after stopped`() {
+    func `subagentStarted revives a stopped session`() {
         var session = ClaudeSession(id: "test", cwd: "/tmp")
         session.stop()
 
         session.subagentStarted()
 
-        #expect(session.phase == .stopped)
+        #expect(session.phase == .subagentsWorking)
+        #expect(session.activeSubagentCount == 1)
+    }
+
+    @Test
+    func `resume returns a stopped session to active`() {
+        var session = ClaudeSession(id: "test", cwd: "/tmp")
+        session.stop()
+
+        session.resume()
+
+        #expect(session.phase == .active)
         #expect(session.activeSubagentCount == 0)
+    }
+
+    @Test
+    func `resume keeps subagentsWorking when subagents are active`() {
+        var session = ClaudeSession(id: "test", cwd: "/tmp")
+        session.subagentStarted()
+
+        session.resume()
+
+        #expect(session.phase == .subagentsWorking)
+        #expect(session.activeSubagentCount == 1)
+    }
+
+    @Test
+    func `resume is ignored after ended`() {
+        var session = ClaudeSession(id: "test", cwd: "/tmp")
+        session.end()
+
+        session.resume()
+
+        #expect(session.phase == .ended)
     }
 
     @Test

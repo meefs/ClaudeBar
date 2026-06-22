@@ -44,17 +44,27 @@ public struct ClaudeSession: Sendable, Equatable, Identifiable {
 
     // MARK: - Mutations
 
-    /// Records a subagent starting work
+    /// Records a subagent starting work. Subagent activity also revives a
+    /// `.stopped` session: a new turn is clearly underway, so the indicator
+    /// should reflect work rather than staying stuck on the previous turn's stop.
     public mutating func subagentStarted() {
-        guard phase != .stopped, phase != .ended else { return }
+        guard phase != .ended else { return }
         activeSubagentCount += 1
         updatePhase()
     }
 
     /// Records a subagent stopping work
     public mutating func subagentStopped() {
-        guard phase != .stopped, phase != .ended else { return }
+        guard phase != .ended else { return }
         activeSubagentCount = max(0, activeSubagentCount - 1)
+        updatePhase()
+    }
+
+    /// Revives a stopped/idle session when a new turn begins (UserPromptSubmit).
+    /// `Stop` fires at the end of every turn, so without this a session would be
+    /// stuck `.stopped` for the rest of its life. No-op once ended.
+    public mutating func resume() {
+        guard phase != .ended else { return }
         updatePhase()
     }
 

@@ -110,5 +110,6 @@ struct SessionEventTests {
         #expect(SessionEvent.EventName.subagentStart.rawValue == "SubagentStart")
         #expect(SessionEvent.EventName.subagentStop.rawValue == "SubagentStop")
         #expect(SessionEvent.EventName.stop.rawValue == "Stop")
+        #expect(SessionEvent.EventName.userPromptSubmit.rawValue == "UserPromptSubmit")
     }
 }

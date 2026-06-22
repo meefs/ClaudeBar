@@ -172,6 +172,28 @@ struct SessionMonitorTests {
         #expect(monitor.activeSession?.phase == .active)
     }
 
+    @Test
+    func `UserPromptSubmit revives a stopped session to active`() {
+        let monitor = SessionMonitor()
+
+        monitor.processEvent(makeEvent(eventName: .sessionStart))
+        monitor.processEvent(makeEvent(eventName: .stop))
+        monitor.processEvent(makeEvent(eventName: .userPromptSubmit))
+
+        #expect(monitor.activeSession?.phase == .active)
+    }
+
+    @Test
+    func `UserPromptSubmit for wrong session is ignored`() {
+        let monitor = SessionMonitor()
+
+        monitor.processEvent(makeEvent(sessionId: "session-1", eventName: .sessionStart))
+        monitor.processEvent(makeEvent(sessionId: "session-1", eventName: .stop))
+        monitor.processEvent(makeEvent(sessionId: "other", eventName: .userPromptSubmit))
+
+        #expect(monitor.activeSession?.phase == .stopped)
+    }
+
     // MARK: - Recent Sessions
 
     @Test
