@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Claude Fable 5 weekly limit is now parsed from both the CLI `/usage` output
+  ("Current week (Fable)") and the OAuth usage API's new `limits` array, shown as a
+  quota card in the window and selectable as a menu-bar metric. The API-side parsing
+  is generic over model-scoped limits, so future scoped models appear automatically.
+
+### Fixed
+- Claude CLI probe no longer fails on every tick with recent Claude CLI versions.
+  The `/usage` screen grew taller than the probe's 50-row terminal (usage-contribution
+  report), scrolling the quota sections off the visible screen; the terminal renderer
+  now includes scrollback, so all sections are parsed again.
+
 ---
 
 ## [0.4.69] - 2026-06-25

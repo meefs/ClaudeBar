@@ -290,12 +290,14 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
         // Extract percentages
         let sessionPct = extractPercent(labelSubstring: "Current session", text: clean)
         let weeklyPct = extractPercent(labelSubstring: "Current week (all models)", text: clean)
-        // Check for model-specific quota (Opus or Sonnet)
+        // Check for model-specific quota (Opus, Sonnet, or Fable)
         let opusPct = extractPercent(labelSubstring: "Current week (Opus)", text: clean)
         let sonnetPct = extractPercent(labelSubstrings: [
             "Current week (Sonnet only)",
             "Current week (Sonnet)",
         ], text: clean)
+        // Paren-open anchor also matches a future "Current week (Fable 5)" label
+        let fablePct = extractPercent(labelSubstring: "Current week (Fable", text: clean)
 
         guard let sessionPct else {
             AppLog.probes.error("Claude parse failed: could not find 'Current session' percentage in output")
@@ -346,6 +348,21 @@ public final class ClaudeUsageProbe: UsageProbe, @unchecked Sendable {
                 providerId: "claude",
                 resetsAt: parseResetDate(weeklyReset),
                 resetText: cleanResetText(weeklyReset)
+            ))
+        }
+
+        if let fablePct {
+            // Promotional Fable window can reset at a different time than the
+            // all-models weekly, so anchor on its own section before falling back.
+            // The model key must match what the API probe derives from the scoped
+            // limit's display name ("fable").
+            let fableReset = extractReset(labelSubstring: "Current week (Fable", text: clean) ?? weeklyReset
+            quotas.append(UsageQuota(
+                percentRemaining: Double(fablePct),
+                quotaType: .modelSpecific("fable"),
+                providerId: "claude",
+                resetsAt: parseResetDate(fableReset),
+                resetText: cleanResetText(fableReset)
             ))
         }
 

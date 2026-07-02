@@ -426,6 +426,148 @@ struct ClaudeAPIUsageProbeTests {
     }
 
     @Test
+    func `probe parses fable quota from scoped limits array`() async throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let futureExpiry = Date().addingTimeInterval(3600).timeIntervalSince1970 * 1000
+        try createCredentialsFile(at: tempDir, expiresAt: futureExpiry)
+
+        let mockNetwork = MockNetworkClient()
+        // Newer API responses report model limits via a generic "limits" array
+        // (kind "weekly_scoped" + scope.model.display_name) instead of
+        // dedicated seven_day_<model> fields.
+        let responseJSON = """
+        {
+          "five_hour": { "utilization": 23.0, "resets_at": "2026-07-02T07:09:59Z" },
+          "seven_day": { "utilization": 10.0, "resets_at": "2026-07-02T10:59:59Z" },
+          "seven_day_opus": null,
+          "seven_day_sonnet": null,
+          "limits": [
+            { "kind": "session", "group": "session", "percent": 23, "resets_at": "2026-07-02T07:09:59Z", "scope": null },
+            { "kind": "weekly_all", "group": "weekly", "percent": 10, "resets_at": "2026-07-02T10:59:59Z", "scope": null },
+            { "kind": "weekly_scoped", "group": "weekly", "percent": 17, "resets_at": "2026-07-02T11:00:00Z",
+              "scope": { "model": { "id": null, "display_name": "Fable" }, "surface": null } }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.anthropic.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let loader = ClaudeCredentialLoader(homeDirectory: tempDir.path, useKeychain: false)
+        let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
+
+        let snapshot = try await probe.probe()
+
+        let fableQuota = snapshot.quotas.first { $0.quotaType == .modelSpecific("fable") }
+        #expect(fableQuota != nil)
+        #expect(fableQuota?.percentRemaining == 83.0)  // 100 - 17
+        #expect(fableQuota?.resetsAt != nil)
+
+        // Unscoped session/weekly entries in the limits array must not create duplicates
+        #expect(snapshot.quotas.filter { $0.quotaType == .session }.count == 1)
+        #expect(snapshot.quotas.filter { $0.quotaType == .weekly }.count == 1)
+    }
+
+    @Test
+    func `probe skips malformed limits entries and keeps over-quota negative remaining`() async throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let futureExpiry = Date().addingTimeInterval(3600).timeIntervalSince1970 * 1000
+        try createCredentialsFile(at: tempDir, expiresAt: futureExpiry)
+
+        let mockNetwork = MockNetworkClient()
+        // Malformed scoped entries (no scope, no model, empty name, no percent) are
+        // skipped; duplicate scoped entries yield one quota; a multi-word display
+        // name keys on its first word; 105% used stays negative (over-quota signal).
+        let responseJSON = """
+        {
+          "five_hour": { "utilization": 10.0, "resets_at": "2025-01-15T10:00:00Z" },
+          "limits": [
+            { "kind": "weekly_scoped", "group": "weekly", "percent": 50, "resets_at": "2025-01-20T00:00:00Z", "scope": null },
+            { "kind": "weekly_scoped", "group": "weekly", "percent": 50, "resets_at": "2025-01-20T00:00:00Z", "scope": { "model": null } },
+            { "kind": "weekly_scoped", "group": "weekly", "percent": 50, "resets_at": "2025-01-20T00:00:00Z",
+              "scope": { "model": { "id": null, "display_name": "" } } },
+            { "kind": "weekly_scoped", "group": "weekly", "resets_at": "2025-01-20T00:00:00Z",
+              "scope": { "model": { "id": null, "display_name": "Opus" } } },
+            { "kind": "weekly_scoped", "group": "weekly", "percent": 105, "resets_at": "2025-01-20T00:00:00Z",
+              "scope": { "model": { "id": null, "display_name": "Fable 5" } } },
+            { "kind": "weekly_scoped", "group": "weekly", "percent": 40, "resets_at": "2025-01-20T00:00:00Z",
+              "scope": { "model": { "id": null, "display_name": "Fable" } } }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.anthropic.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let loader = ClaudeCredentialLoader(homeDirectory: tempDir.path, useKeychain: false)
+        let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
+
+        let snapshot = try await probe.probe()
+
+        let fableQuotas = snapshot.quotas.filter { $0.quotaType == .modelSpecific("fable") }
+        #expect(fableQuotas.count == 1)
+        #expect(fableQuotas.first?.percentRemaining == -5.0)  // 100 - 105, first entry wins
+
+        // Malformed entries produce no quotas: session (legacy) + fable only
+        #expect(snapshot.quotas.count == 2)
+    }
+
+    @Test
+    func `probe does not duplicate model quota reported in both legacy field and limits array`() async throws {
+        let tempDir = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let futureExpiry = Date().addingTimeInterval(3600).timeIntervalSince1970 * 1000
+        try createCredentialsFile(at: tempDir, expiresAt: futureExpiry)
+
+        let mockNetwork = MockNetworkClient()
+        let responseJSON = """
+        {
+          "five_hour": { "utilization": 10.0, "resets_at": "2025-01-15T10:00:00Z" },
+          "seven_day_opus": { "utilization": 60.0, "resets_at": "2025-01-20T00:00:00Z" },
+          "limits": [
+            { "kind": "weekly_scoped", "group": "weekly", "percent": 60, "resets_at": "2025-01-20T00:00:00Z",
+              "scope": { "model": { "id": null, "display_name": "Opus" }, "surface": null } }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let response = HTTPURLResponse(
+            url: URL(string: "https://api.anthropic.com")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        given(mockNetwork).request(.any).willReturn((responseJSON, response))
+
+        let loader = ClaudeCredentialLoader(homeDirectory: tempDir.path, useKeychain: false)
+        let probe = ClaudeAPIUsageProbe(credentialLoader: loader, networkClient: mockNetwork)
+
+        let snapshot = try await probe.probe()
+
+        let opusQuotas = snapshot.quotas.filter { $0.quotaType == .modelSpecific("opus") }
+        #expect(opusQuotas.count == 1)
+        #expect(opusQuotas.first?.percentRemaining == 40.0)  // 100 - 60
+    }
+
+    @Test
     func `probe parses extra usage correctly converting cents to dollars`() async throws {
         let tempDir = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: tempDir) }

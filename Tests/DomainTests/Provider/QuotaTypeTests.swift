@@ -25,6 +25,15 @@ struct QuotaTypeTests {
     }
 
     @Test
+    func `fable quota key round trips through persistence`() {
+        let fable = QuotaType.modelSpecific("fable")
+        #expect(fable.displayName == "Fable")
+        #expect(fable.shortLabel == "Fable")
+        #expect(fable.quotaKey == "model:fable")
+        #expect(QuotaType(quotaKey: "model:fable") == fable)
+    }
+
+    @Test
     func `model specific quota handles multi-word names`() {
         // .capitalized capitalizes each word
         #expect(QuotaType.modelSpecific("claude-3-opus").displayName == "Claude-3-Opus")

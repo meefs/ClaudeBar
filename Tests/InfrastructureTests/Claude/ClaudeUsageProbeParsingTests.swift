@@ -49,6 +49,22 @@ struct ClaudeUsageProbeParsingTests {
     ████████████░░░░░░░░ 60% used
     """
 
+    static let fableQuotaOutput = """
+    Claude Code v2.1.198
+
+    Current session
+    ██████████░░░░░░░░░░ 23% used
+    Resets 1:09am (America/Chicago)
+
+    Current week (all models)
+    ██░░░░░░░░░░░░░░░░░░ 10% used
+    Resets Jul 2 at 4:59am (America/Chicago)
+
+    Current week (Fable)
+    ████░░░░░░░░░░░░░░░░ 17% used
+    Resets Jul 2 at 5:59am (America/Chicago)
+    """
+
     // MARK: - Parsing Percentages
 
     @Test
@@ -89,6 +105,60 @@ struct ClaudeUsageProbeParsingTests {
         let opusQuota = snapshot.quota(for: .modelSpecific("opus"))
         #expect(opusQuota?.percentRemaining == 80)
         #expect(opusQuota?.status == .healthy)
+    }
+
+    @Test
+    func `parses fable weekly quota with its own reset time`() throws {
+        // Given
+        let output = Self.fableQuotaOutput
+
+        // When
+        let snapshot = try simulateParse(text: output)
+
+        // Then - 17% used = 83% remaining, reset from the Fable section (not all-models)
+        let fableQuota = snapshot.quota(for: .modelSpecific("fable"))
+        #expect(fableQuota?.percentRemaining == 83)
+        #expect(fableQuota?.status == .healthy)
+        #expect(fableQuota?.resetText?.contains("5:59am") == true)
+    }
+
+    static let fableQuotaWithoutOwnResetOutput = """
+    Current session
+    ██████████░░░░░░░░░░ 23% used
+    Resets 1:09am (America/Chicago)
+
+    Current week (all models)
+    ██░░░░░░░░░░░░░░░░░░ 10% used
+    Resets Jul 2 at 4:59am (America/Chicago)
+
+    Current week (Fable)
+    ████░░░░░░░░░░░░░░░░ 17% used
+    """
+
+    @Test
+    func `fable quota falls back to weekly reset when its section has none`() throws {
+        // Given
+        let output = Self.fableQuotaWithoutOwnResetOutput
+
+        // When
+        let snapshot = try simulateParse(text: output)
+
+        // Then - inherits the all-models weekly reset
+        let fableQuota = snapshot.quota(for: .modelSpecific("fable"))
+        #expect(fableQuota?.percentRemaining == 83)
+        #expect(fableQuota?.resetText?.contains("4:59am") == true)
+    }
+
+    @Test
+    func `no fable quota when section absent`() throws {
+        // Given
+        let output = Self.sampleClaudeOutput
+
+        // When
+        let snapshot = try simulateParse(text: output)
+
+        // Then
+        #expect(snapshot.quota(for: .modelSpecific("fable")) == nil)
     }
 
     @Test
@@ -880,6 +950,52 @@ struct ClaudeUsageProbeParsingTests {
 
         // Then - colors are stripped, text is preserved
         #expect(rendered.contains("Green") && rendered.contains("Normal"))
+    }
+
+    @Test
+    func `TerminalRenderer includes content scrolled into scrollback`() throws {
+        // Given - more lines than the terminal is tall (50 rows), so early
+        // lines scroll out of the visible screen into scrollback
+        let renderer = TerminalRenderer()
+        let input = (1...80).map { "line \($0)" }.joined(separator: "\n")
+
+        // When
+        let rendered = renderer.render(input)
+
+        // Then - both the scrolled-off top and the visible bottom survive
+        #expect(rendered.contains("line 1\n"))
+        #expect(rendered.contains("line 80"))
+    }
+
+    @Test
+    func `parses usage sections that scrolled off the visible screen`() throws {
+        // Given - the CLI /usage screen grew past 50 rows (usage-contribution
+        // report), pushing the quota sections above the visible screen
+        let filler = (1...60).map { "contributing insight line \($0)" }.joined(separator: "\n")
+        let output = """
+        Current session
+        ██████████████████████████████▌                    61% used
+        Resets 1:09am (America/Chicago)
+
+        Current week (all models)
+        █████████                                          18% used
+        Resets Jul 2 at 4:59am (America/Chicago)
+
+        Current week (Fable)
+        ████████████████                                   32% used
+        Resets Jul 2 at 5:59am (America/Chicago)
+
+        What's contributing to your limits usage?
+        \(filler)
+        """
+
+        // When
+        let snapshot = try simulateParse(text: output)
+
+        // Then
+        #expect(snapshot.sessionQuota?.percentRemaining == 39)
+        #expect(snapshot.weeklyQuota?.percentRemaining == 82)
+        #expect(snapshot.quota(for: .modelSpecific("fable"))?.percentRemaining == 68)
     }
 
     @Test

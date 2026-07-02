@@ -471,6 +471,38 @@ public struct ClaudeAPIUsageProbe: UsageProbe, @unchecked Sendable {
             ))
         }
 
+        // Parse model-scoped limits from the generic `limits` array (e.g. Fable).
+        // Session/weekly entries there mirror `five_hour`/`seven_day` and are
+        // skipped; a model already covered by a legacy field is not duplicated.
+        // If the legacy `five_hour`/`seven_day` fields ever go null (as
+        // `seven_day_opus`/`seven_day_sonnet` did), extend this loop to the
+        // `session`/`weekly_all` kinds.
+        for entry in response.limits ?? [] {
+            guard entry.kind == "weekly_scoped",
+                  // Key on the first word of the display name ("Fable 5" -> "fable")
+                  // — must stay in sync with the key the CLI probe hardcodes so a
+                  // persisted "model:<name>" menu-bar selection survives switching
+                  // probe modes.
+                  let modelName = entry.scope?.model?.displayName?
+                      .split(separator: " ").first.map({ $0.lowercased() }),
+                  !modelName.isEmpty,
+                  let percent = entry.percent else {
+                continue
+            }
+            let quotaType = QuotaType.modelSpecific(modelName)
+            guard !quotas.contains(where: { $0.quotaType == quotaType }) else {
+                continue
+            }
+            let resetsAt = parseISODate(entry.resetsAt)
+            quotas.append(UsageQuota(
+                percentRemaining: 100.0 - percent,
+                quotaType: quotaType,
+                providerId: "claude",
+                resetsAt: resetsAt,
+                resetText: formatResetText(resetsAt)
+            ))
+        }
+
         // Parse extra usage
         // API returns used_credits and monthly_limit in cents, convert to dollars
         var costUsage: CostUsage?
@@ -586,6 +618,7 @@ private struct UsageResponse: Decodable {
     let sevenDaySonnet: UsageQuotaData?
     let sevenDayOpus: UsageQuotaData?
     let extraUsage: ExtraUsageData?
+    let limits: [LimitEntry]?
 
     enum CodingKeys: String, CodingKey {
         case fiveHour = "five_hour"
@@ -593,6 +626,36 @@ private struct UsageResponse: Decodable {
         case sevenDaySonnet = "seven_day_sonnet"
         case sevenDayOpus = "seven_day_opus"
         case extraUsage = "extra_usage"
+        case limits
+    }
+}
+
+/// Entry in the newer generic `limits` array. Model-scoped limits (e.g. Fable)
+/// are reported here as `kind: "weekly_scoped"` with the model in `scope`,
+/// instead of dedicated `seven_day_<model>` fields.
+private struct LimitEntry: Decodable {
+    let kind: String?
+    let percent: Double?
+    let resetsAt: String?
+    let scope: LimitScope?
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case percent
+        case resetsAt = "resets_at"
+        case scope
+    }
+}
+
+private struct LimitScope: Decodable {
+    let model: LimitScopeModel?
+}
+
+private struct LimitScopeModel: Decodable {
+    let displayName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case displayName = "display_name"
     }
 }
 
