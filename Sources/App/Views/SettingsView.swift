@@ -357,6 +357,30 @@ struct SettingsContentView: View {
         }
     }
 
+    /// Opt-in stacked rendering for the dual-window label: the two windows
+    /// draw as two smaller lines instead of one long "A | B" line, roughly
+    /// halving the menu bar width the label occupies.
+    private var menuBarStackedToggle: some View {
+        HStack {
+            Text("Stack in Menu Bar")
+                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                .foregroundStyle(theme.textSecondary)
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { settings.menuBarStackedEnabled },
+                set: { enabled in
+                    settings.menuBarStackedEnabled = enabled
+                }
+            ))
+            .toggleStyle(.switch)
+            .tint(theme.accentPrimary)
+            .scaleEffect(0.8)
+            .labelsHidden()
+        }
+    }
+
     private var menuBarControls: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
@@ -447,6 +471,12 @@ struct SettingsContentView: View {
                                 }
                             }
                         }
+                    }
+
+                    // Stacking only changes how two windows render, so the
+                    // toggle appears once a secondary window is selected.
+                    if !settings.menuBarSecondaryQuotaKey.isEmpty {
+                        menuBarStackedToggle
                     }
                 }
             }

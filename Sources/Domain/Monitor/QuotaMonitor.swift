@@ -237,7 +237,8 @@ public final class QuotaMonitor {
     /// non-empty and differs from the primary, a second window is appended: each
     /// window is prefixed with its `QuotaType.shortLabel` and the two are joined
     /// by " | ", e.g. "5h 12% | 7d 34%". The status is the most severe of the
-    /// shown windows.
+    /// shown windows, and each window is also exposed individually via
+    /// `MenuBarLabel.segments` for renderers that draw them on separate lines.
     ///
     /// Returns nil when neither percentage nor duration is enabled, or when no
     /// quota data is available for the requested windows.
@@ -291,9 +292,22 @@ public final class QuotaMonitor {
         case let (.some(primary), .some(secondary)):
             let primaryLabel = QuotaType(quotaKey: primaryQuotaKey)?.shortLabel ?? primaryQuotaKey
             let secondaryLabel = QuotaType(quotaKey: secondaryQuotaKey)?.shortLabel ?? secondaryQuotaKey
+            // Each window becomes its own segment (prefixed text + that
+            // window's status) so stacked rendering can draw and tint them
+            // independently; the joined text stays the canonical single-line
+            // form and doubles as the tooltip.
+            let primarySegment = MenuBarLabel.Segment(
+                text: "\(primaryLabel) \(primary.text)",
+                status: primary.status
+            )
+            let secondarySegment = MenuBarLabel.Segment(
+                text: "\(secondaryLabel) \(secondary.text)",
+                status: secondary.status
+            )
             return MenuBarLabel(
-                text: "\(primaryLabel) \(primary.text) | \(secondaryLabel) \(secondary.text)",
-                status: max(primary.status, secondary.status)
+                text: "\(primarySegment.text) | \(secondarySegment.text)",
+                status: max(primary.status, secondary.status),
+                segments: [primarySegment, secondarySegment]
             )
         case let (.some(primary), .none):
             return MenuBarLabel(text: primary.text, status: primary.status)

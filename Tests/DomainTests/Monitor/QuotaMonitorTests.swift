@@ -374,6 +374,121 @@ struct QuotaMonitorTests {
     }
 
     @Test
+    func `menu bar label carries a single segment when secondary empty`() async {
+        // Given
+        let monitor = await makeRefreshedClaudeMonitor(quotas: [
+            UsageQuota(percentRemaining: 75, quotaType: .session, providerId: "claude"),
+        ])
+
+        // When
+        let label = monitor.menuBarLabel(
+            providerId: "claude",
+            primaryQuotaKey: "session",
+            secondaryQuotaKey: "",
+            showPercentage: true,
+            showDuration: false,
+            mode: .remaining
+        )
+
+        // Then: one segment mirroring the joined text, so segment-based
+        // renderers read the same source as the single-line label
+        #expect(label?.segments == [
+            MenuBarLabel.Segment(text: "75%", status: .healthy),
+        ])
+    }
+
+    @Test
+    func `menu bar label carries both windows as separate segments`() async {
+        // Given: session 75% (healthy), weekly 35% (warning)
+        let monitor = await makeRefreshedClaudeMonitor(quotas: [
+            UsageQuota(percentRemaining: 75, quotaType: .session, providerId: "claude"),
+            UsageQuota(percentRemaining: 35, quotaType: .weekly, providerId: "claude"),
+        ])
+
+        // When
+        let label = monitor.menuBarLabel(
+            providerId: "claude",
+            primaryQuotaKey: "session",
+            secondaryQuotaKey: "weekly",
+            showPercentage: true,
+            showDuration: false,
+            mode: .remaining
+        )
+
+        // Then: joined text stays byte-identical (it doubles as the tooltip),
+        // while each segment keeps its own prefixed text and per-window status
+        // so a stacked renderer can tint the two lines independently
+        #expect(label?.text == "5h 75% | 7d 35%")
+        #expect(label?.status == .warning)
+        #expect(label?.segments == [
+            MenuBarLabel.Segment(text: "5h 75%", status: .healthy),
+            MenuBarLabel.Segment(text: "7d 35%", status: .warning),
+        ])
+    }
+
+    @Test
+    func `menu bar label segments cover the duration-only variant`() async {
+        // Given: session quota with reset ~3h away
+        let monitor = await makeRefreshedClaudeMonitor(quotas: [
+            UsageQuota(
+                percentRemaining: 75,
+                quotaType: .session,
+                providerId: "claude",
+                resetsAt: Date().addingTimeInterval(3.0 * 3600 + 30)
+            ),
+        ])
+
+        // When: duration only, no percentage
+        let label = monitor.menuBarLabel(
+            providerId: "claude",
+            primaryQuotaKey: "session",
+            secondaryQuotaKey: "",
+            showPercentage: false,
+            showDuration: true,
+            mode: .remaining
+        )
+
+        // Then
+        #expect(label?.text == "3h")
+        #expect(label?.segments == [
+            MenuBarLabel.Segment(text: "3h", status: .healthy),
+        ])
+    }
+
+    @Test
+    func `menu bar label segments cover percentage plus duration windows`() async {
+        // Given: both windows carry reset times
+        let monitor = await makeRefreshedClaudeMonitor(quotas: [
+            UsageQuota(
+                percentRemaining: 75,
+                quotaType: .session,
+                providerId: "claude",
+                resetsAt: Date().addingTimeInterval(3.0 * 3600 + 30)
+            ),
+            UsageQuota(
+                percentRemaining: 35,
+                quotaType: .weekly,
+                providerId: "claude",
+                resetsAt: Date().addingTimeInterval(6.0 * 86400 + 30)
+            ),
+        ])
+
+        // When: percentage and duration together
+        let label = monitor.menuBarLabel(
+            providerId: "claude",
+            primaryQuotaKey: "session",
+            secondaryQuotaKey: "weekly",
+            showPercentage: true,
+            showDuration: true,
+            mode: .remaining
+        )
+
+        // Then: segments carry the full "percentage · duration" window texts
+        #expect(label?.text == "5h 75% · 3h | 7d 35% · 6d")
+        #expect(label?.segments.map(\.text) == ["5h 75% · 3h", "7d 35% · 6d"])
+    }
+
+    @Test
     func `monitor skips unavailable providers`() async {
         // Given
         let settings = makeSettingsRepository()

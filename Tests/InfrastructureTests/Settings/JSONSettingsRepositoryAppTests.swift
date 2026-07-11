@@ -153,6 +153,29 @@ struct JSONSettingsRepositoryAppTests {
     }
 
     @Test
+    func `menuBarStackedEnabled defaults to false`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.menuBarStackedEnabled() == false)
+    }
+
+    @Test
+    func `setMenuBarStackedEnabled persists value`() {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("claudebar-test-\(UUID().uuidString)")
+        let fileURL = tempDir.appendingPathComponent("settings.json")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let store = JSONSettingsStore(fileURL: fileURL)
+        let repo1 = JSONSettingsRepository(store: store)
+        repo1.setMenuBarStackedEnabled(true)
+
+        let repo2 = JSONSettingsRepository(store: store)
+        #expect(repo2.menuBarStackedEnabled() == true)
+    }
+
+    @Test
     func `showDailyUsageCards defaults to true`() {
         let (repo, dir) = makeRepository()
         defer { cleanup(dir) }

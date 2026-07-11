@@ -58,6 +58,16 @@ public final class AppSettings {
         }
     }
 
+    /// Whether a dual-window menu bar label should render as two stacked
+    /// smaller lines (one per quota window) instead of one long "A | B" line,
+    /// roughly halving the menu bar width it occupies. Opt-in, default off;
+    /// has no effect while only a single quota window is shown.
+    public var menuBarStackedEnabled: Bool {
+        didSet {
+            repository.setMenuBarStackedEnabled(menuBarStackedEnabled)
+        }
+    }
+
     /// Provider used for the menu bar percentage label.
     public var menuBarPercentageProviderId: String {
         didSet {
@@ -217,6 +227,7 @@ public final class AppSettings {
         self.backgroundSyncInterval = repository.backgroundSyncInterval()
         self.menuBarPercentageEnabled = repository.menuBarPercentageEnabled()
         self.menuBarDurationEnabled = repository.menuBarDurationEnabled()
+        self.menuBarStackedEnabled = repository.menuBarStackedEnabled()
         self.menuBarPercentageProviderId = repository.menuBarPercentageProviderId()
         self.menuBarPercentageQuotaKey = repository.menuBarPercentageQuotaKey()
         self.menuBarSecondaryQuotaKey = repository.menuBarSecondaryQuotaKey()

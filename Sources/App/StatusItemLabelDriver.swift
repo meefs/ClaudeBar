@@ -58,6 +58,9 @@ final class StatusItemLabelDriver {
         var fallbackStatus: QuotaStatus
         var sessionPhase: ClaudeSession.Phase?
         var themeModeId: String
+        /// Whether a dual-window label should render as two stacked smaller
+        /// lines instead of one long "A | B" line (opt-in setting).
+        var stacked: Bool = false
     }
 
     /// Attaches to the `NSStatusItem` exposed by MenuBarExtraAccess and starts
@@ -126,7 +129,8 @@ final class StatusItemLabelDriver {
             label: freshLabel ?? lastKnownLabel(whenFreshIsMissing: freshLabel),
             fallbackStatus: effectiveSelectedProviderStatus,
             sessionPhase: sessionMonitor.activeSession?.phase,
-            themeModeId: settings.themeMode
+            themeModeId: settings.themeMode,
+            stacked: settings.menuBarStackedEnabled
         )
     }
 
@@ -192,10 +196,22 @@ final class StatusItemLabelDriver {
         }
 
         if let label = content.label {
-            parts.append(StatusBarPercentageImageRenderer.image(
-                text: label.text,
-                color: theme.statusColor(for: label.status)
-            ))
+            // Stacked mode only applies to a dual-window label: two windows
+            // become two smaller lines (halving the width the label needs).
+            // Anything else, including a dual label with stacking off, keeps
+            // the classic single-line rendering. The tooltip always stays the
+            // full joined text, so no information is lost either way.
+            if content.stacked, label.segments.count == 2 {
+                parts.append(StatusBarStackedImageRenderer.image(
+                    top: (label.segments[0].text, theme.statusColor(for: label.segments[0].status)),
+                    bottom: (label.segments[1].text, theme.statusColor(for: label.segments[1].status))
+                ))
+            } else {
+                parts.append(StatusBarPercentageImageRenderer.image(
+                    text: label.text,
+                    color: theme.statusColor(for: label.status)
+                ))
+            }
         } else {
             let symbolName = theme.statusBarIconName ?? fallbackIconName(for: content.fallbackStatus)
             parts.append(symbolImage(
@@ -337,6 +353,57 @@ enum StatusBarPercentageImageRenderer {
         let imageSize = NSSize(width: ceil(textSize.width), height: ceil(textSize.height))
         let image = NSImage(size: imageSize, flipped: false) { _ in
             attributedText.draw(at: .zero)
+            return true
+        }
+        image.isTemplate = false
+
+        return image
+    }
+}
+
+/// Renders a dual-window label as two vertically stacked lines in one image,
+/// so the label takes roughly half the menu bar width of the joined "A | B"
+/// form. Sibling of `StatusBarPercentageImageRenderer`: same original-color
+/// rationale (macOS can ignore `Text.foregroundStyle` in a menu bar item, and
+/// each line must keep its own window's status color), but a smaller font so
+/// both lines fit inside the menu bar's usable height.
+enum StatusBarStackedImageRenderer {
+    /// The menu bar's usable content height. Status-item images taller than
+    /// this get clipped or scaled by the system, so the stack never exceeds it.
+    private static let maxHeight: CGFloat = 22
+
+    /// Vertical breathing room between the two lines. When the two natural
+    /// line heights plus this gap overflow `maxHeight`, the lines keep their
+    /// top/bottom anchors and the overflow is absorbed by the gap and the
+    /// fonts' descender space instead of clipping a line.
+    private static let lineSpacing: CGFloat = 1
+
+    @MainActor
+    static func image(
+        top: (text: String, color: Color),
+        bottom: (text: String, color: Color)
+    ) -> NSImage {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .semibold)
+        func attributedLine(_ line: (text: String, color: Color)) -> NSAttributedString {
+            NSAttributedString(string: line.text, attributes: [
+                .font: font,
+                .foregroundColor: NSColor(line.color),
+            ])
+        }
+        let topLine = attributedLine(top)
+        let bottomLine = attributedLine(bottom)
+
+        // Lines stay left-aligned: the image is as wide as the wider line and
+        // both draw from x = 0, matching how the two windows read as a list.
+        let width = ceil(max(topLine.size().width, bottomLine.size().width))
+        let naturalHeight = topLine.size().height + lineSpacing + bottomLine.size().height
+        let height = min(maxHeight, ceil(naturalHeight))
+
+        // flipped: false, so y grows upward: the bottom line sits at y = 0 and
+        // the top line is anchored to the image's top edge.
+        let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { _ in
+            bottomLine.draw(at: .zero)
+            topLine.draw(at: NSPoint(x: 0, y: height - topLine.size().height))
             return true
         }
         image.isTemplate = false

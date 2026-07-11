@@ -73,6 +73,14 @@ public final class JSONSettingsRepository:
         store.write(value: enabled, key: "app.menuBarDurationEnabled")
     }
 
+    public func menuBarStackedEnabled() -> Bool {
+        store.read(key: "app.menuBarStackedEnabled") ?? false
+    }
+
+    public func setMenuBarStackedEnabled(_ enabled: Bool) {
+        store.write(value: enabled, key: "app.menuBarStackedEnabled")
+    }
+
     public func menuBarPercentageProviderId() -> String {
         store.read(key: "app.menuBarPercentageProviderId") ?? "claude"
     }
