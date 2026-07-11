@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import SwiftUI
 import Domain
 import Infrastructure
@@ -61,6 +62,10 @@ final class StatusItemLabelDriver {
         /// Whether a dual-window label should render as two stacked smaller
         /// lines instead of one long "A | B" line (opt-in setting).
         var stacked: Bool = false
+        /// The user-selected text size for the stacked lines. Carried in the
+        /// content (not read at draw time) so changing the size in Settings
+        /// invalidates the observation sync and repaints the label.
+        var stackedSize: MenuBarStackedSize = .default
     }
 
     /// Attaches to the `NSStatusItem` exposed by MenuBarExtraAccess and starts
@@ -130,7 +135,8 @@ final class StatusItemLabelDriver {
             fallbackStatus: effectiveSelectedProviderStatus,
             sessionPhase: sessionMonitor.activeSession?.phase,
             themeModeId: settings.themeMode,
-            stacked: settings.menuBarStackedEnabled
+            stacked: settings.menuBarStackedEnabled,
+            stackedSize: settings.menuBarStackedSize
         )
     }
 
@@ -204,7 +210,8 @@ final class StatusItemLabelDriver {
             if content.stacked, label.segments.count == 2 {
                 parts.append(StatusBarStackedImageRenderer.image(
                     top: (label.segments[0].text, theme.statusColor(for: label.segments[0].status)),
-                    bottom: (label.segments[1].text, theme.statusColor(for: label.segments[1].status))
+                    bottom: (label.segments[1].text, theme.statusColor(for: label.segments[1].status)),
+                    size: content.stackedSize
                 ))
             } else {
                 parts.append(StatusBarPercentageImageRenderer.image(
@@ -367,6 +374,12 @@ enum StatusBarPercentageImageRenderer {
 /// rationale (macOS can ignore `Text.foregroundStyle` in a menu bar item, and
 /// each line must keep its own window's status color), but a smaller font so
 /// both lines fit inside the menu bar's usable height.
+///
+/// The line size is user-selectable (`MenuBarStackedSize`): Small keeps the
+/// original 9pt look, Medium and Large render 10pt and 11pt. At those larger
+/// sizes the two natural line boxes no longer fit inside the 22pt clamp, so
+/// the renderer verifies the two lines' measured glyph ink cannot collide and
+/// switches anchoring strategies when it would (see `image(top:bottom:size:)`).
 enum StatusBarStackedImageRenderer {
     /// The menu bar's usable content height. Status-item images taller than
     /// this get clipped or scaled by the system, so the stack never exceeds it.
@@ -378,12 +391,20 @@ enum StatusBarStackedImageRenderer {
     /// fonts' descender space instead of clipping a line.
     private static let lineSpacing: CGFloat = 1
 
+    /// Safety inset above the image's bottom edge when ink anchoring engages.
+    /// AppKit's string drawing rounds baselines to pixel boundaries, which can
+    /// land actual glyph pixels up to ~0.4pt below the analytic glyph-path
+    /// bounds (measured), so pinning ink to exactly y = 0 could shave the
+    /// bottom row off descenders.
+    private static let bottomInkInset: CGFloat = 0.5
+
     @MainActor
     static func image(
         top: (text: String, color: Color),
-        bottom: (text: String, color: Color)
+        bottom: (text: String, color: Color),
+        size: MenuBarStackedSize = .default
     ) -> NSImage {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .semibold)
+        let font = NSFont.monospacedDigitSystemFont(ofSize: size.stackedLinePointSize, weight: .semibold)
         func attributedLine(_ line: (text: String, color: Color)) -> NSAttributedString {
             NSAttributedString(string: line.text, attributes: [
                 .font: font,
@@ -399,15 +420,68 @@ enum StatusBarStackedImageRenderer {
         let naturalHeight = topLine.size().height + lineSpacing + bottomLine.size().height
         let height = min(maxHeight, ceil(naturalHeight))
 
-        // flipped: false, so y grows upward: the bottom line sits at y = 0 and
-        // the top line is anchored to the image's top edge.
+        // Default layout: line boxes anchored to the image edges, bottom line
+        // at y = 0 and the top line's box against the top edge, with any clamp
+        // deficit absorbed by the gap and the fonts' descender space. This is
+        // the original Small rendering, byte-identical when no collision.
+        var topOriginY = height - topLine.size().height
+        var bottomOriginY: CGFloat = 0
+
+        // Collision check: at 10pt a descender-bearing top line, and at 11pt
+        // every realistic pairing, would let the glyphs themselves overlap
+        // under box anchoring (measured -0.3 to -2.2pt of ink clearance).
+        // When the measured glyph ink of the two lines would touch, switch to
+        // INK anchoring: pin the bottom line's lowest ink just above y = 0 and
+        // the top line's highest ink to the top edge. Line boxes may then
+        // overflow the image, but a line box is mostly empty ascender and
+        // descender allowance; reclaiming that padding restores over +3pt of
+        // clearance at 11pt for realistic labels while nothing clips. Small
+        // (9pt) always measures positive clearance here, so its rendering is
+        // untouched. A line drawn at origin y has its baseline at
+        // y + boxHeight - font.ascender, and ink bounds are baseline-relative.
+        let topInk = inkBounds(of: topLine)
+        let bottomInk = inkBounds(of: bottomLine)
+        if !topInk.isNull, !bottomInk.isNull {
+            let topInkBottom = topOriginY + topLine.size().height - font.ascender + topInk.minY
+            let bottomInkTop = bottomOriginY + bottomLine.size().height - font.ascender + bottomInk.maxY
+            if topInkBottom - bottomInkTop < 0 {
+                bottomOriginY = bottomInkInset - (bottomLine.size().height - font.ascender) - bottomInk.minY
+                topOriginY = height - (topLine.size().height - font.ascender) - topInk.maxY
+            }
+        }
+
+        // flipped: false, so y grows upward: the bottom line sits at the
+        // bottom and the top line is anchored to the image's top edge.
         let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { _ in
-            bottomLine.draw(at: .zero)
-            topLine.draw(at: NSPoint(x: 0, y: height - topLine.size().height))
+            bottomLine.draw(at: NSPoint(x: 0, y: bottomOriginY))
+            topLine.draw(at: NSPoint(x: 0, y: topOriginY))
             return true
         }
         image.isTemplate = false
 
         return image
+    }
+
+    /// Tight glyph-path bounds of the line's ink, relative to its baseline
+    /// origin (CoreText convention: y = 0 is the baseline, descenders are
+    /// negative). Null for a line with no ink, e.g. all whitespace.
+    private static func inkBounds(of line: NSAttributedString) -> CGRect {
+        CTLineGetBoundsWithOptions(CTLineCreateWithAttributedString(line), [.useGlyphPathBounds])
+    }
+}
+
+extension MenuBarStackedSize {
+    /// The point size each stacked line renders at. This mapping lives in the
+    /// App layer (not Domain) because it is a rendering concern: Domain models
+    /// the user's choice, the renderer decides what it means in points. The
+    /// values are capped at 11pt because two lines of measured glyph ink must
+    /// still fit inside the menu bar's 22pt content height (see
+    /// `StatusBarStackedImageRenderer`).
+    var stackedLinePointSize: CGFloat {
+        switch self {
+        case .small: 9
+        case .medium: 10
+        case .large: 11
+        }
     }
 }

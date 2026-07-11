@@ -176,6 +176,29 @@ struct JSONSettingsRepositoryAppTests {
     }
 
     @Test
+    func `menuBarStackedSize defaults to small`() {
+        let (repo, dir) = makeRepository()
+        defer { cleanup(dir) }
+
+        #expect(repo.menuBarStackedSize() == "small")
+    }
+
+    @Test
+    func `setMenuBarStackedSize persists value`() {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("claudebar-test-\(UUID().uuidString)")
+        let fileURL = tempDir.appendingPathComponent("settings.json")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let store = JSONSettingsStore(fileURL: fileURL)
+        let repo1 = JSONSettingsRepository(store: store)
+        repo1.setMenuBarStackedSize("large")
+
+        let repo2 = JSONSettingsRepository(store: store)
+        #expect(repo2.menuBarStackedSize() == "large")
+    }
+
+    @Test
     func `showDailyUsageCards defaults to true`() {
         let (repo, dir) = makeRepository()
         defer { cleanup(dir) }

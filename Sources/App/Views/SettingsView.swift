@@ -381,6 +381,28 @@ struct SettingsContentView: View {
         }
     }
 
+    /// Size selector for the stacked lines. Small is the original 9pt
+    /// rendering; Medium and Large enlarge both lines to 10pt and 11pt while
+    /// the renderer keeps their ink inside the menu bar's height limit.
+    private var menuBarStackedSizePicker: some View {
+        HStack {
+            Text("Stacked Text Size")
+                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                .foregroundStyle(theme.textSecondary)
+
+            Spacer()
+
+            Picker("", selection: $settings.menuBarStackedSize) {
+                ForEach(MenuBarStackedSize.allCases, id: \.self) { size in
+                    Text(size.displayLabel).tag(size)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+        }
+    }
+
     private var menuBarControls: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
@@ -477,6 +499,12 @@ struct SettingsContentView: View {
                     // toggle appears once a secondary window is selected.
                     if !settings.menuBarSecondaryQuotaKey.isEmpty {
                         menuBarStackedToggle
+
+                        // The size only matters while stacking is actually
+                        // rendering, so it appears with the toggle on.
+                        if settings.menuBarStackedEnabled {
+                            menuBarStackedSizePicker
+                        }
                     }
                 }
             }

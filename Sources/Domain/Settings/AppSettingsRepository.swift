@@ -30,6 +30,9 @@ public protocol AppSettingsRepository: Sendable {
     func menuBarStackedEnabled() -> Bool
     func setMenuBarStackedEnabled(_ enabled: Bool)
 
+    func menuBarStackedSize() -> String
+    func setMenuBarStackedSize(_ size: String)
+
     func menuBarPercentageProviderId() -> String
     func setMenuBarPercentageProviderId(_ providerId: String)
 

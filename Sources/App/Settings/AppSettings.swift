@@ -68,6 +68,16 @@ public final class AppSettings {
         }
     }
 
+    /// Text size for the stacked menu bar lines. Small is the original 9pt
+    /// rendering and the default; Medium (10pt) and Large (11pt) trade some of
+    /// the inter-line breathing room for legibility. Only consulted while
+    /// `menuBarStackedEnabled` is actually rendering two lines.
+    public var menuBarStackedSize: MenuBarStackedSize {
+        didSet {
+            repository.setMenuBarStackedSize(menuBarStackedSize.rawValue)
+        }
+    }
+
     /// Provider used for the menu bar percentage label.
     public var menuBarPercentageProviderId: String {
         didSet {
@@ -228,6 +238,10 @@ public final class AppSettings {
         self.menuBarPercentageEnabled = repository.menuBarPercentageEnabled()
         self.menuBarDurationEnabled = repository.menuBarDurationEnabled()
         self.menuBarStackedEnabled = repository.menuBarStackedEnabled()
+        // The stored size decodes through the Domain fallback so an unknown
+        // raw value (from a newer build's settings file) renders small
+        // instead of crashing or dropping the label.
+        self.menuBarStackedSize = MenuBarStackedSize(storedRawValue: repository.menuBarStackedSize())
         self.menuBarPercentageProviderId = repository.menuBarPercentageProviderId()
         self.menuBarPercentageQuotaKey = repository.menuBarPercentageQuotaKey()
         self.menuBarSecondaryQuotaKey = repository.menuBarSecondaryQuotaKey()
