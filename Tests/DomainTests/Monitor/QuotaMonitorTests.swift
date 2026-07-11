@@ -483,9 +483,14 @@ struct QuotaMonitorTests {
             mode: .remaining
         )
 
-        // Then: segments carry the full "percentage · duration" window texts
+        // Then: segments carry the full "percentage · duration" window texts,
+        // each with its own per-window status (matching the dual-window test)
         #expect(label?.text == "5h 75% · 3h | 7d 35% · 6d")
-        #expect(label?.segments.map(\.text) == ["5h 75% · 3h", "7d 35% · 6d"])
+        #expect(label?.status == .warning)
+        #expect(label?.segments == [
+            MenuBarLabel.Segment(text: "5h 75% · 3h", status: .healthy),
+            MenuBarLabel.Segment(text: "7d 35% · 6d", status: .warning),
+        ])
     }
 
     @Test
