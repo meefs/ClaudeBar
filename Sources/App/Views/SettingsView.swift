@@ -384,22 +384,27 @@ struct SettingsContentView: View {
     /// Size selector for the stacked lines. Small is the original 9pt
     /// rendering; Medium and Large enlarge both lines to 10pt and 11pt while
     /// the renderer keeps their ink inside the menu bar's height limit.
+    /// Rendered as a labelled chip row (like PROVIDER and QUOTA above) so the
+    /// control speaks the section's choice-button language instead of a
+    /// system segmented picker.
     private var menuBarStackedSizePicker: some View {
-        HStack {
-            Text("Stacked Text Size")
-                .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+        VStack(alignment: .leading, spacing: 6) {
+            Text("STACKED TEXT SIZE")
+                .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
                 .foregroundStyle(theme.textSecondary)
+                .tracking(0.5)
 
-            Spacer()
-
-            Picker("", selection: $settings.menuBarStackedSize) {
+            HStack(spacing: 8) {
                 ForEach(MenuBarStackedSize.allCases, id: \.self) { size in
-                    Text(size.displayLabel).tag(size)
+                    MenuBarChoiceButton(
+                        iconName: size.choiceIconName,
+                        label: size.displayLabel,
+                        isSelected: settings.menuBarStackedSize == size
+                    ) {
+                        settings.menuBarStackedSize = size
+                    }
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
         }
     }
 

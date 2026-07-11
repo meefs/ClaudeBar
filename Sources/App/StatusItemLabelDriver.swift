@@ -484,4 +484,14 @@ extension MenuBarStackedSize {
         case .large: 11
         }
     }
+
+    /// SF Symbol for the settings choice chip. Every chip in the menu bar
+    /// section carries a leading icon, so the size options do too.
+    var choiceIconName: String {
+        switch self {
+        case .small: "textformat.size.smaller"
+        case .medium: "textformat.size"
+        case .large: "textformat.size.larger"
+        }
+    }
 }
