@@ -18,9 +18,25 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
     /// Raw reset text from CLI (e.g., "Resets 11am", "Resets Jan 15")
     public let resetText: String?
 
+    /// The actual duration of this quota's window in seconds, when the data
+    /// source reports it (e.g. Oh My Pi's `window.durationMs`). Pace math
+    /// falls back to `quotaType.duration` when nil.
+    public let windowDuration: TimeInterval?
+
     /// Dollar balance remaining for credit-based quotas with no cap (e.g., "$50 remaining").
     /// nil for percentage-based quotas that have a known total.
     public let dollarRemaining: Decimal?
+
+    /// Section this quota belongs to when an aggregating provider spans
+    /// several upstream accounts (e.g. "Claude", "Claude · work").
+    /// nil for providers whose quotas render as one flat list.
+    public let group: String?
+
+    /// Short card title used when the quota renders inside its group's
+    /// section (e.g. "5h", "Spark 7d"). The UI falls back to
+    /// `quotaType.displayName` when nil. The full label stays in
+    /// `quotaType` so persisted quota keys and the menu bar are unaffected.
+    public let compactTitle: String?
 
     // MARK: - Initialization
 
@@ -30,14 +46,20 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         providerId: String,
         resetsAt: Date? = nil,
         resetText: String? = nil,
-        dollarRemaining: Decimal? = nil
+        windowDuration: TimeInterval? = nil,
+        dollarRemaining: Decimal? = nil,
+        group: String? = nil,
+        compactTitle: String? = nil
     ) {
         self.percentRemaining = min(100, percentRemaining)  // Allow negative, cap at 100
         self.quotaType = quotaType
         self.providerId = providerId
         self.resetsAt = resetsAt
         self.resetText = resetText
+        self.windowDuration = windowDuration
         self.dollarRemaining = dollarRemaining
+        self.group = group
+        self.compactTitle = compactTitle
     }
 
     // MARK: - Domain Behavior
@@ -142,7 +164,7 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
     /// Calculated as: `(totalDuration - timeUntilReset) / totalDuration * 100`
     public var percentTimeElapsed: Double? {
         guard let timeUntilReset else { return nil }
-        let totalDuration = quotaType.duration.seconds
+        let totalDuration = windowDuration ?? quotaType.duration.seconds
         guard totalDuration > 0 else { return nil }
         let elapsed = totalDuration - timeUntilReset
         return min(100, max(0, elapsed / totalDuration * 100))

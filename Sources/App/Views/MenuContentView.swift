@@ -80,12 +80,22 @@ struct MenuContentView: View {
                             .padding(.bottom, 8)
                     }
 
-                    // Main Content Area - no scroll, dynamic height
-                    VStack(spacing: 12) {
-                        metricsContent
+                    // Main Content Area — hugs its content, but caps at the
+                    // screen height and scrolls beyond it (aggregating
+                    // providers can show a dozen cards; the action bar must
+                    // never be pushed off-screen).
+                    ScrollView(.vertical, showsIndicators: true) {
+                        VStack(spacing: 12) {
+                            metricsContent
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
+                    .frame(maxHeight: contentMaxHeight)
+                    // Recreate the scroll view when the shown content
+                    // changes, so a newly selected provider starts at the
+                    // top instead of inheriting the previous scroll offset.
+                    .id(settings.overviewModeEnabled ? "overview" : monitor.selectedProviderId)
 
                     // Bottom Action Bar
                     actionBar
@@ -146,6 +156,15 @@ struct MenuContentView: View {
                 await refresh(providerId: newProviderId)
             }
         }
+    }
+
+    /// Upper bound for the scrollable content region — see
+    /// `PopoverContentHeight` for the policy and its tests.
+    private var contentMaxHeight: CGFloat {
+        PopoverContentHeight.maxHeight(
+            visibleScreenHeight: NSScreen.main?.visibleFrame.height ?? 800,
+            overviewMode: settings.overviewModeEnabled
+        )
     }
 
     // MARK: - Background Orbs
@@ -368,25 +387,19 @@ struct MenuContentView: View {
         }
     }
 
-    /// Max height for the overview scroll area (80% of screen or 500pt)
-    private var overviewMaxHeight: CGFloat {
-        let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-        return min(screenHeight * 0.8, 500)
-    }
-
     private func overviewContent(providers: [any AIProvider]) -> some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(spacing: 12) {
-                ForEach(Array(providers.enumerated()), id: \.element.id) { index, provider in
-                    if index > 0 {
-                        Divider()
-                            .background(theme.glassBorder)
-                    }
-                    providerSection(provider: provider)
+        // Scrolling is owned by the shared middle-region ScrollView in
+        // `body`; nesting another vertical ScrollView here would break
+        // height negotiation and swallow gestures.
+        VStack(spacing: 12) {
+            ForEach(Array(providers.enumerated()), id: \.element.id) { index, provider in
+                if index > 0 {
+                    Divider()
+                        .background(theme.glassBorder)
                 }
+                providerSection(provider: provider)
             }
         }
-        .frame(maxHeight: overviewMaxHeight)
         .opacity(animateIn ? 1 : 0)
         .animation(.easeOut(duration: 0.5).delay(0.2), value: animateIn)
     }
@@ -490,11 +503,108 @@ struct MenuContentView: View {
         .glassCard(cornerRadius: 12, padding: 10)
     }
 
+    /// Collapsed state of quota-group sections, keyed by `QuotaGroup.id`.
+    /// Ephemeral by design: reopening the popover starts fully expanded.
+    @State private var collapsedQuotaGroups: Set<String> = []
+
+    /// Sections for aggregating providers (e.g. Oh My Pi): one collapsible
+    /// block per upstream account, so ten flat cards become scannable.
+    @ViewBuilder
+    private func quotaGroupSections(snapshot: UsageSnapshot) -> some View {
+        let groups = snapshot.quotaGroups
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(groups.enumerated()), id: \.element.id) { groupIndex, group in
+                let baseDelay = Double(groups.prefix(groupIndex).reduce(0) { $0 + $1.quotas.count }) * 0.08
+                quotaGroupSection(group, baseDelay: baseDelay)
+            }
+        }
+    }
+
+    private func quotaGroupSection(_ group: QuotaGroup, baseDelay: Double) -> some View {
+        // Note-only sections (accounts without usable quota data) have no
+        // cards to collapse; the note renders inline in the header.
+        let isNoteOnly = group.quotas.isEmpty
+        let isCollapsed = !isNoteOnly && collapsedQuotaGroups.contains(group.id)
+        return VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    collapsedQuotaGroups = isCollapsed
+                        ? collapsedQuotaGroups.subtracting([group.id])
+                        : collapsedQuotaGroups.union([group.id])
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    if !isNoteOnly {
+                        Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(theme.textTertiary)
+                    }
+
+                    Text((group.title ?? "Other").uppercased())
+                        .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                        .foregroundStyle(theme.textSecondary)
+                        .tracking(0.5)
+
+                    Spacer(minLength: 4)
+
+                    if case .headerInline(let note) = group.notePlacement {
+                        Text(note)
+                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textTertiary)
+                    } else if isNoteOnly {
+                        Text("No usage data")
+                            .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                            .foregroundStyle(theme.textTertiary)
+                    } else {
+                        // Collapsed sections keep their headline number visible.
+                        if isCollapsed, let lowest = group.lowestQuota {
+                            Text("\(Int(lowest.percentRemaining))% left")
+                                .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                                .foregroundStyle(theme.textTertiary)
+                        }
+
+                        Text(group.worstStatus.badgeText)
+                            .badge(theme.statusColor(for: group.worstStatus))
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isNoteOnly)
+
+            if !isNoteOnly && !isCollapsed {
+                // A note attached to a quota-bearing section (the same
+                // account also reported "No usage" somewhere) is shown as
+                // its own row - never silently dropped.
+                if case .row(let note) = group.notePlacement {
+                    Text(note)
+                        .font(.system(size: 9, weight: .medium, design: theme.fontDesign))
+                        .foregroundStyle(theme.textTertiary)
+                }
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
+                    ForEach(Array(group.quotas.enumerated()), id: \.element.quotaType) { index, quota in
+                        WrappedStatCard(quota: quota, delay: baseDelay + Double(index) * 0.08)
+                    }
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private func statsGrid(snapshot: UsageSnapshot) -> some View {
         VStack(spacing: 10) {
-            // Show quota cards if quotas exist (Max/Pro accounts)
-            if !snapshot.quotas.isEmpty {
+            // Grouped sections cover aggregating providers even when every
+            // account lacks quota data (note-only sections must still render).
+            if snapshot.hasQuotaGroups {
+                quotaGroupSections(snapshot: snapshot)
+            } else if !snapshot.quotas.isEmpty {
                 LazyVGrid(
                     columns: [
                         GridItem(.flexible(), spacing: 10),
@@ -539,7 +649,8 @@ struct MenuContentView: View {
             }
 
             // Show extension metrics cards (from extension probes)
-            if let extensionMetrics = snapshot.extensionMetrics, !extensionMetrics.isEmpty {
+            if let extensionMetrics = snapshot.extensionMetrics?.filter({ $0.group == nil }),
+               !extensionMetrics.isEmpty {
                 let metricBaseDelay = Double(snapshot.quotas.count + 2) * 0.08
                 LazyVGrid(
                     columns: [
@@ -859,7 +970,7 @@ struct WrappedStatCard: View {
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(statusColor)
 
-                    Text(quota.quotaType.displayName.uppercased())
+                    Text((quota.compactTitle ?? quota.quotaType.displayName).uppercased())
                         .font(.system(size: 8, weight: .medium, design: theme.fontDesign))
                         .foregroundStyle(theme.textSecondary)
                         .tracking(0.3)

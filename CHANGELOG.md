@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Oh My Pi (`omp`) provider: shows the rate-limit windows of every account the
+  harness is signed into (Claude, Codex, Z.ai, ...) via `omp usage --json`. Each
+  window appears as its own quota with reset countdown; pace math uses the
+  window duration reported by the CLI, multiple accounts on the same upstream
+  provider are disambiguated per account, and accounts without usable quota
+  data — fetch failures (`accountsWithoutUsage`) or providers that report
+  zero limits by design (e.g. Ollama) — are listed as explicit
+  "No usage reported" rows instead of being dropped.
+- Aggregated provider cards (Oh My Pi) group their quotas into one
+  collapsible section per upstream account — with compact card titles,
+  a worst-status badge per section, and an inline "No usage reported"
+  line for accounts without quota data — and the popover's content area
+  now caps at the screen height and scrolls, so the action bar can no
+  longer be pushed off-screen.
+- CLI probes now run with a PATH that includes the common install directories
+  and the resolved binary's own directory, and `~/.bun/bin` is searched when
+  locating tools — bun/node-shebang CLIs (like `omp`) now work from the
+  menu bar (launchd) context where the login-shell PATH is unavailable.
+
+### Fixed
+- Time-limit quota labels are no longer force-capitalized in the UI
+  ("MCP" was displayed as "Mcp").
+
 ---
 
 ## [0.4.70] - 2026-07-02
