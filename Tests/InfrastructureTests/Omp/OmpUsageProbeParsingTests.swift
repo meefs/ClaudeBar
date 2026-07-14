@@ -211,6 +211,24 @@ struct OmpUsageProbeParsingTests {
     }
 
     @Test
+    func `monetary label falls back to window id`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "opencode-go",
+            "limits": [ {
+              "window": { "id": "monthly" },
+              "amount": { "used": 50, "limit": 500, "unit": "usd" }
+            } ]
+        } ] }
+        """
+
+        let snapshot = try OmpUsageProbe.parse(json)
+        let quota = try #require(snapshot.quota(for: .timeLimit("OpenCode Go Monthly")))
+
+        #expect(quota.compactTitle == "Monthly")
+    }
+
+    @Test
     func `uncapped spend becomes a grouped note instead of a quota`() throws {
         let json = """
         { "reports": [ {
