@@ -57,7 +57,7 @@ A macOS menu bar application that monitors AI coding assistant usage quotas. Kee
   - [Kiro](https://kiro.dev) (`kiro-cli`) - Requires kiro-cli installation (see below)
   - [Amp](https://ampcode.com) (`amp`) - Auto-detected when CLI is installed
   - [OpenCode Go](https://opencode.ai/go) (`opencode`) - Tracks OpenCode Go usage windows (5hr/$12, weekly/$30, monthly/$60) via local SQLite DB
-  - [Oh My Pi](https://omp.sh) (`omp`) - Shows the rate-limit windows of every account the harness is signed into (Claude, Codex, Z.ai, ...) via `omp usage --json`
+  - [Oh My Pi](https://omp.sh) (`omp`) - Aggregates account usage via `omp usage --json`, showing rate-limit windows and, where reported, capped USD money cards or uncapped spend notes
 
 ### Kimi Setup
 
