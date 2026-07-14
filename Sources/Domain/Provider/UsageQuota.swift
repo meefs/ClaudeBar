@@ -104,6 +104,30 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         return String(format: "$%.2f", amount)
     }
 
+    /// Formatted spend amount for capped monetary quotas (e.g. "$1,234.56").
+    public var formattedDollarUsed: String? {
+        formatDollars(dollarUsed, minimumFractionDigits: 2)
+    }
+
+    /// Formatted cap for capped monetary quotas (e.g. "$500").
+    public var formattedDollarCap: String? {
+        formatDollars(dollarCap, minimumFractionDigits: 0)
+    }
+
+    private func formatDollars(_ amount: Decimal?, minimumFractionDigits: Int) -> String? {
+        guard let amount else { return nil }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.usesGroupingSeparator = true
+        formatter.groupingSeparator = ","
+        formatter.decimalSeparator = "."
+        formatter.minimumFractionDigits = minimumFractionDigits
+        formatter.maximumFractionDigits = 2
+        let value = formatter.string(from: amount as NSDecimalNumber) ?? "\(amount)"
+        return "$\(value)"
+    }
+
     /// Whether this quota needs attention (warning, critical, or depleted)
     public var needsAttention: Bool {
         status.needsAttention

@@ -396,6 +396,20 @@ struct UsageQuotaTests {
         #expect(quota.dollarRemaining == nil)
     }
 
+    @Test
+    func `formats capped zero spend at a glance`() {
+        let quota = UsageQuota(
+            percentRemaining: 100,
+            quotaType: .timeLimit("Claude Extra"),
+            providerId: "omp",
+            dollarUsed: 0,
+            dollarCap: 500
+        )
+
+        #expect(quota.formattedDollarUsed == "$0.00")
+        #expect(quota.formattedDollarCap == "$500")
+    }
+
     // MARK: - Burn Rate
 
     @Test
