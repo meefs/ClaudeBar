@@ -151,6 +151,184 @@ struct OmpUsageProbeParsingTests {
         #expect(zai.resetsAt == nil)
     }
 
+    // MARK: - Monetary Limits
+
+    @Test
+    func `maps capped zero spend to a monetary quota`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "id": "anthropic:extra",
+              "label": "Claude Extra Usage",
+              "scope": { "provider": "anthropic", "windowId": "extra" },
+              "amount": {
+                "used": 0,
+                "limit": 500,
+                "remaining": 500,
+                "usedFraction": 0,
+                "remainingFraction": 1,
+                "unit": "usd"
+              }
+            } ]
+        } ] }
+        """
+
+        let snapshot = try OmpUsageProbe.parse(json)
+        let quota = try #require(snapshot.quota(for: .timeLimit("Claude Extra")))
+
+        #expect(quota.percentRemaining == 100)
+        #expect(quota.dollarUsed == 0)
+        #expect(quota.dollarCap == 500)
+        #expect(quota.compactTitle == "Extra")
+        #expect(quota.group == "Claude")
+    }
+
+    @Test
+    func `capped spend honors fractions and preserves rounded dollars`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "extra" },
+              "amount": {
+                "used": 123.45,
+                "limit": 500,
+                "remainingFraction": 0.8,
+                "usedFraction": 0.2,
+                "unit": "USD"
+              }
+            } ]
+        } ] }
+        """
+
+        let snapshot = try OmpUsageProbe.parse(json)
+        let quota = try #require(snapshot.quota(for: .timeLimit("Claude Extra")))
+
+        #expect(quota.percentRemaining == 80)
+        #expect(quota.dollarUsed == Decimal(string: "123.45"))
+        #expect(quota.dollarCap == 500)
+    }
+
+    @Test
+    func `uncapped spend becomes a grouped note instead of a quota`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "id": "anthropic:extra",
+              "label": "Claude Extra Usage",
+              "scope": { "provider": "anthropic", "windowId": "extra" },
+              "amount": { "used": 1234.56, "unit": "usd" }
+            } ],
+            "metadata": { "email": "solo@example.com" }
+        } ] }
+        """
+
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.quotas.isEmpty)
+        let metrics = try #require(snapshot.extensionMetrics)
+        #expect(metrics.count == 1)
+        #expect(metrics[0].label == "Claude Extra Usage")
+        #expect(metrics[0].value == "Extra usage $1,234.56 spent · no cap")
+        #expect(metrics[0].icon == "dollarsign.circle")
+        #expect(metrics[0].group == "Claude")
+        #expect(snapshot.quotaGroups.first?.note == "Extra usage $1,234.56 spent · no cap")
+    }
+
+    @Test
+    func `windowless cursor spend labels suppress the usd meter`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "cursor",
+            "limits": [
+              {
+                "id": "cursor:usd:included",
+                "label": "included spend",
+                "amount": { "used": 1234.56, "limit": 5000, "unit": "UsD" }
+              },
+              {
+                "id": "cursor:usd:bonus",
+                "label": "bonus spend",
+                "amount": { "used": 10, "limit": 100, "unit": "usd" }
+              }
+            ]
+        } ] }
+        """
+
+        let snapshot = try OmpUsageProbe.parse(json)
+        let labels = snapshot.quotas.map(\.quotaType.displayName)
+
+        #expect(labels == ["Cursor Spend", "Cursor Spend (2)"])
+        #expect(labels.allSatisfy { !$0.localizedCaseInsensitiveContains("usd") })
+        #expect(snapshot.quotas.first?.compactTitle == "Spend")
+        #expect(snapshot.quotas.first?.dollarUsed == Decimal(string: "1234.56"))
+        #expect(snapshot.quotas.first?.dollarCap == 5000)
+    }
+
+    @Test
+    func `monetary and window quotas share the account group`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [
+              {
+                "scope": { "windowId": "5h" },
+                "window": { "id": "5h", "durationMs": 18000000 },
+                "amount": { "remainingFraction": 0.9, "unit": "percent" }
+              },
+              {
+                "scope": { "windowId": "extra" },
+                "amount": { "used": 125, "limit": 500, "unit": "usd" }
+              }
+            ]
+        } ] }
+        """
+
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.quotas.map(\.quotaType.displayName) == ["Claude 5h", "Claude Extra"])
+        #expect(snapshot.quotas.allSatisfy { $0.group == "Claude" })
+        #expect(snapshot.quotaGroups.count == 1)
+        #expect(snapshot.quotaGroups[0].quotas.count == 2)
+    }
+
+    @Test
+    func `uncapped spend notes discriminate same-provider accounts`() throws {
+        let json = """
+        { "reports": [
+          {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "extra" },
+              "amount": { "used": 10, "unit": "usd" }
+            } ],
+            "metadata": { "email": "work@example.com" }
+          },
+          {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "extra" },
+              "amount": { "used": 20, "unit": "usd" }
+            } ],
+            "metadata": { "email": "home@example.com" }
+          }
+        ] }
+        """
+
+        let snapshot = try OmpUsageProbe.parse(json)
+        let metrics = try #require(snapshot.extensionMetrics)
+
+        #expect(snapshot.quotas.isEmpty)
+        #expect(metrics.map(\.label) == [
+            "Claude Extra Usage · work",
+            "Claude Extra Usage · home",
+        ])
+        #expect(metrics.map(\.group) == ["Claude · work", "Claude · home"])
+        #expect(Set(metrics.map(\.label)).count == metrics.count)
+    }
+
     // MARK: - Account Email
 
     @Test
