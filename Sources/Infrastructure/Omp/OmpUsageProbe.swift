@@ -205,10 +205,36 @@ public struct OmpUsageProbe: UsageProbe {
 
         // Credentials the harness holds for usage-capable providers that
         // produced no attributable report (expired session, fetch failure).
-        // Surface them as explicit "No usage reported" rows — never as fake
-        // quotas — so the card covers the full credential pool, matching
-        // `omp usage`'s own account listing.
+        // Surface genuinely unmatched credentials as explicit
+        // "No usage reported" rows — never as fake quotas.
+        var emittedUnreportedAccounts: [UnreportedAccount] = []
         for account in payload.accountsWithoutUsage ?? [] {
+            let matchesReport = payload.reports.contains { report in
+                Self.emailOrAccountIdMatch(
+                    provider: account.provider,
+                    email: account.email,
+                    accountId: account.accountId,
+                    orgId: account.orgId,
+                    otherProvider: report.provider,
+                    otherEmail: report.metadata?.email,
+                    otherAccountId: report.matchableAccountId
+                )
+            }
+            let duplicatesRow = emittedUnreportedAccounts.contains { emitted in
+                guard !Self.hasOrganization(emitted.orgId) else { return false }
+                return Self.emailOrAccountIdMatch(
+                    provider: account.provider,
+                    email: account.email,
+                    accountId: account.accountId,
+                    orgId: account.orgId,
+                    otherProvider: emitted.provider,
+                    otherEmail: emitted.email,
+                    otherAccountId: emitted.accountId
+                )
+            }
+            guard !matchesReport, !duplicatesRow else { continue }
+
+            emittedUnreportedAccounts.append(account)
             let providerName = Self.upstreamDisplayName(account.provider)
             accountRows.append(Self.accountRow(
                 label: Self.uniqueLabel(
@@ -221,7 +247,6 @@ public struct OmpUsageProbe: UsageProbe {
                 )
             ))
         }
-
         guard !quotas.isEmpty || !accountRows.isEmpty else {
             throw ProbeError.noData
         }
@@ -233,6 +258,46 @@ public struct OmpUsageProbe: UsageProbe {
             accountEmail: Self.singleDistinctEmail(in: payload),
             extensionMetrics: accountRows.isEmpty ? nil : accountRows
         )
+    }
+
+    /// Provider-scoped identity match for defensively omitting only org-less
+    /// stale credential rows. Org-scoped credentials represent distinct limit
+    /// pools and remain visible even when an email or account id matches.
+    /// For org-less rows, normalized email is authoritative when both sides
+    /// have one; exact account id is the fallback when either email is absent.
+    private static func emailOrAccountIdMatch(
+        provider: String,
+        email: String?,
+        accountId: String?,
+        orgId: String?,
+        otherProvider: String,
+        otherEmail: String?,
+        otherAccountId: String?
+    ) -> Bool {
+        guard provider == otherProvider else { return false }
+        guard !Self.hasOrganization(orgId) else { return false }
+
+        if let email = Self.normalizedEmail(email),
+           let otherEmail = Self.normalizedEmail(otherEmail) {
+            return email == otherEmail
+        }
+
+        guard let accountId, !accountId.isEmpty,
+              let otherAccountId, !otherAccountId.isEmpty else {
+            return false
+        }
+        return accountId == otherAccountId
+    }
+
+    private static func normalizedEmail(_ email: String?) -> String? {
+        guard let email else { return nil }
+        let normalized = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized.isEmpty ? nil : normalized
+    }
+
+    private static func hasOrganization(_ orgId: String?) -> Bool {
+        guard let orgId else { return false }
+        return !orgId.isEmpty
     }
 
     /// Returns `label`, suffixed if needed so it is unique within `seen`.
@@ -356,6 +421,7 @@ public struct OmpUsageProbe: UsageProbe {
         let type: String?
         let email: String?
         let accountId: String?
+        let orgId: String?
         let projectId: String?
         let enterpriseUrl: String?
 
@@ -373,6 +439,20 @@ public struct OmpUsageProbe: UsageProbe {
         let provider: String
         let limits: [UsageLimit]
         let metadata: ReportMetadata?
+
+        /// Account identity used for exact matching. Some providers place it
+        /// on limit scopes; project ids remain deliberately excluded.
+        var matchableAccountId: String? {
+            if let accountId = metadata?.accountId, !accountId.isEmpty {
+                return accountId
+            }
+            for limit in limits {
+                if let accountId = limit.scope?.accountId, !accountId.isEmpty {
+                    return accountId
+                }
+            }
+            return nil
+        }
 
         /// Full identity of this account, mirroring `omp usage`'s own
         /// `reportAccountLabel`: metadata email → accountId → projectId,
