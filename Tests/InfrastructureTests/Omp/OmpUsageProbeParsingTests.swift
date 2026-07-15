@@ -327,6 +327,544 @@ struct OmpUsageProbeParsingTests {
         #expect(snapshot.accountEmail == "solo@example.com")
     }
 
+    @Test
+    func `suppresses unreported account with matching account id`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": { "accountId": "account-123" }
+        } ],
+          "accountsWithoutUsage": [
+            { "provider": "anthropic", "type": "oauth", "accountId": "account-123" }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.quotas.count == 1)
+        #expect(snapshot.extensionMetrics == nil)
+    }
+
+    @Test
+    func `suppresses unreported account matching scoped account id`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "google-gemini-cli",
+            "limits": [ {
+              "scope": {
+                "windowId": "1d",
+                "accountId": "scoped-account-123"
+              },
+              "window": { "id": "1d" },
+              "amount": { "remainingFraction": 0.9 }
+            } ]
+        } ],
+          "accountsWithoutUsage": [
+            {
+              "provider": "google-gemini-cli",
+              "type": "oauth",
+              "accountId": "scoped-account-123"
+            }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.quotas.count == 1)
+        #expect(snapshot.extensionMetrics == nil)
+    }
+
+    @Test
+    func `matching account id on different provider does not suppress unreported account`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": { "accountId": "shared-account-id" }
+        } ],
+          "accountsWithoutUsage": [
+            {
+              "provider": "github-copilot",
+              "type": "oauth",
+              "accountId": "shared-account-id"
+            }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.map(\.label) == ["Copilot · shared-account-id"])
+    }
+
+    @Test
+    func `suppresses unreported account with normalized matching email`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": { "email": " Alice@Example.COM " }
+        } ],
+          "accountsWithoutUsage": [
+            { "provider": "anthropic", "type": "oauth", "email": "alice@example.com" }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics == nil)
+    }
+
+    @Test
+    func `matching email overrides different credential account ids`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": {
+              "email": "alice@example.com",
+              "accountId": "report-credential-id"
+            }
+        } ],
+          "accountsWithoutUsage": [ {
+            "provider": "anthropic",
+            "type": "oauth",
+            "email": "alice@example.com",
+            "accountId": "stale-credential-id"
+          } ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics == nil)
+    }
+
+    @Test
+    func `same email with differing organization keeps unreported account visible`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": {
+              "email": "alice@example.com",
+              "orgId": "reported-org"
+            }
+        } ],
+          "accountsWithoutUsage": [ {
+            "provider": "anthropic",
+            "type": "oauth",
+            "email": "alice@example.com",
+            "orgId": "unreported-org"
+          } ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · alice@example.com"])
+    }
+
+    @Test
+    func `same email and organization keeps upstream unreported account visible`() throws {
+        // omp's org gate normally absorbs this identity into the same-org
+        // report. If it still reaches ClaudeBar, preserve omp's decision to
+        // surface the failed fetch instead of second-guessing it by email.
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": {
+              "email": "alice@example.com",
+              "orgId": "same-org"
+            }
+        } ],
+          "accountsWithoutUsage": [ {
+            "provider": "anthropic",
+            "type": "oauth",
+            "email": "alice@example.com",
+            "orgId": "same-org"
+          } ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · alice@example.com"])
+    }
+
+    @Test
+    func `organization-scoped account id match keeps unreported account visible`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": { "accountId": "shared-account-id" }
+        } ],
+          "accountsWithoutUsage": [ {
+            "provider": "anthropic",
+            "type": "oauth",
+            "accountId": "shared-account-id",
+            "orgId": "unreported-org"
+          } ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · shared-account-id"])
+    }
+
+    @Test
+    func `same email on different provider does not suppress unreported account`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": { "email": "shared@example.com" }
+        } ],
+          "accountsWithoutUsage": [
+            { "provider": "github-copilot", "type": "oauth", "email": "shared@example.com" }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.map(\.label) == ["Copilot · shared@example.com"])
+    }
+
+    @Test
+    func `different identities on one provider both render`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": {
+              "email": "alice@example.com",
+              "accountId": "alice-credential"
+            }
+        } ],
+          "accountsWithoutUsage": [ {
+            "provider": "anthropic",
+            "type": "oauth",
+            "email": "bob@example.com",
+            "accountId": "bob-credential"
+          } ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.quotas.count == 1)
+        #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · bob@example.com"])
+        #expect(snapshot.quotaGroups.map(\.title) == ["Claude", "Claude · bob"])
+    }
+
+    @Test
+    func `different emails do not fall back to matching account id`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": {
+              "email": "alice@example.com",
+              "accountId": "shared-credential-id"
+            }
+        } ],
+          "accountsWithoutUsage": [ {
+            "provider": "anthropic",
+            "type": "oauth",
+            "email": "bob@example.com",
+            "accountId": "shared-credential-id"
+          } ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.map(\.label) == ["Claude · bob@example.com"])
+    }
+
+    @Test
+    func `shared project id does not suppress unreported account`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "google-gemini-cli",
+            "limits": [ {
+              "scope": { "windowId": "1d" },
+              "window": { "id": "1d" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": { "projectId": "shared-project" }
+        } ],
+          "accountsWithoutUsage": [ {
+            "provider": "google-gemini-cli",
+            "type": "oauth",
+            "projectId": "shared-project"
+          } ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.map(\.label) == ["Gemini · shared-project"])
+    }
+
+    @Test
+    func `identical whitespace emails with different account ids stay distinct`() throws {
+        let json = """
+        { "reports": [],
+          "accountsWithoutUsage": [
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": " ",
+              "accountId": "first-credential"
+            },
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": " ",
+              "accountId": "second-credential"
+            }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.count == 2)
+    }
+
+    @Test
+    func `identical whitespace emails fall back to identical account ids`() throws {
+        let json = """
+        { "reports": [],
+          "accountsWithoutUsage": [
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": " ",
+              "accountId": "same-credential"
+            },
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": " ",
+              "accountId": "same-credential"
+            }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.count == 1)
+    }
+
+    @Test
+    func `duplicate identified unreported accounts collapse to one row`() throws {
+        let json = """
+        { "reports": [],
+          "accountsWithoutUsage": [
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": "alice@example.com",
+              "accountId": "first-credential"
+            },
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": " ALICE@example.com ",
+              "accountId": "second-credential"
+            }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+        let metrics = try #require(snapshot.extensionMetrics)
+
+        #expect(metrics.count == 1)
+        #expect(metrics[0].label == "Claude · alice@example.com")
+    }
+
+    @Test
+    func `organization-scoped unreported accounts with same email both render`() throws {
+        let json = """
+        { "reports": [],
+          "accountsWithoutUsage": [
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": "alice@example.com",
+              "accountId": "first-credential",
+              "orgId": "first-org"
+            },
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": "alice@example.com",
+              "accountId": "second-credential",
+              "orgId": "second-org"
+            }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.count == 2)
+    }
+
+    @Test
+    func `mixed organization and legacy unreported accounts stay distinct regardless of order`() throws {
+        let organizationFirst = """
+        { "reports": [],
+          "accountsWithoutUsage": [
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": "alice@example.com",
+              "accountId": "organization-credential",
+              "orgId": "organization"
+            },
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": "alice@example.com",
+              "accountId": "legacy-credential"
+            }
+          ] }
+        """
+        let legacyFirst = """
+        { "reports": [],
+          "accountsWithoutUsage": [
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": "alice@example.com",
+              "accountId": "legacy-credential"
+            },
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": "alice@example.com",
+              "accountId": "organization-credential",
+              "orgId": "organization"
+            }
+          ] }
+        """
+
+        let organizationFirstSnapshot = try OmpUsageProbe.parse(organizationFirst)
+        let legacyFirstSnapshot = try OmpUsageProbe.parse(legacyFirst)
+
+        #expect(organizationFirstSnapshot.extensionMetrics?.count == 2)
+        #expect(legacyFirstSnapshot.extensionMetrics?.count == 2)
+    }
+
+    @Test
+    func `zero-limit report identity suppresses matching unreported account`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "ollama",
+            "limits": [],
+            "metadata": { "email": "local@ollama.dev" }
+        } ],
+          "accountsWithoutUsage": [
+            { "provider": "ollama", "type": "oauth", "email": "LOCAL@OLLAMA.DEV" }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.map(\.label) == ["Ollama · local@ollama.dev"])
+        #expect(snapshot.quotaGroups.map(\.title) == ["Ollama · local"])
+    }
+
+    @Test
+    func `anonymous unreported account never matches anonymous report`() throws {
+        let json = """
+        { "reports": [ {
+            "provider": "ollama",
+            "limits": []
+        } ],
+          "accountsWithoutUsage": [
+            { "provider": "ollama", "type": "oauth" }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.extensionMetrics?.map(\.label) == [
+            "Ollama · account 1",
+            "Ollama · OAuth account",
+        ])
+    }
+
+    @Test
+    func `live duplicate shape keeps two quota groups and drops stale rows`() throws {
+        let json = """
+        { "reports": [
+          {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.9 }
+            } ],
+            "metadata": {
+              "email": "alice@example.com",
+              "accountId": "alice-report-credential"
+            }
+          },
+          {
+            "provider": "anthropic",
+            "limits": [ {
+              "scope": { "windowId": "5h" },
+              "window": { "id": "5h" },
+              "amount": { "remainingFraction": 0.4 }
+            } ],
+            "metadata": {
+              "email": "bob@example.com",
+              "accountId": "bob-report-credential"
+            }
+          }
+        ],
+          "accountsWithoutUsage": [
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": "alice@example.com",
+              "accountId": "alice-stale-credential"
+            },
+            {
+              "provider": "anthropic",
+              "type": "oauth",
+              "email": "bob@example.com",
+              "accountId": "bob-stale-credential"
+            }
+          ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+
+        #expect(snapshot.quotas.count == 2)
+        #expect(snapshot.quotaGroups.map(\.title) == ["Claude · alice", "Claude · bob"])
+        #expect(snapshot.extensionMetrics == nil)
+    }
+
     // MARK: - Reports Without Usable Limits
 
     @Test

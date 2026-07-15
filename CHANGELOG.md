@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Oh My Pi no longer shows duplicate "No usage reported" account rows when
+  org-less stale credentials share an email with an account that already
+  reported usage; organization-scoped failures remain visible.
+
 ---
 
 ## [0.4.71] - 2026-07-13
