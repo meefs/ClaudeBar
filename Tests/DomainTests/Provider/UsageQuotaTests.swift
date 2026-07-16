@@ -467,4 +467,44 @@ struct UsageQuotaTests {
         let elapsed = quota.percentTimeElapsed!
         #expect(elapsed > 49 && elapsed < 51)
     }
+
+    @Test
+    func `paceTickHelp explains expected remaining in remaining mode`() {
+        // 75% of a 5h window elapsed -> steady usage would leave ~25%.
+        let quota = UsageQuota(
+            percentRemaining: 43,
+            quotaType: .timeLimit("Z.ai 5h"),
+            providerId: "zai",
+            resetsAt: Date().addingTimeInterval(1.25 * 3600),
+            windowDuration: 5 * 3600
+        )
+        let help = quota.paceTickHelp(mode: .remaining)!
+        #expect(help.contains("~25% remaining"))
+        // 57 used vs 75 elapsed -> below expected usage, surfaced inline.
+        #expect(help.contains("below expected usage"))
+    }
+
+    @Test
+    func `paceTickHelp uses consumed wording in used mode`() {
+        let quota = UsageQuota(
+            percentRemaining: 43,
+            quotaType: .timeLimit("Z.ai 5h"),
+            providerId: "zai",
+            resetsAt: Date().addingTimeInterval(1.25 * 3600),
+            windowDuration: 5 * 3600
+        )
+        let help = quota.paceTickHelp(mode: .used)!
+        #expect(help.contains("~75%"))
+        #expect(help.contains("used"))
+    }
+
+    @Test
+    func `paceTickHelp is nil without reset time`() {
+        let quota = UsageQuota(
+            percentRemaining: 43,
+            quotaType: .timeLimit("MCP"),
+            providerId: "zai"
+        )
+        #expect(quota.paceTickHelp(mode: .remaining) == nil)
+    }
 }

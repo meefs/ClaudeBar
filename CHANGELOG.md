@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The pace tick under quota progress bars now explains itself: hovering the
+  bar shows a mode-aware tooltip ("steady usage would leave ~N% remaining by
+  now"), so the marker no longer reads as a misaligned rendering glitch.
+
 ---
 
 ## [0.4.72] - 2026-07-15

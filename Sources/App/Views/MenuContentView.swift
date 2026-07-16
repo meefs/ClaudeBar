@@ -1062,6 +1062,7 @@ struct WrappedStatCard: View {
                     .frame(height: 5)
                 }
             }
+            .help(quota.paceTickHelp(mode: effectiveDisplayMode) ?? "")
 
             // Reset info
             if let resetText = quota.resetTimestampDescription ?? quota.resetText ?? quota.resetDescription {
