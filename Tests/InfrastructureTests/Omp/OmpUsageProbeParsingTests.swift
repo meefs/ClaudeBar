@@ -573,6 +573,34 @@ struct OmpUsageProbeParsingTests {
     }
 
     @Test
+    func `keeps the meter prefix for window-label card titles`() throws {
+        // A window label ("Monthly") names timing, not the metered
+        // resource: two meters falling back to the same window label must
+        // stay distinguishable on their cards.
+        let json = """
+        { "reports": [ {
+            "provider": "zai",
+            "limits": [
+              {
+                "scope": { "windowId": "billing-cycle" },
+                "window": { "id": "billing-cycle", "label": "Monthly" },
+                "amount": { "usedFraction": 0.1, "remainingFraction": 0.9, "unit": "tokens" }
+              },
+              {
+                "scope": { "windowId": "billing-cycle" },
+                "window": { "id": "billing-cycle", "label": "Monthly" },
+                "amount": { "usedFraction": 0.2, "remainingFraction": 0.8, "unit": "requests" }
+              }
+            ]
+        } ] }
+        """
+        let snapshot = try OmpUsageProbe.parse(json)
+        let titles = snapshot.quotas.compactMap(\.compactTitle)
+
+        #expect(titles == ["Tokens Monthly", "Requests Monthly"])
+    }
+
+    @Test
     func `degrades oversized window durations to the label instead of trapping`() throws {
         // durationMs is attacker-adjacent external JSON; a finite value past
         // Int.max must fall through to the label fallback, not crash the

@@ -647,7 +647,9 @@ public struct OmpUsageProbe: UsageProbe {
         /// derived from the window duration, the limit's own label, the
         /// window label, the raw id. Label-derived tokens drop a leading
         /// provider name (Gemini labels embed it) since the section header
-        /// already carries that context.
+        /// already carries that context. Only the LIMIT's label is
+        /// self-describing — a window label ("Monthly") names timing, not
+        /// the metered resource, so it keeps the shared-window meter prefix.
         func displayWindowToken(providerName: String) -> DisplayWindowToken {
             let raw = scope?.windowId ?? window?.id
             if let raw, Self.isCompactWindowToken(raw) {
@@ -666,7 +668,7 @@ public struct OmpUsageProbe: UsageProbe {
             if let windowLabel = window?.label, !windowLabel.isEmpty {
                 return DisplayWindowToken(
                     token: Self.strippingProviderPrefix(windowLabel, providerName: providerName),
-                    selfDescribing: true
+                    selfDescribing: false
                 )
             }
             return DisplayWindowToken(token: raw ?? "limit", selfDescribing: false)
