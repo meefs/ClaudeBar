@@ -233,6 +233,21 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         }
     }
 
+    /// Tooltip copy explaining the pace tick mark under the progress bar.
+    /// Mode-aware: describes where the bar would sit if usage were spread
+    /// evenly across the window. Returns nil when reset time is unknown.
+    public func paceTickHelp(mode: UsageDisplayMode) -> String? {
+        guard let expected = expectedProgressPercent(mode: mode) else { return nil }
+        let base = switch mode {
+        case .used:
+            "Pace marker: steady usage would have used ~\(Int(expected.rounded()))% by now"
+        case .remaining, .pace:
+            "Pace marker: steady usage would leave ~\(Int(expected.rounded()))% remaining by now"
+        }
+        guard let insight = paceInsight else { return base + "." }
+        return base + " — " + insight.prefix(1).lowercased() + insight.dropFirst() + "."
+    }
+
     /// Time until this quota resets (if known)
     public var timeUntilReset: TimeInterval? {
         guard let resetsAt else { return nil }

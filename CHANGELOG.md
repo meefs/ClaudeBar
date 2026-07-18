@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The pace tick under quota progress bars now explains itself: hovering the
+  bar shows a mode-aware tooltip ("steady usage would leave ~N% remaining by
+  now"), so the marker no longer reads as a misaligned rendering glitch.
+=======
 ### Added
 - Claude Extra Usage now reads the current OAuth `spend` payload (with the
   legacy `extra_usage` shape as a tolerant fallback), converts minor units with
