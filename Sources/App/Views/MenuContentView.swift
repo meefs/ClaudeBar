@@ -955,6 +955,16 @@ struct WrappedStatCard: View {
         theme.statusColor(for: quota.status)
     }
 
+    private var isCappedSpend: Bool {
+        quota.dollarUsed != nil && quota.dollarCap != nil
+    }
+
+    private var valueCaption: String {
+        if isCappedSpend { return "Spent" }
+        if quota.isDollarBased { return "Remaining" }
+        return effectiveDisplayMode.displayLabel
+    }
+
     /// The color used for the pace label/number
     private var paceColor: Color {
         quota.pace.displayColor
@@ -990,7 +1000,22 @@ struct WrappedStatCard: View {
 
             // Large value display with label (end-aligned)
             HStack(alignment: .firstTextBaseline) {
-                if let dollarText = quota.formattedDollarRemaining {
+                if let dollarUsed = quota.formattedDollarUsed,
+                   let dollarCap = quota.formattedDollarCap {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text(dollarUsed)
+                            .font(.system(size: 20, weight: .heavy, design: theme.fontDesign))
+                            .foregroundStyle(theme.textPrimary)
+                            .contentTransition(.numericText())
+
+                        Text("of \(dollarCap)")
+                            .font(.system(size: 9, weight: .semibold, design: theme.fontDesign))
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
+                } else if let dollarText = quota.formattedDollarRemaining {
                     Text(dollarText)
                         .font(.system(size: 18, weight: .bold, design: theme.fontDesign))
                         .foregroundStyle(theme.textPrimary)
@@ -1008,10 +1033,11 @@ struct WrappedStatCard: View {
                     }
                 }
 
-                Spacer()
+                Spacer(minLength: 4)
 
-                Text(quota.isDollarBased ? "Remaining" : effectiveDisplayMode.displayLabel)
-                    .font(.system(size: 12, weight: .medium, design: theme.fontDesign))
+                Text(valueCaption)
+                    .font(.system(size: isCappedSpend ? 10 : 12, weight: .medium, design: theme.fontDesign))
+                    .fixedSize()
                     .foregroundStyle(effectiveDisplayMode == .pace ? paceColor.opacity(0.8) : theme.textTertiary)
             }
 

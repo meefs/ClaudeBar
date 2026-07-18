@@ -145,11 +145,28 @@ public struct OmpUsageProbe: UsageProbe {
                 .mapValues(\.count)
 
             let quotaCountBefore = quotas.count
+            let accountRowCountBefore = accountRows.count
 
             let providerName = Self.upstreamDisplayName(report.provider)
             let group = discriminator.map { "\(providerName) · \($0)" } ?? providerName
 
             for limit in report.limits {
+                if let dollarUsed = limit.uncappedMonetaryUsed {
+                    accountRows.append(Self.uncappedSpendRow(
+                        upstreamProvider: report.provider,
+                        limit: limit,
+                        dollarUsed: dollarUsed,
+                        discriminator: discriminator,
+                        group: group,
+                        seenLabels: &seenRowLabels
+                    ))
+                    continue
+                }
+
+                let monetaryAmounts = limit.cappedMonetaryAmounts
+                if limit.isMonetary, monetaryAmounts == nil {
+                    continue
+                }
                 guard let percentRemaining = limit.percentRemaining else { continue }
 
                 let needsMeter = windowGroupCounts[limit.windowGroupKey, default: 0] > 1
@@ -175,13 +192,15 @@ public struct OmpUsageProbe: UsageProbe {
                         providerId: providerId,
                         resetsAt: limit.resetDate,
                         windowDuration: limit.windowDurationSeconds,
+                        dollarUsed: monetaryAmounts?.used,
+                        dollarCap: monetaryAmounts?.cap,
                         group: group,
                         compactTitle: Self.compactTitle(limit: limit, meter: meter)
                     )
                 )
             }
 
-            if quotas.count > quotaCountBefore {
+            if quotas.count > quotaCountBefore || accountRows.count > accountRowCountBefore {
                 // Reserve the emitted quota-group title so a later note
                 // section can never silently collide with it.
                 seenGroupTitles.insert(group)
@@ -325,6 +344,43 @@ public struct OmpUsageProbe: UsageProbe {
         )
     }
 
+    /// A note row for an uncapped monetary meter. It intentionally does not
+    /// fabricate a percentage-based quota.
+    private static func uncappedSpendRow(
+        upstreamProvider: String,
+        limit: UsageLimit,
+        dollarUsed: Decimal,
+        discriminator: String?,
+        group: String,
+        seenLabels: inout Set<String>
+    ) -> ExtensionMetric {
+        var labelParts = [upstreamDisplayName(upstreamProvider), limit.labelToken, "Usage"]
+        if let discriminator, !discriminator.isEmpty {
+            labelParts.append("· \(discriminator)")
+        }
+
+        return ExtensionMetric(
+            label: uniqueLabel(labelParts.joined(separator: " "), seen: &seenLabels),
+            value: "\(limit.labelToken) usage \(formatMoney(dollarUsed)) spent · no cap",
+            unit: "",
+            icon: "dollarsign.circle",
+            group: group
+        )
+    }
+
+    private static func formatMoney(_ amount: Decimal) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.usesGroupingSeparator = true
+        formatter.groupingSeparator = ","
+        formatter.decimalSeparator = "."
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        let value = formatter.string(from: amount as NSDecimalNumber) ?? "\(amount)"
+        return "$\(value)"
+    }
+
     /// Shortens an account identity for section headers: the email local
     /// part, or a prefix of opaque ids — mirroring quota discriminators.
     static func shortIdentity(_ identity: String) -> String {
@@ -353,7 +409,7 @@ public struct OmpUsageProbe: UsageProbe {
         if let meter, !meter.isEmpty {
             parts.append(meter)
         }
-        parts.append(limit.windowToken)
+        parts.append(limit.labelToken)
         if let discriminator, !discriminator.isEmpty {
             parts.append("· \(discriminator)")
         }
@@ -371,7 +427,7 @@ public struct OmpUsageProbe: UsageProbe {
         if let meter, !meter.isEmpty {
             parts.append(meter)
         }
-        parts.append(limit.windowToken)
+        parts.append(limit.labelToken)
         return parts.joined(separator: " ")
     }
 
@@ -496,6 +552,32 @@ public struct OmpUsageProbe: UsageProbe {
         let window: LimitWindow?
         let amount: LimitAmount?
 
+        var isMonetary: Bool {
+            amount?.unit?.caseInsensitiveCompare("usd") == .orderedSame
+        }
+
+        var cappedMonetaryAmounts: (used: Decimal, cap: Decimal)? {
+            guard isMonetary,
+                  let rawLimit = amount?.limit, rawLimit > 0,
+                  let used = amount?.roundedUsed,
+                  let cap = amount?.roundedLimit
+            else { return nil }
+            return (used, cap)
+        }
+
+        var uncappedMonetaryUsed: Decimal? {
+            guard isMonetary, amount?.limit == nil else { return nil }
+            return amount?.roundedUsed
+        }
+
+        /// Monetary rows get a spend-oriented token without changing
+        /// `windowToken`, which remains the grouping key for all meters.
+        var labelToken: String {
+            guard isMonetary else { return windowToken }
+            let token = scope?.windowId ?? window?.id ?? "spend"
+            return token.prefix(1).uppercased() + token.dropFirst()
+        }
+
         /// Percent of this window still remaining, preferring explicit
         /// fractions over derived used/limit math.
         var percentRemaining: Double? {
@@ -506,7 +588,8 @@ public struct OmpUsageProbe: UsageProbe {
                 return (1 - used) * 100
             }
             if let used = amount?.used, let limit = amount?.limit, limit > 0 {
-                return (limit - used) / limit * 100
+                let fraction = (limit - used) / limit * 100
+                return NSDecimalNumber(decimal: fraction).doubleValue
             }
             return nil
         }
@@ -537,7 +620,8 @@ public struct OmpUsageProbe: UsageProbe {
         /// Display name of the metered resource when it isn't the default
         /// percent meter (e.g. "Tokens", "Requests").
         var meterName: String? {
-            guard let unit = amount?.unit, !unit.isEmpty,
+            guard !isMonetary,
+                  let unit = amount?.unit, !unit.isEmpty,
                   unit.caseInsensitiveCompare("percent") != .orderedSame
             else { return nil }
             return unit.capitalized
@@ -560,11 +644,29 @@ public struct OmpUsageProbe: UsageProbe {
     }
 
     struct LimitAmount: Decodable {
-        let used: Double?
-        let limit: Double?
+        /// Monetary fields decode as `Decimal` straight from the JSON number
+        /// token, so cent-boundary values like 1.005 never pick up binary
+        /// floating-point error before rounding.
+        let used: Decimal?
+        let limit: Decimal?
         let remaining: Double?
         let usedFraction: Double?
         let remainingFraction: Double?
         let unit: String?
+
+        var roundedUsed: Decimal? {
+            Self.roundedMoney(used)
+        }
+
+        var roundedLimit: Decimal? {
+            Self.roundedMoney(limit)
+        }
+
+        private static func roundedMoney(_ value: Decimal?) -> Decimal? {
+            guard var decimal = value else { return nil }
+            var rounded = Decimal()
+            NSDecimalRound(&rounded, &decimal, 2, .plain)
+            return rounded
+        }
     }
 }

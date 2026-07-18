@@ -27,6 +27,14 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
     /// nil for percentage-based quotas that have a known total.
     public let dollarRemaining: Decimal?
 
+    /// Dollars spent for a capped spend meter.
+    /// Co-occurs with `dollarCap`; nil for percentage and balance meters.
+    public let dollarUsed: Decimal?
+
+    /// Dollar cap for a capped spend meter.
+    /// Co-occurs with `dollarUsed`; nil for percentage and balance meters.
+    public let dollarCap: Decimal?
+
     /// Section this quota belongs to when an aggregating provider spans
     /// several upstream accounts (e.g. "Claude", "Claude · work").
     /// nil for providers whose quotas render as one flat list.
@@ -48,6 +56,8 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         resetText: String? = nil,
         windowDuration: TimeInterval? = nil,
         dollarRemaining: Decimal? = nil,
+        dollarUsed: Decimal? = nil,
+        dollarCap: Decimal? = nil,
         group: String? = nil,
         compactTitle: String? = nil
     ) {
@@ -58,6 +68,8 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         self.resetText = resetText
         self.windowDuration = windowDuration
         self.dollarRemaining = dollarRemaining
+        self.dollarUsed = dollarUsed
+        self.dollarCap = dollarCap
         self.group = group
         self.compactTitle = compactTitle
     }
@@ -90,6 +102,30 @@ public struct UsageQuota: Sendable, Equatable, Hashable, Comparable {
         guard let dollarRemaining else { return nil }
         let amount = NSDecimalNumber(decimal: dollarRemaining).doubleValue
         return String(format: "$%.2f", amount)
+    }
+
+    /// Formatted spend amount for capped monetary quotas (e.g. "$1,234.56").
+    public var formattedDollarUsed: String? {
+        formatDollars(dollarUsed, minimumFractionDigits: 2)
+    }
+
+    /// Formatted cap for capped monetary quotas (e.g. "$500").
+    public var formattedDollarCap: String? {
+        formatDollars(dollarCap, minimumFractionDigits: 0)
+    }
+
+    private func formatDollars(_ amount: Decimal?, minimumFractionDigits: Int) -> String? {
+        guard let amount else { return nil }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.usesGroupingSeparator = true
+        formatter.groupingSeparator = ","
+        formatter.decimalSeparator = "."
+        formatter.minimumFractionDigits = minimumFractionDigits
+        formatter.maximumFractionDigits = 2
+        let value = formatter.string(from: amount as NSDecimalNumber) ?? "\(amount)"
+        return "$\(value)"
     }
 
     /// Whether this quota needs attention (warning, critical, or depleted)

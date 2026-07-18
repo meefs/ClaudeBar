@@ -117,7 +117,11 @@ public struct UsageSnapshot: Sendable, Equatable {
         for metric in extensionMetrics ?? [] {
             guard let group = metric.group else { continue }
             if buckets[group] == nil, notes[group] == nil { order.append(group) }
-            notes[group] = metric.value
+            if let existing = notes[group] {
+                notes[group] = "\(existing)\n\(metric.value)"
+            } else {
+                notes[group] = metric.value
+            }
         }
 
         return order.map { key in

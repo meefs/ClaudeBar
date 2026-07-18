@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The pace tick under quota progress bars now explains itself: hovering the
   bar shows a mode-aware tooltip ("steady usage would leave ~N% remaining by
   now"), so the marker no longer reads as a misaligned rendering glitch.
+=======
+### Added
+- Claude Extra Usage now reads the current OAuth `spend` payload (with the
+  legacy `extra_usage` shape as a tolerant fallback), converts minor units with
+  exponent-aware decimal math, and renders spend as a distinct "EXTRA USAGE"
+  card with capped remaining budget or an explicit "No monthly cap" state.
+- Oh My Pi (`omp`) USD limits now render as monetary spend meters: capped rows
+  show "$X of $Y" while preserving their percentage-driven status and progress,
+  and uncapped rows become account notes such as "$X spent · no cap" instead of
+  being dropped or assigned a fabricated percentage.
+
+### Fixed
+- Grouped provider notes now accumulate in source order rather than overwriting
+  one another, so spend notes and other account notes remain visible together.
+- Claude's configured API budget now applies only to API-cost cards; it no
+  longer supplies a misleading cap for uncapped Extra Usage.
 
 ---
 

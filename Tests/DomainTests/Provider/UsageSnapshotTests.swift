@@ -449,6 +449,28 @@ struct UsageSnapshotTests {
     }
 
     @Test
+    func `group notes accumulate in first appearance order`() {
+        let quotas = [
+            UsageQuota(percentRemaining: 90, quotaType: .timeLimit("Claude 5h"), providerId: "omp", group: "Claude"),
+        ]
+        let metrics = [
+            ExtensionMetric(label: "Claude Extra Usage", value: "Extra usage $1,234.56 spent · no cap", unit: "", group: "Claude"),
+            ExtensionMetric(label: "Claude account", value: "No usage reported", unit: "", group: "Claude"),
+        ]
+        let snapshot = UsageSnapshot(
+            providerId: "omp",
+            quotas: quotas,
+            capturedAt: Date(),
+            extensionMetrics: metrics
+        )
+
+        #expect(snapshot.quotaGroups.first?.note == """
+        Extra usage $1,234.56 spent · no cap
+        No usage reported
+        """)
+    }
+
+    @Test
     func `note placement is header-inline for note-only groups and nil without a note`() {
         let noteOnly = QuotaGroup(title: "Copilot", quotas: [], note: "No usage reported")
         #expect(noteOnly.notePlacement == .headerInline("No usage reported"))
